@@ -1,0 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: #f8fafc;
+  color: #1e293b;
+  min-height: 100vh;
+}
+
+/* Score circle animation */
+@keyframes score-fill {
+  from { stroke-dashoffset: 339; }
+}
+
+.score-circle-progress {
+  animation: score-fill 1.2s ease-out forwards;
+}
+
+/* Ingredient card hover */
+.ingredient-card {
+  transition: all 0.2s ease;
+}
+.ingredient-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+/* Upload area */
+.upload-area {
+  transition: all 0.2s ease;
+  border: 2px dashed #cbd5e1;
+}
+.upload-area:hover, .upload-area.drag-over {
+  border-color: #16a34a;
+  background-color: #f0fdf4;
+}
+
+/* Pulse animation for loading */
+@keyframes pulse-ring {
+  0% { transform: scale(0.9); opacity: 1; }
+  100% { transform: scale(1.3); opacity: 0; }
+}
+.pulse-ring {
+  animation: pulse-ring 1.5s ease-out infinite;
+}
