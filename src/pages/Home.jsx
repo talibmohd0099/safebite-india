@@ -82,6 +82,7 @@ export default function Home() {
           setLoadingMessage('Looking up ingredients...');
           const analysis = await analyzeText(text.trim(), textProductName.trim());
           result = analysis.report;
+          result.ingredientsText = text.trim();
 
           // A single-ingredient search (e.g. "INS 102") isn't a real
           // product — it's already cached in the ingredients table, so
@@ -168,6 +169,7 @@ export default function Home() {
         setLoadingMessage('Looking up ingredients...');
         const analysis = await analyzeText(reviewText.trim(), reviewProductName.trim(), review.brand, review.offIngredients);
         result = analysis.report;
+        result.ingredientsText = reviewText.trim();
 
         // Same rule as text mode: a single-ingredient result isn't a
         // real product, so don't cache it as one.

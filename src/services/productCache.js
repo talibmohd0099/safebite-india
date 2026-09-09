@@ -25,7 +25,7 @@ export async function getCachedReport(lookupKey) {
 
   const { data, error } = await supabase
     .from('product_reports')
-    .select('id, scan_count, report')
+    .select('id, scan_count, report, ingredients_text')
     .eq('lookup_key', lookupKey)
     .maybeSingle();
 
@@ -38,7 +38,10 @@ export async function getCachedReport(lookupKey) {
     .eq('id', data.id)
     .then(() => {}, () => {});
 
-  return data.report;
+  // The raw label text lives in its own column, not inside the report
+  // JSON -- attach it here so callers get it the same way whether this
+  // was a fresh analysis or a cache hit.
+  return { ...data.report, ingredientsText: data.ingredients_text };
 }
 
 /**

@@ -287,6 +287,21 @@ export default function Result() {
         )}
       </div>
 
+      {/* Raw label text, for the user to cross-check against the pack */}
+      {result.ingredientsText && (
+        <div className="mb-4">
+          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">04 · As Read From The Label</p>
+          <p className="text-xs text-slate-400 mb-2 px-1">
+            Compare this against the breakdown above — if something on your actual pack isn't in here, it may have been missed during reading.
+          </p>
+          <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+            <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap break-words">
+              {result.ingredientsText}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Disclaimer */}
       <div className="bg-slate-100 rounded-xl p-3 text-xs text-slate-500 leading-relaxed">
         <strong>Disclaimer:</strong> SafeBite is an AI-powered tool for informational purposes only. 
