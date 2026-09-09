@@ -9,7 +9,7 @@ import About from './pages/About';
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen" style={{ background: 'var(--bg-grouped)' }}>
         <Header />
         <main>
           <Routes>

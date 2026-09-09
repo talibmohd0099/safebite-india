@@ -1,68 +1,55 @@
 // src/components/ScoreCircle.jsx
-// Animated circular score display
+// The score ring. Colour comes from the shared verdict scale, so the ring
+// says the same thing as the verdict word next to it.
 import { getScoreColor } from '../utils/storage';
 
 export default function ScoreCircle({ score, size = 'large' }) {
   const colors = getScoreColor(score);
-  const radius = size === 'large' ? 54 : 36;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (score / 100) * circumference;
 
-  const svgSize = size === 'large' ? 140 : 96;
-  const strokeWidth = size === 'large' ? 10 : 7;
-  const fontSize = size === 'large' ? 'text-4xl' : 'text-2xl';
-  const labelSize = size === 'large' ? 'text-sm' : 'text-xs';
+  const svgSize = size === 'large' ? 112 : 64;
+  const strokeWidth = size === 'large' ? 9 : 6;
+  const radius = svgSize / 2 - strokeWidth;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = Math.max(0, Math.min(100, score));
+  const strokeDashoffset = circumference - (clamped / 100) * circumference;
 
   return (
-    <div className="flex flex-col items-center gap-2">
-      <div className="relative" style={{ width: svgSize, height: svgSize }}>
-        <svg
-          width={svgSize}
-          height={svgSize}
-          viewBox={`0 0 ${svgSize} ${svgSize}`}
-          className="rotate-[-90deg]"
+    <div className="relative flex-shrink-0" style={{ width: svgSize, height: svgSize }}>
+      <svg width={svgSize} height={svgSize} viewBox={`0 0 ${svgSize} ${svgSize}`} className="rotate-[-90deg]">
+        <circle
+          cx={svgSize / 2}
+          cy={svgSize / 2}
+          r={radius}
+          fill="none"
+          stroke="var(--fill)"
+          strokeWidth={strokeWidth}
+        />
+        <circle
+          cx={svgSize / 2}
+          cy={svgSize / 2}
+          r={radius}
+          fill="none"
+          stroke={colors.color}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          style={{ transition: 'stroke-dashoffset 1s ease-out' }}
+        />
+      </svg>
+
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span
+          className={`${size === 'large' ? 'text-4xl' : 'text-xl'} font-bold leading-none tracking-tight`}
+          style={{ color: colors.color }}
         >
-          {/* Background circle */}
-          <circle
-            cx={svgSize / 2}
-            cy={svgSize / 2}
-            r={radius}
-            fill="none"
-            stroke="#e2e8f0"
-            strokeWidth={strokeWidth}
-          />
-          {/* Score progress */}
-          <circle
-            cx={svgSize / 2}
-            cy={svgSize / 2}
-            r={radius}
-            fill="none"
-            stroke={colors.stroke}
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffset}
-            className="score-circle-progress"
-            style={{
-              transition: 'stroke-dashoffset 1.2s ease-out',
-            }}
-          />
-        </svg>
-
-        {/* Score text in center */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={`${fontSize} font-bold ${colors.text} leading-none`}>
-            {score}
-          </span>
-          <span className="text-xs text-slate-500 font-medium">/100</span>
-        </div>
-      </div>
-
-      {/* Label below circle */}
-      <div className={`${colors.bg} ${colors.border} border px-3 py-1 rounded-full`}>
-        <span className={`${colors.text} font-semibold ${labelSize}`}>
-          {colors.label}
+          {score}
         </span>
+        {size === 'large' && (
+          <span className="text-xs mt-1" style={{ color: 'var(--label-2)' }}>
+            out of 100
+          </span>
+        )}
       </div>
     </div>
   );

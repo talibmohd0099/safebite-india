@@ -1,16 +1,45 @@
 // src/pages/Result.jsx
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { getHistoryById, updateHistoryProductName } from '../utils/storage';
+import { getHistoryById, updateHistoryProductName, getScoreColor, getIngredientSeverity } from '../utils/storage';
 import { updateProductName } from '../services/productCache';
 import ScoreCircle from '../components/ScoreCircle';
 import IngredientCard from '../components/IngredientCard';
+
+function SectionHeader({ children, action }) {
+  return (
+    <div className="flex items-end justify-between px-5 pb-1.5 pt-7">
+      <span className="text-[13px]" style={{ color: 'var(--label-2)' }}>{children}</span>
+      {action}
+    </div>
+  );
+}
+
+function Group({ children, className = '' }) {
+  return (
+    <div
+      className={`ios-group mx-4 rounded-[14px] overflow-hidden ${className}`}
+      style={{ background: 'var(--bg-card)' }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function BulletRow({ color, children }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 min-h-[44px]">
+      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
+      <span className="text-[17px] leading-snug" style={{ color: 'var(--label-1)' }}>{children}</span>
+    </div>
+  );
+}
 
 export default function Result() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [result, setResult] = useState(null);
-  const [filter, setFilter] = useState('all'); // 'all', 'harmful', 'concerning', 'safe'
+  const [filter, setFilter] = useState('all');
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
 
@@ -42,279 +71,260 @@ export default function Result() {
 
   if (!result) return null;
 
+  const score = result.overallScore || 0;
+  const scoreColors = getScoreColor(score);
   const ingredients = result.ingredients || [];
-  const harmful = ingredients.filter(i => i.status === 'harmful');
-  const concerning = ingredients.filter(i => i.status === 'concerning');
-  const safe = ingredients.filter(i => i.status === 'safe');
 
-  const filteredIngredients = filter === 'all' ? ingredients
-    : ingredients.filter(i => i.status === filter);
+  // Stats, dots and the filter all read from one severity scale, so the
+  // counts can never disagree with the colours shown next to each row.
+  const severityOf = (ing) => getIngredientSeverity(ing).label;
+  const tiers = [
+    { key: 'Harmful', label: 'Harmful', color: 'var(--v-very-poor)' },
+    { key: 'Concerning', label: 'Concerning', color: 'var(--v-poor)' },
+    { key: 'Highly processed', label: 'Processed', color: 'var(--v-moderate)' },
+    { key: 'Fine', label: 'Fine', color: 'var(--v-good)' },
+  ].map((t) => ({ ...t, count: ingredients.filter((i) => severityOf(i) === t.key).length }));
+
+  const flaggedCount = ingredients.filter((i) => ['Harmful', 'Concerning'].includes(severityOf(i))).length;
+  const filteredIngredients = filter === 'all' ? ingredients : ingredients.filter((i) => severityOf(i) === filter);
 
   const savedDate = new Date(result.savedAt).toLocaleDateString('en-IN', {
-    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
-
   const reportId = `SB-${(result.id || '').toString().slice(-8).toUpperCase()}`;
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
+    <div className="max-w-[560px] mx-auto pb-12" style={{ background: 'var(--bg-grouped)' }}>
 
-      {/* Back */}
+      {/* Nav */}
       <button
         onClick={() => navigate('/')}
-        className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-4 transition-colors"
+        className="flex items-center gap-1.5 px-4 pt-3 pb-1 text-[17px]"
+        style={{ color: 'var(--tint)' }}
       >
-        ← New scan
+        <svg viewBox="0 0 12 20" fill="none" className="w-3 h-5">
+          <path d="M10 2L2 10l8 8" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        Scan
       </button>
 
-      {/* Report Card */}
-      <div className="bg-white rounded-2xl border border-slate-200 mb-4 shadow-sm overflow-hidden">
+      {/* Title */}
+      <div className="px-5 pt-1 pb-5">
+        {result.brand && !editingName && (
+          <p className="text-[13px] font-semibold mb-0.5" style={{ color: 'var(--label-2)' }}>
+            {result.brand.toUpperCase()}
+          </p>
+        )}
 
-        {/* Letterhead */}
-        <div className="bg-slate-800 px-5 py-3 flex items-center justify-between">
+        {editingName ? (
           <div className="flex items-center gap-2">
-            <span className="text-base">🛡️</span>
-            <span className="text-white text-xs font-bold tracking-widest uppercase">SafeBite Health Report</span>
+            <input
+              type="text"
+              autoFocus
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveName();
+                if (e.key === 'Escape') setEditingName(false);
+              }}
+              placeholder="Enter product name"
+              className="flex-1 min-w-0 text-[28px] font-bold tracking-tight bg-transparent border-b-2 focus:outline-none"
+              style={{ color: 'var(--label-1)', borderColor: 'var(--tint)' }}
+            />
+            <button onClick={saveName} className="text-[17px]" style={{ color: 'var(--tint)' }} aria-label="Save name">Done</button>
           </div>
-          <div className="text-right">
-            <p className="text-slate-300 text-[11px] leading-tight">{reportId}</p>
-            <p className="text-slate-400 text-[11px] leading-tight">{savedDate}</p>
-          </div>
-        </div>
-
-        <div className="p-6 text-center">
-          {result.brand && !editingName && (
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-              {result.brand}
-            </p>
-          )}
-          {editingName ? (
-            <div className="flex items-center justify-center gap-2 mb-1.5">
-              <input
-                type="text"
-                autoFocus
-                value={nameInput}
-                onChange={(e) => setNameInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') saveName();
-                  if (e.key === 'Escape') setEditingName(false);
-                }}
-                placeholder="Enter product name"
-                className="flex-1 max-w-xs text-center text-xl font-bold text-slate-800 border-b-2 border-green-500 focus:outline-none bg-transparent"
-              />
-              <button
-                onClick={saveName}
-                className="text-green-600 hover:text-green-800 text-lg"
-                aria-label="Save name"
-              >
-                ✓
-              </button>
-              <button
-                onClick={() => setEditingName(false)}
-                className="text-slate-400 hover:text-slate-600 text-lg"
-                aria-label="Cancel"
-              >
-                ✕
-              </button>
-            </div>
-          ) : (
-            <h1 className="text-xl font-bold text-slate-800 mb-1.5 flex items-center justify-center gap-2 group">
-              {result.productName || 'Unknown Product'}
-              <button
-                onClick={startEditingName}
-                className="text-slate-300 hover:text-slate-500 text-sm transition-colors"
-                aria-label="Edit product name"
-                title="Edit product name"
-              >
-                ✏️
-              </button>
-            </h1>
-          )}
-          {result.productName === 'Unknown Product' && !editingName && (
-            <p className="text-xs text-amber-600 -mt-1 mb-4">
-              We couldn't identify this product — tap ✏️ to name it yourself.
-            </p>
-          )}
-          {result.verdict && (
-            <span className="inline-block text-xs font-bold uppercase tracking-wide text-slate-600 bg-slate-100 border border-slate-200 rounded-full px-3 py-1 mb-6">
-              Verdict: {result.verdict}
-            </span>
-          )}
-
-          <div className="flex flex-col items-center mb-6">
-            <ScoreCircle score={result.overallScore || 0} size="large" />
-            <Link
-              to="/about#how-score-works"
-              className="text-xs text-slate-400 hover:text-green-600 underline underline-offset-2 mt-2 transition-colors"
+        ) : (
+          <h1 className="text-[34px] leading-[1.1] font-bold tracking-tight flex items-start gap-2" style={{ color: 'var(--label-1)' }}>
+            <span className="min-w-0">{result.productName || 'Unknown Product'}</span>
+            <button
+              onClick={startEditingName}
+              className="text-[15px] mt-2.5 flex-shrink-0"
+              style={{ color: 'var(--tint)' }}
+              aria-label="Edit product name"
             >
-              How is this score calculated?
-            </Link>
-          </div>
+              Edit
+            </button>
+          </h1>
+        )}
 
-          {result.summary && (
-            <div className="text-left bg-slate-50 rounded-xl p-4 border border-slate-100">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Executive Summary</p>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                {result.summary}
-              </p>
-            </div>
-          )}
+        {result.productName === 'Unknown Product' && !editingName && (
+          <p className="text-[13px] mt-1.5" style={{ color: 'var(--v-poor)' }}>
+            We couldn't identify this product — tap Edit to name it yourself.
+          </p>
+        )}
+      </div>
 
-          {result.hasEstimatedQuantities && (
-            <div className="text-left bg-blue-50 border border-blue-100 rounded-xl p-3 mt-3">
-              <p className="text-xs text-blue-700 leading-relaxed">
-                ℹ️ This label doesn't state an exact percentage for every ingredient, so part of this score is a reasonable estimate rather than this product's exact measured composition.
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Credibility strip */}
-        <div className="border-t border-slate-100 bg-slate-50 px-5 py-2.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-          <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
-            <span className="text-green-600">✓</span> FSSAI cross-checked
-          </span>
-          <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
-            <span className="text-green-600">✓</span> EU/EFSA compared
-          </span>
-          <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
-            <span className="text-green-600">✓</span> AI-analyzed
-          </span>
+      {/* Score hero */}
+      <div className="mx-4 rounded-[20px] p-5 flex items-center gap-5" style={{ background: 'var(--bg-card)' }}>
+        <ScoreCircle score={score} size="large" />
+        <div className="min-w-0">
+          <p className="text-[24px] font-bold tracking-tight leading-tight" style={{ color: scoreColors.color }}>
+            {result.verdict || scoreColors.label}
+          </p>
+          <p className="text-[15px] mt-0.5" style={{ color: 'var(--label-2)' }}>
+            {ingredients.length === 0
+              ? 'No ingredients analyzed'
+              : flaggedCount === 0
+                ? `Nothing flagged across ${ingredients.length} ingredients`
+                : `${flaggedCount} of ${ingredients.length} ingredients raise a flag`}
+          </p>
+          <Link to="/about#how-score-works" className="inline-block text-[15px] mt-2" style={{ color: 'var(--tint)' }}>
+            How is this calculated?
+          </Link>
         </div>
       </div>
 
-      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">01 · Safety Breakdown</p>
-
-      {/* Stats row */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <button
-          onClick={() => setFilter(filter === 'harmful' ? 'all' : 'harmful')}
-          className={`rounded-xl border p-3 text-center transition-all ${
-            filter === 'harmful' ? 'border-red-400 bg-red-50' : 'border-slate-200 bg-white hover:border-red-300'
-          }`}
-        >
-          <div className="text-2xl font-bold text-red-600">{harmful.length}</div>
-          <div className="text-xs text-slate-500 mt-0.5">🚫 Harmful</div>
-        </button>
-        <button
-          onClick={() => setFilter(filter === 'concerning' ? 'all' : 'concerning')}
-          className={`rounded-xl border p-3 text-center transition-all ${
-            filter === 'concerning' ? 'border-yellow-400 bg-yellow-50' : 'border-slate-200 bg-white hover:border-yellow-300'
-          }`}
-        >
-          <div className="text-2xl font-bold text-yellow-600">{concerning.length}</div>
-          <div className="text-xs text-slate-500 mt-0.5">⚠️ Concerning</div>
-        </button>
-        <button
-          onClick={() => setFilter(filter === 'safe' ? 'all' : 'safe')}
-          className={`rounded-xl border p-3 text-center transition-all ${
-            filter === 'safe' ? 'border-green-400 bg-green-50' : 'border-slate-200 bg-white hover:border-green-300'
-          }`}
-        >
-          <div className="text-2xl font-bold text-green-600">{safe.length}</div>
-          <div className="text-xs text-slate-500 mt-0.5">✅ Safe</div>
-        </button>
-      </div>
-
-      {(result.flags?.length > 0 || result.positives?.length > 0 || result.recommendation) && (
-        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">02 · Key Findings</p>
-      )}
-
-      {/* Flags */}
-      {result.flags?.length > 0 && (
-        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-4">
-          <p className="text-sm font-semibold text-orange-800 mb-2">⚠️ Watch out for:</p>
-          <div className="flex flex-wrap gap-2">
-            {result.flags.map((flag, i) => (
-              <span key={i} className="bg-orange-100 text-orange-700 border border-orange-200 text-xs font-medium px-2.5 py-1 rounded-full">
-                {flag}
-              </span>
-            ))}
-          </div>
+      {result.hasEstimatedQuantities && (
+        <div className="mx-4 mt-3 rounded-[14px] px-4 py-3" style={{ background: 'var(--bg-card)' }}>
+          <p className="text-[13px] leading-relaxed" style={{ color: 'var(--label-2)' }}>
+            This label doesn't state an exact percentage for every ingredient, so part of this score is a reasonable estimate rather than the product's exact measured composition.
+          </p>
         </div>
       )}
 
-      {/* Positives */}
-      {result.positives?.length > 0 && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
-          <p className="text-sm font-semibold text-green-800 mb-2">👍 Good things:</p>
-          <div className="flex flex-wrap gap-2">
-            {result.positives.map((pos, i) => (
-              <span key={i} className="bg-green-100 text-green-700 border border-green-200 text-xs font-medium px-2.5 py-1 rounded-full">
-                {pos}
-              </span>
-            ))}
+      {/* Summary */}
+      {result.summary && (
+        <>
+          <SectionHeader>Summary</SectionHeader>
+          <Group>
+            <p className="px-4 py-3.5 text-[15px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
+              {result.summary}
+            </p>
+          </Group>
+        </>
+      )}
+
+      {/* Breakdown — also the ingredient filter */}
+      {ingredients.length > 0 && (
+        <>
+          <SectionHeader
+            action={filter !== 'all' && (
+              <button onClick={() => setFilter('all')} className="text-[13px]" style={{ color: 'var(--tint)' }}>
+                Show all
+              </button>
+            )}
+          >
+            Breakdown
+          </SectionHeader>
+          <div className="mx-4 grid grid-cols-4 gap-2">
+            {tiers.map((tier) => {
+              const active = filter === tier.key;
+              return (
+                <button
+                  key={tier.key}
+                  onClick={() => setFilter(active ? 'all' : tier.key)}
+                  className="rounded-[14px] py-3 px-1 text-center transition-colors"
+                  style={{
+                    background: active ? tier.color : 'var(--bg-card)',
+                    color: active ? '#fff' : 'var(--label-1)',
+                  }}
+                >
+                  <span className="block text-[24px] font-bold leading-none tracking-tight" style={{ color: active ? '#fff' : tier.color }}>
+                    {tier.count}
+                  </span>
+                  <span className="block text-[11px] mt-1" style={{ color: active ? '#fff' : 'var(--label-2)' }}>
+                    {tier.label}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-        </div>
+        </>
       )}
 
       {/* Recommendation */}
       {result.recommendation && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
-          <p className="text-sm font-semibold text-blue-800 mb-1">💡 Our recommendation</p>
-          <p className="text-sm text-blue-700">{result.recommendation}</p>
-        </div>
+        <>
+          <SectionHeader>Our recommendation</SectionHeader>
+          <Group>
+            <p className="px-4 py-3.5 text-[15px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
+              {result.recommendation}
+            </p>
+          </Group>
+        </>
       )}
 
-      {/* Ingredients List */}
-      <div className="mb-4">
-        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">03 · Detailed Ingredient Analysis</p>
-        <div className="flex items-center justify-between mb-1">
-          <h2 className="text-base font-bold text-slate-800">
-            Ingredient Breakdown
-          </h2>
-          {filter !== 'all' && (
-            <button
-              onClick={() => setFilter('all')}
-              className="text-xs text-green-600 hover:text-green-800 font-medium"
-            >
-              Show all
-            </button>
-          )}
-        </div>
-        <p className="text-xs text-slate-400 mb-3">
-          💡 Tap any ingredient to see what it is, its health effects, and research it further.
-        </p>
-
-        {filteredIngredients.length === 0 ? (
-          <p className="text-sm text-slate-400 text-center py-4">No ingredients in this category.</p>
-        ) : (
-          <div className="space-y-2">
-            {filteredIngredients.map((ingredient, i) => (
-              <IngredientCard key={i} ingredient={ingredient} />
+      {/* Flags */}
+      {result.flags?.length > 0 && (
+        <>
+          <SectionHeader>Watch out for</SectionHeader>
+          <Group>
+            {result.flags.map((flag, i) => (
+              <BulletRow key={i} color="var(--v-poor)">{flag}</BulletRow>
             ))}
-          </div>
-        )}
-      </div>
+          </Group>
+        </>
+      )}
 
-      {/* Raw label text, for the user to cross-check against the pack */}
-      {result.ingredientsText && (
-        <div className="mb-4">
-          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">04 · As Read From The Label</p>
-          <p className="text-xs text-slate-400 mb-2 px-1">
-            Compare this against the breakdown above — if something on your actual pack isn't in here, it may have been missed during reading.
+      {/* Positives */}
+      {result.positives?.length > 0 && (
+        <>
+          <SectionHeader>Good things</SectionHeader>
+          <Group>
+            {result.positives.map((pos, i) => (
+              <BulletRow key={i} color="var(--v-good)">{pos}</BulletRow>
+            ))}
+          </Group>
+        </>
+      )}
+
+      {/* Ingredients */}
+      <SectionHeader>
+        {filter === 'all'
+          ? `All ${ingredients.length} ingredients`
+          : `${filteredIngredients.length} ${filter.toLowerCase()}`}
+      </SectionHeader>
+      {filteredIngredients.length === 0 ? (
+        <Group>
+          <p className="px-4 py-4 text-[15px] text-center" style={{ color: 'var(--label-2)' }}>
+            None in this category.
           </p>
-          <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
-            <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap break-words">
+        </Group>
+      ) : (
+        <Group>
+          {filteredIngredients.map((ingredient, i) => (
+            <IngredientCard key={i} ingredient={ingredient} />
+          ))}
+        </Group>
+      )}
+
+      {/* Raw label */}
+      {result.ingredientsText && (
+        <>
+          <SectionHeader>As read from the label</SectionHeader>
+          <Group>
+            <p className="px-4 py-3.5 text-[13px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: 'var(--label-2)' }}>
               {result.ingredientsText}
             </p>
-          </div>
-        </div>
+          </Group>
+          <p className="px-5 pt-2 text-[13px] leading-relaxed" style={{ color: 'var(--label-3)' }}>
+            Compare this against the list above — if something on your pack isn't here, it was missed while reading the label.
+          </p>
+        </>
       )}
 
-      {/* Disclaimer */}
-      <div className="bg-slate-100 rounded-xl p-3 text-xs text-slate-500 leading-relaxed">
-        <strong>Disclaimer:</strong> SafeBite is an AI-powered tool for informational purposes only. 
-        Always consult a healthcare professional for dietary advice. Scores are based on general health guidelines and may not account for individual health conditions.
+      {/* Verification + disclaimer */}
+      <div className="px-5 pt-8 text-center">
+        <p className="text-[12px] leading-relaxed" style={{ color: 'var(--label-3)' }}>
+          Cross-checked against FSSAI and EU/EFSA standards · AI-analyzed
+        </p>
+        <p className="text-[12px] leading-relaxed mt-2" style={{ color: 'var(--label-3)' }}>
+          SafeBite is an informational tool, not medical advice. Always consult a healthcare professional for dietary guidance.
+        </p>
+        <p className="text-[12px] mt-2" style={{ color: 'var(--label-3)' }}>
+          {reportId} · {savedDate}
+        </p>
       </div>
 
-      {/* Scan again */}
-      <button
-        onClick={() => navigate('/')}
-        className="w-full mt-4 py-3.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-colors"
-      >
-        🔍 Scan Another Product
-      </button>
+      <div className="px-4 pt-6">
+        <button
+          onClick={() => navigate('/')}
+          className="w-full py-3.5 rounded-[14px] text-[17px] font-semibold text-white"
+          style={{ background: 'var(--tint)' }}
+        >
+          Scan another product
+        </button>
+      </div>
     </div>
   );
 }

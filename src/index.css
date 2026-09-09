@@ -4,15 +4,79 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Design tokens — iOS system surfaces plus a 5-step verdict ramp that
+ * matches VERDICT_TIERS in scoringEngine.js (85/65/45/25). Colours are
+ * CSS variables rather than Tailwind classes so that score/severity
+ * colours computed in JS adapt to dark mode on their own, instead of
+ * every helper having to return two class strings.
+ */
+:root {
+  color-scheme: light dark;
+
+  --bg-grouped: #f2f2f7;
+  --bg-card: #ffffff;
+  --label-1: #000000;
+  --label-2: rgba(60, 60, 67, 0.60);
+  --label-3: rgba(60, 60, 67, 0.30);
+  --separator: rgba(60, 60, 67, 0.20);
+  --fill: rgba(120, 120, 128, 0.12);
+  --tint: #007aff;
+
+  --v-very-healthy: #1e8e3e;
+  --v-good: #34c759;
+  --v-moderate: #e6a700;
+  --v-poor: #ff9500;
+  --v-very-poor: #ff3b30;
+
+  --v-very-healthy-bg: rgba(30, 142, 62, 0.12);
+  --v-good-bg: rgba(52, 199, 89, 0.12);
+  --v-moderate-bg: rgba(230, 167, 0, 0.14);
+  --v-poor-bg: rgba(255, 149, 0, 0.14);
+  --v-very-poor-bg: rgba(255, 59, 48, 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-grouped: #000000;
+    --bg-card: #1c1c1e;
+    --label-1: #ffffff;
+    --label-2: rgba(235, 235, 245, 0.60);
+    --label-3: rgba(235, 235, 245, 0.30);
+    --separator: rgba(84, 84, 88, 0.65);
+    --fill: rgba(120, 120, 128, 0.24);
+    --tint: #0a84ff;
+
+    /* Deep greens go muddy on black, so the ramp lightens rather than
+       darkens at the healthy end. */
+    --v-very-healthy: #28c94f;
+    --v-good: #5be07d;
+    --v-moderate: #ffd60a;
+    --v-poor: #ff9f0a;
+    --v-very-poor: #ff453a;
+
+    --v-very-healthy-bg: rgba(40, 201, 79, 0.18);
+    --v-good-bg: rgba(91, 224, 125, 0.16);
+    --v-moderate-bg: rgba(255, 214, 10, 0.18);
+    --v-poor-bg: rgba(255, 159, 10, 0.18);
+    --v-very-poor-bg: rgba(255, 69, 58, 0.18);
+  }
+}
+
 * {
   box-sizing: border-box;
 }
 
 body {
   font-family: 'Inter', system-ui, sans-serif;
-  background-color: #f8fafc;
-  color: #1e293b;
+  background-color: var(--bg-grouped);
+  color: var(--label-1);
   min-height: 100vh;
+}
+
+/* iOS-style grouped list: hairline dividers between rows, none at the edges. */
+.ios-group > * + * {
+  border-top: 1px solid var(--separator);
 }
 
 /* Score circle animation */

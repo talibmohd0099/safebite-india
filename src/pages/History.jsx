@@ -1,7 +1,7 @@
 // src/pages/History.jsx
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getHistory, clearHistory, deleteFromHistory, getScoreColor } from '../utils/storage';
+import { getHistory, clearHistory, deleteFromHistory } from '../utils/storage';
 import ScoreCircle from '../components/ScoreCircle';
 
 export default function History() {
@@ -56,7 +56,6 @@ export default function History() {
 
       <div className="space-y-3">
         {history.map((entry) => {
-          const colors = getScoreColor(entry.overallScore || 0);
           const date = new Date(entry.savedAt).toLocaleDateString('en-IN', {
             day: 'numeric', month: 'short', year: 'numeric'
           });

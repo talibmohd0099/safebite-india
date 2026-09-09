@@ -82,27 +82,49 @@ export function clearHistory() {
 }
 
 /**
- * Get score color class based on score value
+ * The single rating scale for the whole app. These thresholds and labels
+ * must stay identical to VERDICT_TIERS in services/scoringEngine.js —
+ * the colour IS the verdict now, so a product can't be told it's
+ * "Moderate" while being painted the colour of "Poor".
  */
+const SCORE_TIERS = [
+  { min: 85, label: 'Very Healthy', token: 'very-healthy' },
+  { min: 65, label: 'Good', token: 'good' },
+  { min: 45, label: 'Moderate', token: 'moderate' },
+  { min: 25, label: 'Poor', token: 'poor' },
+  { min: 0, label: 'Very Poor', token: 'very-poor' },
+];
+
 export function getScoreColor(score) {
-  if (score >= 75) return { text: 'text-green-600', bg: 'bg-green-100', border: 'border-green-300', stroke: '#16a34a', label: 'Healthy' };
-  if (score >= 50) return { text: 'text-yellow-600', bg: 'bg-yellow-100', border: 'border-yellow-300', stroke: '#ca8a04', label: 'Moderate' };
-  if (score >= 25) return { text: 'text-orange-600', bg: 'bg-orange-100', border: 'border-orange-300', stroke: '#ea580c', label: 'Poor' };
-  return { text: 'text-red-600', bg: 'bg-red-100', border: 'border-red-300', stroke: '#dc2626', label: 'Avoid' };
+  const tier = SCORE_TIERS.find((t) => score >= t.min) || SCORE_TIERS[SCORE_TIERS.length - 1];
+  return {
+    label: tier.label,
+    color: `var(--v-${tier.token})`,
+    bg: `var(--v-${tier.token}-bg)`,
+  };
 }
 
+// An ingredient can be perfectly legal and non-toxic and still be one of
+// the biggest things dragging a score down — refined flour, hydrolyzed
+// vegetable protein, glucose syrup. Painting those the same green as a
+// whole spice tells the user the opposite of what the score is doing, so
+// they get their own middle tier. The cutoff matches the "refined /
+// processed staples and notable concerns" band in the research prompt.
+const NOTABLE_PENALTY = 9;
+
 /**
- * Get status color/icon for an ingredient
+ * Four-tier severity for an ingredient row: harmful, concerning,
+ * nutritionally costly, or genuinely fine.
  */
-export function getIngredientStatus(status) {
-  switch (status) {
-    case 'safe':
-      return { icon: '✅', text: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200', label: 'Safe' };
-    case 'concerning':
-      return { icon: '⚠️', text: 'text-yellow-700', bg: 'bg-yellow-50', border: 'border-yellow-200', label: 'Concerning' };
-    case 'harmful':
-      return { icon: '🚫', text: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200', label: 'Harmful' };
-    default:
-      return { icon: '❓', text: 'text-gray-700', bg: 'bg-gray-50', border: 'border-gray-200', label: 'Unknown' };
+export function getIngredientSeverity(ingredient) {
+  if (ingredient?.status === 'harmful') {
+    return { label: 'Harmful', color: 'var(--v-very-poor)', bg: 'var(--v-very-poor-bg)' };
   }
+  if (ingredient?.status === 'concerning') {
+    return { label: 'Concerning', color: 'var(--v-poor)', bg: 'var(--v-poor-bg)' };
+  }
+  if ((ingredient?.penalty || 0) >= NOTABLE_PENALTY) {
+    return { label: 'Highly processed', color: 'var(--v-moderate)', bg: 'var(--v-moderate-bg)' };
+  }
+  return { label: 'Fine', color: 'var(--v-good)', bg: 'var(--v-good-bg)' };
 }
