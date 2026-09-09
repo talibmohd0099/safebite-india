@@ -93,27 +93,45 @@ export function buildReport(ingredients, { productName } = {}) {
   }
 
   const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
-  const summaryParts = [
-    `This contains ${plural(ingredients.length, 'ingredient')}: ${safe.length} safe, ${concerning.length} concerning, ${harmful.length} harmful.`,
-  ];
-  if (harmful.length > 0) {
-    summaryParts.push(
-      `Notably, it contains ${harmful.map((i) => i.name).join(', ')}, flagged as harmful.`
-    );
-  } else if (concerning.length > 0) {
-    summaryParts.push(`Main concerns: ${concerning.slice(0, 3).map((i) => i.name).join(', ')}.`);
-  } else if (ingredients.length > 0) {
-    summaryParts.push('No significant concerns were found.');
-  }
 
   return {
     productName: productName || 'Unknown Product',
     overallScore: score,
     verdict,
-    summary: summaryParts.join(' '),
+    summary: buildSummary({ verdict, harmful, concerning, ingredients, plural }),
     ingredients,
     flags,
     positives,
     recommendation: recommendationFor(score),
   };
+}
+
+// Opening line by verdict tier, used only when there's something worth
+// naming -- kept separate from `recommendation` below (the UI shows both:
+// this is the hook, that's the "what should I do" advice).
+const CONCERN_OPENERS = {
+  'Very Healthy': 'About as clean as packaged food gets, but not quite —',
+  Good: 'A solid pick overall —',
+  Moderate: 'Not the healthiest option on the shelf, but not the worst either —',
+  Poor: 'This one leans heavily processed —',
+  'Very Poor': 'This one leans heavily processed —',
+};
+
+function buildSummary({ verdict, harmful, concerning, ingredients, plural }) {
+  if (ingredients.length === 0) return 'No ingredients were found to analyze.';
+
+  if (harmful.length > 0) {
+    const names = harmful.slice(0, 3).map((i) => i.name);
+    const verb = names.length === 1 ? 'is' : 'are';
+    return `This one's a real red flag — ${names.join(', ')} ${verb} flagged as harmful, not just "something to watch."`;
+  }
+
+  if (concerning.length > 0) {
+    const names = concerning.slice(0, 3).map((i) => i.name);
+    const verb = names.length === 1 ? 'is' : 'are';
+    const opener = CONCERN_OPENERS[verdict] || 'Worth a closer look —';
+    return `${opener} ${names.join(', ')} ${verb} doing a lot of the work here instead of real ingredients.`;
+  }
+
+  return `Clean ingredient list — all ${plural(ingredients.length, 'ingredient')} check out, nothing artificial or concerning standing out.`;
 }
