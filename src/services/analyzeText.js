@@ -5,10 +5,10 @@
 // score it with plain rules. No whole-product AI call needed once
 // ingredients are known.
 
-import { parseLabel } from './ingredientParser.js';
+import { parseLabel, isBracketBalanced } from './ingredientParser.js';
 import { resolveIngredients } from './ingredientLibrary.js';
 import { buildReport } from './scoringEngine.js';
-import { generateSummary } from './geminiService.js';
+import { generateSummary, repairLabelPunctuation } from './geminiService.js';
 import { applyOffPercentEstimates } from './openFoodFacts.js';
 
 /**
@@ -24,7 +24,15 @@ import { applyOffPercentEstimates } from './openFoodFacts.js';
  * ingredients table, so caching it again as a "product" is redundant).
  */
 export async function analyzeText(rawText, productName, brand, offIngredients) {
-  const { ingredients: parsed, allergens } = parseLabel(rawText);
+  // Only for parsing -- the caller keeps showing the user their real,
+  // original scanned/typed text regardless of what happens here.
+  let textToParse = rawText;
+  if (!isBracketBalanced(rawText)) {
+    const repaired = await repairLabelPunctuation(rawText);
+    if (repaired) textToParse = repaired;
+  }
+
+  const { ingredients: parsed, allergens } = parseLabel(textToParse);
 
   if (parsed.length === 0) {
     throw new Error("Couldn't find any recognizable ingredients in that text. Please check and try again.");

@@ -11,6 +11,25 @@
 const OPENERS = '([{';
 const CLOSERS = ')]}';
 
+/**
+ * Cheap, deterministic check for "are this label's brackets actually
+ * well-formed" -- catches both a missing closer (depth never returns to
+ * zero) and a stray extra closer (depth would go negative). Used to
+ * decide whether a label needs AI punctuation repair before parsing, so
+ * that call only ever runs for the labels that actually need it.
+ */
+export function isBracketBalanced(text) {
+  let depth = 0;
+  for (const ch of text || '') {
+    if (OPENERS.includes(ch)) depth++;
+    else if (CLOSERS.includes(ch)) {
+      depth--;
+      if (depth < 0) return false;
+    }
+  }
+  return depth === 0;
+}
+
 // Words that show up as label boilerplate rather than as ingredients.
 const NOISE_PREFIXES = [
   'ingredients', 'ingredient', 'contains', 'containing', 'made from',
@@ -389,6 +408,30 @@ export function parseIngredients(labelText) {
       }
     }
 
+    // "SEASONING (ONION POWDER, MALTODEXTRIN, SUGAR, ...)" — a bracket
+    // listing multiple named items, with or without a group name in
+    // front of it (some labels wrap the whole clause in one more outer
+    // bracket, e.g. "(DEHYDRATED VEGETABLES (ONION, CARROT, ...))").
+    // Parse each sub-item as its own real ingredient and drop the
+    // generic wrapper, rather than merging them into one vague,
+    // under-researched entry -- recursing handles either shape, since a
+    // bare bracket's inner content just gets fed back through this same
+    // check on its own next pass.
+    //
+    // This has to run on the untouched `cleaned` text, before any
+    // percentage/code extraction below -- those work on the whole
+    // string and would otherwise grab the *first* "%" they find and
+    // strip it, even when it actually belongs to one specific sub-item
+    // several levels down, leaving that sub-item with no percentage by
+    // the time its own turn comes around.
+    const compound = findLastBracketGroup(cleaned);
+    if (compound && compound.inner.includes(',')) {
+      for (const subEntry of splitTopLevel(compound.inner)) {
+        processEntry(subEntry);
+      }
+      return;
+    }
+
     const { text: noPct, percentage } = extractPercentage(cleaned);
 
     // A standalone code on its own, e.g. "INS 330" or "(129)".
@@ -407,18 +450,6 @@ export function parseIngredients(labelText) {
           nameText = noPct.slice(0, bracketed.start) + noPct.slice(bracketed.end + 1);
         }
       }
-    }
-
-    // "SEASONING (ONION POWDER, MALTODEXTRIN, SUGAR, ...)" — a bracket
-    // listing multiple named items behind a group name. Parse each
-    // sub-item as its own real ingredient and drop the generic wrapper,
-    // rather than merging them into one vague, under-researched entry.
-    const compound = findLastBracketGroup(nameText);
-    if (compound && compound.inner.includes(',') && nameText.slice(0, compound.start).trim()) {
-      for (const subEntry of splitTopLevel(compound.inner)) {
-        processEntry(subEntry);
-      }
-      return;
     }
 
     let name = nameText

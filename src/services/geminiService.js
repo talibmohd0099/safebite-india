@@ -372,6 +372,56 @@ Concerning ingredients: ${concerningNames.length ? concerningNames.join(', ') : 
   }
 }
 
+const LABEL_REPAIR_PROMPT = `You are repairing a bracket-matching error in a food ingredients label (a missing or extra bracket, almost always from OCR or printing) that breaks automated parsing.
+
+Rewrite the text with correctly balanced brackets. Follow these rules strictly:
+- Do NOT add, remove, reorder, or reword any ingredient, word, or number. Every ingredient name and value must appear exactly as given.
+- Do NOT invent anything that isn't in the original text.
+- Only adjust punctuation -- brackets ( ) [ ] { }, commas, and periods -- so the structure is well-formed and each ingredient/group is clearly delimited.
+- Return ONLY the corrected text as plain text. No markdown, no explanation, no preamble.`;
+
+/**
+ * Ask Gemini to fix a label's bracket punctuation when our own
+ * deterministic bracket-counting can't (there's more than one plausible
+ * place a missing/extra bracket belongs, which needs understanding what
+ * the label means, not just counting characters). Only ever called when
+ * isBracketBalanced() has already found a real problem -- most labels
+ * never reach this, and it's a one-time cost per new product either way.
+ * Returns null on any failure so the caller parses the original text.
+ */
+export async function repairLabelPunctuation(rawText) {
+  if (!GEMINI_API_KEY) return null;
+
+  const requestBody = {
+    contents: [{ parts: [{ text: `${LABEL_REPAIR_PROMPT}\n\nText to repair:\n${rawText}` }] }],
+    generationConfig: {
+      temperature: 0,
+      topK: 1,
+      topP: 0.8,
+      maxOutputTokens: 2000,
+      thinkingConfig: { thinkingLevel: 'low' },
+    },
+  };
+
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const finishReason = data.candidates?.[0]?.finishReason;
+    if (!text || finishReason !== 'STOP') return null;
+
+    return text.trim().replace(/^```[a-z]*\n?/i, '').replace(/```$/, '').trim();
+  } catch {
+    return null;
+  }
+}
+
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
