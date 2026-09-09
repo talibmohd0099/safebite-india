@@ -1,0 +1,50 @@
+name: Scrape Blinkit
+
+# Runs the Blinkit scraper on a schedule, free of charge.
+#
+# This used to be a Netlify scheduled function firing every minute,
+# which burned through the plan's credits and got production deploys
+# paused. GitHub Actions gives public repositories unlimited minutes,
+# and a scraper doesn't need a web host anyway — it writes straight to
+# Supabase, so Netlify is no longer involved.
+#
+# Each run resumes from where the last one stopped (tracked in the
+# blinkit_seed_progress table), so the categories advance steadily
+# rather than re-scraping their opening products every time.
+
+on:
+  schedule:
+    # Every 2 hours. GitHub queues scheduled jobs on a best-effort basis,
+    # so runs can start a few minutes late — harmless here, since the
+    # cursor means nothing is lost by an irregular schedule.
+    - cron: '0 */2 * * *'
+  # Adds a "Run workflow" button on the Actions tab for running it on demand.
+  workflow_dispatch:
+    inputs:
+      per_category:
+        description: 'Products to fetch per category this run'
+        required: false
+        default: '10'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    # Well under the 6h ceiling; a normal run is roughly 25-30 minutes.
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Scrape
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+        run: node scripts/scrape-blinkit.js --all --per-category ${{ github.event.inputs.per_category || '10' }} --no-ai

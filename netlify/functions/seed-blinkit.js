@@ -29,7 +29,7 @@ import {
 
 // Flip to true to stop the job without removing its schedule. While
 // paused it still fires but does nothing — no requests, no writes.
-const BLINKIT_PAUSED = false;
+const BLINKIT_PAUSED = true;
 
 const PRODUCTS_PER_RUN = 3;
 const TIME_BUDGET_MS = 8000;  // stay well inside Netlify's execution limit

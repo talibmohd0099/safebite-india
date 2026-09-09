@@ -50,15 +50,41 @@ const PER_CATEGORY = parseInt(flag('per-category', '8'), 10);
 const DRY_RUN = has('dry-run');
 const USE_AI = !has('no-ai');
 
-async function save(products) {
+function client() {
   const url = process.env.VITE_SUPABASE_URL;
   const key = process.env.VITE_SUPABASE_ANON_KEY;
-  if (!url || !key) {
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
+
+/**
+ * Where each category got to last time, so repeated runs walk forward
+ * through a category instead of re-fetching its first few products for
+ * ever. Shares the blinkit_seed_progress table with the scheduled job.
+ */
+async function loadProgress(supabase) {
+  const { data, error } = await supabase.from('blinkit_seed_progress').select('*');
+  if (error) {
+    console.warn('Could not read progress (has blinkit_seed_progress_schema.sql been run?):', error.message);
+    return {};
+  }
+  return Object.fromEntries((data || []).map((row) => [row.category, row]));
+}
+
+async function saveProgress(supabase, rows) {
+  if (rows.length === 0) return;
+  const { error } = await supabase
+    .from('blinkit_seed_progress')
+    .upsert(rows.map((r) => ({ ...r, updated_at: new Date().toISOString() })), { onConflict: 'category' });
+  if (error) console.warn('Could not save progress:', error.message);
+}
+
+async function save(products) {
+  const supabase = client();
+  if (!supabase) {
     console.error('Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY — nothing saved.');
     return false;
   }
-
-  const supabase = createClient(url, key);
   const { error } = await supabase
     .from('blinkit_products')
     .upsert(products, { onConflict: 'brand,product_name' });
@@ -111,13 +137,39 @@ async function main() {
   let skipped = 0;
   let aiRescued = 0;
 
-  for (const sitemap of targets) {
-    const max = SCRAPE_ALL ? PER_CATEGORY : LIMIT;
-    const all = await productUrlsFrom(sitemap.url);
-    const urls = (all || []).slice(0, max);
-    if (urls.length === 0) continue;
+  // In --all mode, resume each category where the last run stopped.
+  // Without this, repeated runs would re-scrape the same opening
+  // products of every category and never reach the rest.
+  const supabase = DRY_RUN ? null : client();
+  const progress = supabase && SCRAPE_ALL ? await loadProgress(supabase) : {};
+  const progressUpdates = [];
 
-    console.log(`${sitemap.group}/${sitemap.category}`);
+  for (const sitemap of targets) {
+    const cursor = progress[sitemap.category];
+    if (SCRAPE_ALL && cursor?.exhausted) continue;
+
+    const startIndex = SCRAPE_ALL ? cursor?.next_index || 0 : 0;
+    const max = SCRAPE_ALL ? PER_CATEGORY : LIMIT;
+
+    const all = await productUrlsFrom(sitemap.url);
+    // null means the fetch failed — don't let a transient network error
+    // look like "this category is finished".
+    if (all === null) continue;
+
+    const urls = all.slice(startIndex, startIndex + max);
+    if (urls.length === 0) {
+      if (SCRAPE_ALL && startIndex >= all.length) {
+        progressUpdates.push({
+          category: sitemap.category, sitemap_url: sitemap.url,
+          next_index: startIndex, exhausted: true,
+          products_saved: cursor?.products_saved || 0,
+        });
+      }
+      continue;
+    }
+
+    console.log(`${sitemap.group}/${sitemap.category}  [${startIndex}-${startIndex + urls.length} of ${all.length}]`);
+    let savedHere = 0;
 
     for (const url of urls) {
       const result = await scrapeProduct(url, sitemap.category, { useAI: USE_AI });
@@ -129,10 +181,20 @@ async function main() {
       }
 
       collected.push(result.product);
+      savedHere++;
       if (result.viaAI) aiRescued++;
       const p = result.product;
       console.log(`   ${result.viaAI ? 'ai ' : 'ok '} ${p.brand || '?'} — ${p.product_name}`);
       console.log(`        ${p.ingredients_text.replace(/\s+/g, ' ').slice(0, 100)}…`);
+    }
+
+    if (SCRAPE_ALL) {
+      progressUpdates.push({
+        category: sitemap.category, sitemap_url: sitemap.url,
+        next_index: startIndex + urls.length,
+        exhausted: false,
+        products_saved: (cursor?.products_saved || 0) + savedHere,
+      });
     }
   }
 
@@ -146,12 +208,23 @@ async function main() {
     console.log('--dry-run: nothing written to the database.');
     return;
   }
-  if (deduped.length === 0) return;
 
-  if (await save(deduped)) {
+  if (deduped.length > 0) {
+    if (!(await save(deduped))) {
+      // Leave the cursors untouched so the next run retries these rather
+      // than skipping past products that were never stored.
+      process.exitCode = 1;
+      return;
+    }
     console.log(`Saved ${deduped.length} products to blinkit_products.`);
-  } else {
-    process.exitCode = 1;
+  }
+
+  // Advance even when nothing was saved — a stretch of products that
+  // simply don't publish ingredients must not wedge the cursor.
+  if (supabase && progressUpdates.length > 0) {
+    await saveProgress(supabase, progressUpdates);
+    const done = progressUpdates.filter((p) => p.exhausted).length;
+    console.log(`Progress updated for ${progressUpdates.length} categories${done ? ` (${done} now complete)` : ''}.`);
   }
 }
 
