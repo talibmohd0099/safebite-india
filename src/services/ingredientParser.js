@@ -118,20 +118,27 @@ export function splitTopLevel(text) {
     if (OPENERS.includes(ch)) depth++;
     else if (CLOSERS.includes(ch)) depth = Math.max(0, depth - 1);
 
+    // A period ends a sentence — but not inside a decimal like "0.03%".
+    // This check runs even at depth > 0: a missing or extra bracket
+    // somewhere earlier in the label (common in OCR'd text) can leave
+    // depth permanently stuck above 0, and without this, that one typo
+    // would swallow everything for the rest of the label into one
+    // unsplittable blob instead of just the one malformed group.
+    if (ch === '.') {
+      const prev = text[i - 1];
+      const next = text[i + 1];
+      const insideNumber = /\d/.test(prev || '') && /\d/.test(next || '');
+      if (!insideNumber) {
+        flush();
+        depth = 0;
+        continue;
+      }
+    }
+
     if (depth === 0) {
       if (ch === ',' || ch === ';' || ch === '\n' || ch === '\r' || ch === '•' || ch === '|') {
         flush();
         continue;
-      }
-      // A period ends a sentence — but not inside a decimal like "0.03%".
-      if (ch === '.') {
-        const prev = text[i - 1];
-        const next = text[i + 1];
-        const insideNumber = /\d/.test(prev || '') && /\d/.test(next || '');
-        if (!insideNumber) {
-          flush();
-          continue;
-        }
       }
       if (text.slice(i).toLowerCase().startsWith(' and ')) {
         flush();
@@ -416,7 +423,11 @@ export function parseIngredients(labelText) {
 
     let name = nameText
       .replace(/[([]\s*[)\]]/g, ' ')
-      .replace(/^[\s\-–:.]+|[\s\-–:.]+$/g, '')
+      // Leftover unmatched brackets -- from a missing/extra one earlier
+      // in a malformed label -- are just noise by this point; anything
+      // meaningful they wrapped has already been extracted above.
+      .replace(/[(){}[\]]/g, ' ')
+      .replace(/^[\s\-–:.,]+|[\s\-–:.,]+$/g, '')
       .replace(/\s+/g, ' ')
       .trim();
 
