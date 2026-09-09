@@ -145,7 +145,7 @@ async function fetchPage(searchTerm, page) {
 // Flip to false to resume. While true, the function still fires on
 // schedule (Netlify's dashboard will keep showing it as active) but does
 // nothing -- no Open Food Facts requests, no Gemini calls, no writes.
-const SEED_PAUSED = true;
+const SEED_PAUSED = false;
 
 export const handler = schedule('* * * * *', async () => {
   if (SEED_PAUSED) {
