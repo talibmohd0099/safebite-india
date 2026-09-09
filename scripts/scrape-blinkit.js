@@ -26,27 +26,15 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const SITEMAP_INDEX = 'https://blinkit.com/sitemap.xml';
-const USER_AGENT = 'Mozilla/5.0 (compatible; SafeBiteIndia/1.0; +ingredient research)';
+import {
+  FOOD_GROUPS,
+  getProductSitemaps,
+  productUrlsFrom,
+  scrapeProduct,
+  sleep,
+} from '../src/services/blinkit.js';
+
 const REQUEST_GAP_MS = 1500; // be polite; this is someone else's server
-
-const GEMINI_MODEL = 'gemini-3.1-flash-lite';
-
-// The groups worth scanning for a food-label app. The sitemap also
-// carries fashion, electronics, pet care and so on, which have nothing
-// to score.
-const FOOD_GROUPS = [
-  'atta-rice-dal',
-  'bakery-biscuits',
-  'cold-drinks-juices',
-  'dairy-breakfast',
-  'dry-fruits-masala-oil',
-  'instant-frozen-food',
-  'munchies',
-  'sauces-spreads',
-  'sweet-tooth',
-  'tea-coffee-milk-drinks',
-];
 
 const args = process.argv.slice(2);
 const flag = (name, fallback = null) => {
@@ -61,177 +49,6 @@ const LIMIT = parseInt(flag('limit', '15'), 10);
 const PER_CATEGORY = parseInt(flag('per-category', '8'), 10);
 const DRY_RUN = has('dry-run');
 const USE_AI = !has('no-ai');
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-async function fetchText(url, retries = 3) {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
-      if (res.ok) return await res.text();
-    } catch {
-      // network hiccup — fall through and retry
-    }
-    if (attempt < retries) await sleep(attempt * 1500);
-  }
-  return null;
-}
-
-/** Read a top-level JSON string field out of the embedded page data. */
-function jsonField(html, key) {
-  const match = html.match(new RegExp(`"${key}":("(?:[^"\\\\]|\\\\.)*")`));
-  if (!match) return null;
-  try {
-    return JSON.parse(match[1]);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Every labelled attribute on the page. This is the same content the
- * "View more details" button expands — it's already in the HTML, so no
- * browser or click is needed to reach it.
- */
-function allAttributes(html) {
-  const out = {};
-  const re = /"attribute_name":"([^"]+)"[^}]*?"value":("(?:[^"\\]|\\.)*")/g;
-  let m;
-  while ((m = re.exec(html)) !== null) {
-    if (out[m[1]] !== undefined) continue;
-    try {
-      const value = JSON.parse(m[2]).trim();
-      if (value) out[m[1]] = value;
-    } catch {
-      // skip anything that won't parse
-    }
-  }
-  return out;
-}
-
-const NUTRITION_FIELDS = [
-  'Energy', 'Protein', 'Total Carbohydrates', 'Added Sugar', 'Total Sugar',
-  'Total Fat', 'Saturated Fat', 'Trans Fat', 'Unsaturated Fat', 'Sodium', 'Calcium',
-];
-
-// Attributes that are logistics/tax noise rather than anything a
-// shopper would read — excluded from what Gemini gets shown.
-const NOISE_ATTRIBUTES = /gst|hsn|tax|case|polybag|guidelines|warehouse|_weight|engagement|ptr|uom|unitvalue|unittype|return type|gift wrap|packaged product|packed product|physical packaging/i;
-
-const AI_PROMPT = `You are reading the product information from an Indian grocery listing and pulling out the ingredients list, if one is present.
-
-Rules:
-- Return ONLY the ingredients list, exactly as written in the text you are given.
-- Do NOT invent, infer, complete or guess ingredients. If the text does not contain an actual ingredients list, return exactly: NONE
-- A description of the product ("refreshing cola drink", "made with real fruit") is NOT an ingredients list. Return NONE for those.
-- Do not add commentary, labels or markdown. Just the ingredients text, or NONE.`;
-
-async function extractIngredientsWithAI(productName, attributes) {
-  const apiKey = process.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) return null;
-
-  const shown = Object.entries(attributes)
-    .filter(([name]) => !NOISE_ATTRIBUTES.test(name))
-    .map(([name, value]) => `${name}: ${value}`)
-    .join('\n')
-    .slice(0, 4000);
-
-  if (!shown.trim()) return null;
-
-  const body = {
-    contents: [{ parts: [{ text: `${AI_PROMPT}\n\nProduct: ${productName}\n\n${shown}` }] }],
-    generationConfig: {
-      temperature: 0,
-      topK: 1,
-      maxOutputTokens: 1200,
-      thinkingConfig: { thinkingLevel: 'low' },
-    },
-  };
-
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-    );
-    if (!res.ok) return null;
-
-    const data = await res.json();
-    if (data.candidates?.[0]?.finishReason !== 'STOP') return null;
-
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-    if (!text || /^NONE\b/i.test(text) || text.length < 12) return null;
-    return text;
-  } catch {
-    return null;
-  }
-}
-
-async function scrapeProduct(url, category) {
-  const html = await fetchText(url);
-  if (!html) return { error: 'fetch failed' };
-
-  const productName = jsonField(html, 'product_name');
-  if (!productName) return { error: 'no product name' };
-
-  const attributes = allAttributes(html);
-  let ingredients = attributes['Ingredients'] || null;
-  let viaAI = false;
-
-  if (!ingredients && USE_AI) {
-    ingredients = await extractIngredientsWithAI(productName, attributes);
-    viaAI = Boolean(ingredients);
-  }
-
-  if (!ingredients || ingredients.length < 12) {
-    return { error: 'no ingredients listed', productName };
-  }
-
-  const nutrition = {};
-  for (const field of NUTRITION_FIELDS) {
-    if (attributes[field]) nutrition[field] = attributes[field];
-  }
-
-  return {
-    viaAI,
-    product: {
-      product_name: productName,
-      brand: jsonField(html, 'brand') || '',
-      ingredients_text: ingredients,
-      category,
-      image_url: jsonField(html, 'image_url'),
-      nutrition,
-      fssai_license: attributes['FSSAI License'] || null,
-      scraped_at: new Date().toISOString(),
-    },
-  };
-}
-
-async function getProductSitemaps() {
-  const xml = await fetchText(SITEMAP_INDEX);
-  if (!xml) throw new Error('Could not fetch the Blinkit sitemap index.');
-
-  return (xml.match(/<loc>([^<]+)<\/loc>/g) || [])
-    .map((loc) => loc.replace(/<\/?loc>/g, ''))
-    .filter((url) => url.includes('/sitemaps/products/'))
-    .map((url) => {
-      const parts = url.split('/sitemaps/products/')[1]?.split('/') || [];
-      return { url, group: parts[0] || 'unknown', category: parts[1] || parts[0] || 'unknown' };
-    });
-}
-
-async function productUrlsFrom(sitemap, max) {
-  const xml = await fetchText(sitemap.url);
-  await sleep(REQUEST_GAP_MS);
-  if (!xml) return [];
-
-  const urls = [];
-  for (const loc of xml.match(/<loc>([^<]+)<\/loc>/g) || []) {
-    const url = loc.replace(/<\/?loc>/g, '');
-    if (url.includes('/prid/')) urls.push(url);
-    if (urls.length >= max) break;
-  }
-  return urls;
-}
 
 async function save(products) {
   const url = process.env.VITE_SUPABASE_URL;
@@ -256,6 +73,11 @@ async function save(products) {
 
 async function main() {
   const sitemaps = await getProductSitemaps();
+  if (!sitemaps) {
+    console.error('Could not fetch the Blinkit sitemap index. Check your connection and try again.');
+    process.exitCode = 1;
+    return;
+  }
 
   if (has('list') || (!CATEGORY && !SCRAPE_ALL)) {
     const byGroup = {};
@@ -291,13 +113,14 @@ async function main() {
 
   for (const sitemap of targets) {
     const max = SCRAPE_ALL ? PER_CATEGORY : LIMIT;
-    const urls = await productUrlsFrom(sitemap, max);
+    const all = await productUrlsFrom(sitemap.url);
+    const urls = (all || []).slice(0, max);
     if (urls.length === 0) continue;
 
     console.log(`${sitemap.group}/${sitemap.category}`);
 
     for (const url of urls) {
-      const result = await scrapeProduct(url, sitemap.category);
+      const result = await scrapeProduct(url, sitemap.category, { useAI: USE_AI });
       await sleep(REQUEST_GAP_MS);
 
       if (result.error) {
