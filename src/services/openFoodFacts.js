@@ -41,7 +41,7 @@ export async function lookupBarcode(barcode) {
   const cleaned = barcode.trim();
   if (!cleaned) return { found: false };
 
-  const url = `${BASE_URL}/${encodeURIComponent(cleaned)}.json?fields=product_name,ingredients_text`;
+  const url = `${BASE_URL}/${encodeURIComponent(cleaned)}.json?fields=product_name,ingredients_text,brands`;
 
   let response;
   try {
@@ -62,11 +62,16 @@ export async function lookupBarcode(barcode) {
 
   const rawIngredients = data.product.ingredients_text;
   const productName = data.product.product_name || 'Unknown Product';
+  // "brands" is sometimes a messy comma-separated tag list (e.g.
+  // "Sunfeast, Sunfeast is sold by ITC Limited") -- take just the first,
+  // cleanest-looking entry.
+  const brand = data.product.brands ? data.product.brands.split(',')[0].trim() || null : null;
 
   if (!looksLikeValidIngredients(rawIngredients)) {
     return {
       found: true,
       productName,
+      brand,
       ingredientsText: '',
       readable: false,
       notes: `This product's database entry looks wrong — it has "${rawIngredients.trim()}" listed instead of real ingredients (a mix-up in the crowdsourced data, not your scan). We found the product name, but please type or paste the actual ingredients from the pack below.`,
@@ -76,6 +81,7 @@ export async function lookupBarcode(barcode) {
   return {
     found: true,
     productName,
+    brand,
     ingredientsText: rawIngredients,
   };
 }

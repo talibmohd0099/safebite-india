@@ -8,6 +8,7 @@
 import { parseLabel } from './ingredientParser.js';
 import { resolveIngredients } from './ingredientLibrary.js';
 import { buildReport } from './scoringEngine.js';
+import { generateSummary } from './geminiService.js';
 
 /**
  * Analyze raw ingredients text end to end.
@@ -21,7 +22,7 @@ import { buildReport } from './scoringEngine.js';
  * shared product cache (the ingredient itself is already cached in the
  * ingredients table, so caching it again as a "product" is redundant).
  */
-export async function analyzeText(rawText, productName) {
+export async function analyzeText(rawText, productName, brand) {
   const { ingredients: parsed, allergens } = parseLabel(rawText);
 
   if (parsed.length === 0) {
@@ -34,8 +35,25 @@ export async function analyzeText(rawText, productName) {
     throw new Error("Couldn't research these ingredients right now. Please try again.");
   }
 
-  const report = buildReport(ingredients, { productName });
+  const report = buildReport(ingredients, { productName, brand });
   report.allergens = allergens;
+
+  // Single-ingredient lookups don't need a "product" summary at all --
+  // only worth the extra call for a real multi-ingredient product.
+  if (parsed.length > 1) {
+    const aiSummary = await generateSummary({
+      productName: report.productName,
+      brand,
+      score: report.overallScore,
+      verdict: report.verdict,
+      harmfulNames: ingredients.filter((i) => i.status === 'harmful').map((i) => i.name),
+      concerningNames: ingredients.filter((i) => i.status === 'concerning').map((i) => i.name),
+      ingredientCount: ingredients.length,
+    });
+    // Falls back to the rule-based summary already on `report` if this
+    // AI call fails for any reason -- never let it break the report.
+    if (aiSummary) report.summary = aiSummary;
+  }
 
   return {
     report,

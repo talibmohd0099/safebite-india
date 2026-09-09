@@ -83,6 +83,11 @@ export default function Result() {
         </div>
 
         <div className="p-6 text-center">
+          {result.brand && !editingName && (
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+              {result.brand}
+            </p>
+          )}
           {editingName ? (
             <div className="flex items-center justify-center gap-2 mb-1.5">
               <input

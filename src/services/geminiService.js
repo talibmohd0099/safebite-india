@@ -307,6 +307,71 @@ function extractJson(text, finishReason, shape = 'object') {
   }
 }
 
+const SUMMARY_PROMPT = `You are writing the one-line "executive summary" on a food product's health report for Indian consumers.
+
+Write ONE or TWO short, natural sentences (35 words max) that:
+- React specifically to THIS product's real profile -- not a generic template. Positive, neutral, or concerned, whichever is actually true.
+- If there are concerning or harmful ingredients, name the actual ones given below (not a vague category).
+- Sound like a knowledgeable friend, not a warning label. Vary your opening every time -- never reuse the same stock phrase across different products.
+- Do NOT give diet advice or tell the reader what to do -- a separate field already covers that. Just describe what's going on with this product.
+- Do NOT invent ingredients or facts not given below.
+
+Return ONLY the sentence(s) as plain text. No quotes, no markdown, no preamble.`;
+
+/**
+ * Write a fresh, specific 1-2 sentence summary for one product. Called
+ * once per genuinely new product (the result gets cached in
+ * product_reports forever after), never per repeat scan. Returns null on
+ * any failure so the caller can fall back to the rule-based summary
+ * instead of breaking the whole report over this.
+ */
+export async function generateSummary({ productName, brand, score, verdict, harmfulNames, concerningNames, ingredientCount }) {
+  if (!GEMINI_API_KEY) return null;
+
+  const details = `Product: ${productName}${brand ? ` (brand: ${brand})` : ''}
+Score: ${score}/100 (${verdict})
+Total ingredients: ${ingredientCount}
+Harmful ingredients: ${harmfulNames.length ? harmfulNames.join(', ') : 'none'}
+Concerning ingredients: ${concerningNames.length ? concerningNames.join(', ') : 'none'}`;
+
+  const requestBody = {
+    contents: [{ parts: [{ text: `${SUMMARY_PROMPT}\n\n${details}` }] }],
+    generationConfig: {
+      // Higher than the analysis calls on purpose -- this is creative
+      // writing where varied phrasing is the point, not deterministic
+      // scoring where we want the same answer every time.
+      temperature: 0.9,
+      topK: 40,
+      topP: 0.95,
+      // Gemini's "thinking" tokens count against this budget too, and
+      // can eat 100+ tokens on their own before it writes the actual
+      // sentence -- too tight a limit here silently truncates the reply.
+      maxOutputTokens: 700,
+      thinkingConfig: { thinkingLevel: 'low' },
+    },
+  };
+
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const finishReason = data.candidates?.[0]?.finishReason;
+    // A cut-off sentence is worse than no AI summary at all -- fall back
+    // to the rule-based one rather than show a broken half-sentence.
+    if (!text || finishReason !== 'STOP') return null;
+
+    return text.trim().replace(/^["'\s]+|["'\s]+$/g, '');
+  } catch {
+    return null;
+  }
+}
+
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

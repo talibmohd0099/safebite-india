@@ -66,6 +66,15 @@ const NUTRITION_ONLY_WORDS = new Set([
   'fibre', 'fiber', 'sodium', 'calories', 'kcal', 'sugar', 'sugars', 'cholesterol',
 ]);
 
+// Open Food Facts' "brands" field is sometimes a messy comma-separated
+// tag list (e.g. "Sunfeast, Sunfeast is sold by ITC Limited") -- take
+// just the first, cleanest-looking entry as the brand to show.
+function primaryBrand(brandsField) {
+  if (!brandsField) return null;
+  const first = brandsField.split(',')[0].trim();
+  return first || null;
+}
+
 function looksLikeValidIngredients(text) {
   const cleaned = (text || '').trim();
   if (cleaned.length < 40) return false;
@@ -113,7 +122,7 @@ async function fetchPage(searchTerm, page) {
     page: String(page),
     page_size: String(OFF_PAGE_SIZE),
     countries_tags_en: 'India',
-    fields: 'product_name,ingredients_text,code',
+    fields: 'product_name,ingredients_text,code,brands',
   });
 
   // Returns null on a failed request (network error, Open Food Facts
@@ -193,7 +202,7 @@ export const handler = schedule('* * * * *', async () => {
     }
 
     try {
-      const { report } = await analyzeText(product.ingredients_text, product.product_name);
+      const { report } = await analyzeText(product.ingredients_text, product.product_name, primaryBrand(product.brands));
       await saveReport({
         lookupKey: key,
         source: 'barcode',
