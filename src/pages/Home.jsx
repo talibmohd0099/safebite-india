@@ -49,8 +49,8 @@ export default function Home() {
     handleImageSelect(file);
   };
 
-  const startReview = ({ productName, brand, ingredientsText, notes, readable, source, lookupKey }) => {
-    setReview({ notes: notes || '', readable: readable !== false, source, lookupKey, brand: brand || null });
+  const startReview = ({ productName, brand, ingredientsText, notes, readable, source, lookupKey, offIngredients }) => {
+    setReview({ notes: notes || '', readable: readable !== false, source, lookupKey, brand: brand || null, offIngredients: offIngredients || null });
     setReviewProductName(productName && productName !== 'Unknown Product' ? productName : '');
     setReviewText(ingredientsText || '');
   };
@@ -166,7 +166,7 @@ export default function Home() {
 
       if (!result) {
         setLoadingMessage('Looking up ingredients...');
-        const analysis = await analyzeText(reviewText.trim(), reviewProductName.trim(), review.brand);
+        const analysis = await analyzeText(reviewText.trim(), reviewProductName.trim(), review.brand, review.offIngredients);
         result = analysis.report;
 
         // Same rule as text mode: a single-ingredient result isn't a

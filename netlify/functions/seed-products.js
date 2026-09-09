@@ -122,7 +122,7 @@ async function fetchPage(searchTerm, page) {
     page: String(page),
     page_size: String(OFF_PAGE_SIZE),
     countries_tags_en: 'India',
-    fields: 'product_name,ingredients_text,code,brands',
+    fields: 'product_name,ingredients_text,code,brands,ingredients',
   });
 
   // Returns null on a failed request (network error, Open Food Facts
@@ -202,7 +202,7 @@ export const handler = schedule('* * * * *', async () => {
     }
 
     try {
-      const { report } = await analyzeText(product.ingredients_text, product.product_name, primaryBrand(product.brands));
+      const { report } = await analyzeText(product.ingredients_text, product.product_name, primaryBrand(product.brands), product.ingredients);
       await saveReport({
         lookupKey: key,
         source: 'barcode',

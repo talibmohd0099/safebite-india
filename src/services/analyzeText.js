@@ -9,6 +9,7 @@ import { parseLabel } from './ingredientParser.js';
 import { resolveIngredients } from './ingredientLibrary.js';
 import { buildReport } from './scoringEngine.js';
 import { generateSummary } from './geminiService.js';
+import { applyOffPercentEstimates } from './openFoodFacts.js';
 
 /**
  * Analyze raw ingredients text end to end.
@@ -22,14 +23,22 @@ import { generateSummary } from './geminiService.js';
  * shared product cache (the ingredient itself is already cached in the
  * ingredients table, so caching it again as a "product" is redundant).
  */
-export async function analyzeText(rawText, productName, brand) {
+export async function analyzeText(rawText, productName, brand, offIngredients) {
   const { ingredients: parsed, allergens } = parseLabel(rawText);
 
   if (parsed.length === 0) {
     throw new Error("Couldn't find any recognizable ingredients in that text. Please check and try again.");
   }
 
-  const { ingredients, knownCount, researchedCount } = await resolveIngredients(parsed);
+  // When we have Open Food Facts' structured per-ingredient breakdown
+  // (barcode-sourced only), fill in real percentages it estimated for
+  // ingredients the label itself doesn't state one for -- more accurate
+  // than the category-based default quantityWeight() falls back to.
+  const enrichedParsed = offIngredients?.length
+    ? applyOffPercentEstimates(parsed, offIngredients)
+    : parsed;
+
+  const { ingredients, knownCount, researchedCount } = await resolveIngredients(enrichedParsed);
 
   if (ingredients.length === 0) {
     throw new Error("Couldn't research these ingredients right now. Please try again.");

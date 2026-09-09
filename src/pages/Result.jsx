@@ -159,6 +159,14 @@ export default function Result() {
               </p>
             </div>
           )}
+
+          {result.hasEstimatedQuantities && (
+            <div className="text-left bg-blue-50 border border-blue-100 rounded-xl p-3 mt-3">
+              <p className="text-xs text-blue-700 leading-relaxed">
+                ℹ️ This label doesn't state an exact percentage for every ingredient, so part of this score is a reasonable estimate rather than this product's exact measured composition.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Credibility strip */}

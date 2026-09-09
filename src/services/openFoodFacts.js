@@ -41,7 +41,7 @@ export async function lookupBarcode(barcode) {
   const cleaned = barcode.trim();
   if (!cleaned) return { found: false };
 
-  const url = `${BASE_URL}/${encodeURIComponent(cleaned)}.json?fields=product_name,ingredients_text,brands`;
+  const url = `${BASE_URL}/${encodeURIComponent(cleaned)}.json?fields=product_name,ingredients_text,brands,ingredients`;
 
   let response;
   try {
@@ -83,5 +83,74 @@ export async function lookupBarcode(barcode) {
     productName,
     brand,
     ingredientsText: rawIngredients,
+    offIngredients: data.product.ingredients || null,
   };
+}
+
+function normalizeForMatch(str) {
+  return (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+// Open Food Facts nests sub-ingredients (e.g. "Edible Vegetable Oil" ->
+// "Palm Oil") inside the same array shape -- flatten it so matching just
+// searches one flat list instead of walking the tree by hand.
+function flattenOffIngredients(offIngredients) {
+  const flat = [];
+  const walk = (list) => {
+    for (const entry of list || []) {
+      flat.push(entry);
+      if (Array.isArray(entry.ingredients)) walk(entry.ingredients);
+    }
+  };
+  walk(offIngredients);
+  return flat;
+}
+
+// Open Food Facts' taxonomy ids for additives look like "en:e223" or
+// "en:e503ii" -- pull just the code part so it can be compared against
+// our own insCode format ("223", "503(ii)") after normalizing both.
+function insCodeFromOffId(id) {
+  if (!id || !/^en:e\d/i.test(id)) return null;
+  return id.replace(/^en:e/i, '');
+}
+
+/**
+ * Fill in `percentage` on parsed ingredients using Open Food Facts'
+ * algorithmic percent_estimate, wherever the label itself didn't state
+ * one and we can confidently match an entry against it. Never overrides
+ * a percentage already read straight off the label -- the real printed
+ * number always wins over an estimate, and a failed match just leaves
+ * the ingredient as-is rather than guessing wrong.
+ */
+export function applyOffPercentEstimates(parsedIngredients, offIngredients) {
+  const flat = flattenOffIngredients(offIngredients);
+  if (flat.length === 0) return parsedIngredients;
+
+  return parsedIngredients.map((item) => {
+    if (typeof item.percentage === 'number') return item;
+
+    let match = null;
+
+    if (item.insCode) {
+      const target = normalizeForMatch(item.insCode);
+      match = flat.find((f) => normalizeForMatch(insCodeFromOffId(f.id)) === target) || null;
+    }
+
+    if (!match) {
+      const target = normalizeForMatch(item.canonicalName);
+      if (target.length >= 3) {
+        const candidates = flat
+          .map((f) => ({
+            entry: f,
+            candidate: normalizeForMatch((f.id || '').replace(/^en:/, '').replace(/-/g, ' ')) || normalizeForMatch(f.text),
+          }))
+          .filter((c) => c.candidate.length >= 3 && (target.includes(c.candidate) || c.candidate.includes(target)))
+          .sort((a, b) => b.candidate.length - a.candidate.length); // prefer the more specific match
+        match = candidates[0]?.entry || null;
+      }
+    }
+
+    if (!match || typeof match.percent_estimate !== 'number') return item;
+    return { ...item, percentage: match.percent_estimate };
+  });
 }

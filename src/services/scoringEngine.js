@@ -25,14 +25,29 @@ function verdictFor(score) {
 const HARMFUL_SCORE_CAP = 24;   // forces the "Very Poor" tier
 const CONCERNING_SCORE_CAP = 64; // forces at most "Moderate"
 
-// When a label states an ingredient's percentage, weight its penalty by
-// how dominant it actually is in the product — a 68%-of-product ingredient
+// Categories that are, by regulatory nature, almost always dosed in
+// fractions of a percent -- nobody prints "0.01% TBHQ" on a pack, but
+// preservatives/antioxidants/flavourings/colors/emulsifiers are reliably
+// trace amounts in real products. Bulk-by-nature categories (oil, sugar,
+// flour, protein) are left at full weight since they're often genuinely
+// significant even when the label doesn't state a number.
+const TRACE_CATEGORIES = new Set([
+  'preservative', 'antioxidant', 'flavour', 'flavor', 'color', 'colorant',
+  'emulsifier', 'acidity regulator', 'raising agent', 'stabilizer',
+]);
+
+// When a label states an ingredient's percentage (or Open Food Facts'
+// algorithmic percent_estimate filled one in), weight its penalty by how
+// dominant it actually is in the product — a 68%-of-product ingredient
 // should matter far more than a trace one carrying the same per-unit
-// penalty. Unknown quantity (no % on the label) is left unweighted, since
-// guessing would be worse than not adjusting at all.
+// penalty. With no percentage at all, trace-by-nature categories default
+// to the low end of that range instead of being treated as if they were
+// as significant as an unlabeled bulk ingredient.
 function quantityWeight(ingredient) {
-  if (typeof ingredient.percentage !== 'number') return 1;
-  return 0.5 + (ingredient.percentage / 100) * 0.5; // ranges 0.5x (trace) to 1.0x (100%)
+  if (typeof ingredient.percentage === 'number') {
+    return 0.5 + (ingredient.percentage / 100) * 0.5; // ranges 0.5x (trace) to 1.0x (100%)
+  }
+  return TRACE_CATEGORIES.has((ingredient.category || '').toLowerCase()) ? 0.5 : 1;
 }
 
 function computeScore(ingredients) {
@@ -78,6 +93,15 @@ export function buildReport(ingredients, { productName, brand } = {}) {
     .slice(0, 6)
     .map((i) => i.name);
 
+  // True whenever at least one ingredient that actually affects the
+  // score has no real percentage behind it (neither stated on the label
+  // nor filled in from Open Food Facts) -- its weight came from the
+  // category-based default above, not this specific product's real
+  // composition. Shown to the user as a transparency note.
+  const hasEstimatedQuantities = ingredients.some(
+    (i) => typeof i.percentage !== 'number' && (i.penalty || 0) > 0
+  );
+
   const positives = [];
   if (ingredients.length > 0 && harmful.length === 0) positives.push('No FSSAI-banned ingredients');
   if (ingredients.some((i) => i.category)) {
@@ -104,6 +128,7 @@ export function buildReport(ingredients, { productName, brand } = {}) {
     flags,
     positives,
     recommendation: recommendationFor(score),
+    hasEstimatedQuantities,
   };
 }
 
