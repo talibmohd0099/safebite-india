@@ -67,6 +67,9 @@ const ALLERGEN_WORDS = [
   'egg', 'eggs', 'fish', 'shellfish', 'crustacean', 'gluten', 'sesame',
   'mustard', 'celery', 'sulphite', 'sulphites', 'sulfite', 'sulfites',
   'lupin', 'molluscs', 'cashew', 'almond', 'almonds',
+  // Other gluten-bearing cereals, which "may contain" warnings list
+  // alongside wheat just as often as wheat itself.
+  'barley', 'oats', 'rye',
 ];
 
 /**
@@ -275,9 +278,12 @@ function extractAllergens(text) {
   const allergens = [];
   let remaining = text;
 
-  // Stop the clause at the next "contains" so an earlier non-allergen
+  // Stop the clause at the next trigger word so an earlier non-allergen
   // "CONTAINS ADDED FLAVOUR (...)" doesn't swallow the real allergen line.
-  const re = /\bcontains\b\s*:?\s*((?:(?!\bcontains\b)[^.\n\r])*)/gi;
+  // "May contain" (trace/cross-contamination warnings) is just as common
+  // on Indian labels as "contains" itself, so both are matched.
+  const TRIGGER = '(?:may\\s+(?:also\\s+)?contain|contains?)';
+  const re = new RegExp(`\\b${TRIGGER}\\b\\s*:?\\s*((?:(?!\\b${TRIGGER}\\b)[^.\\n\\r])*)`, 'gi');
   let match;
   const toRemove = [];
 
@@ -319,13 +325,12 @@ export function parseLabel(labelText) {
  * Parse a full ingredients label into individual ingredients.
  *
  * Returns [{ displayName, canonicalName, lookupKeys, insCode, percentage,
- * subIngredients, categoryHint }] with duplicates removed, in label order
- * (which matters — labels list ingredients by descending quantity).
+ * categoryHint }] with duplicates removed, in label order (which matters
+ * — labels list ingredients by descending quantity).
  */
 export function parseIngredients(labelText) {
   if (!labelText || !labelText.trim()) return [];
 
-  const entries = splitTopLevel(labelText);
   const out = [];
   const seen = new Set();
 
@@ -335,10 +340,18 @@ export function parseIngredients(labelText) {
     out.push(item);
   };
 
-  for (const rawEntry of entries) {
+  // Handles one top-level entry, recursing when it turns out to be a
+  // named blend/group whose bracket lists several real ingredients
+  // (e.g. "SEASONING (ONION POWDER, MALTODEXTRIN, SUGAR, ...)") rather
+  // than one thing's chemical makeup. Those sub-items are genuine,
+  // independently-scoreable ingredients -- often the ones that actually
+  // matter (sugar, flavour enhancers, HVP) -- so they get parsed as
+  // their own entries instead of being hidden inside a generic wrapper
+  // name that never gets researched with any awareness of what's in it.
+  const processEntry = (rawEntry) => {
     // A standalone footnote like "#(D-GLUCOSE, LEVULOSE)" explains an
     // ingredient listed above — it isn't an ingredient in its own right.
-    if (/^\s*[#*†‡^]/.test(rawEntry)) continue;
+    if (/^\s*[#*†‡^]/.test(rawEntry)) return;
 
     // Tidy up spacing labels often have inside brackets: "(MAIDA )" -> "(MAIDA)"
     const entry = rawEntry
@@ -346,7 +359,7 @@ export function parseIngredients(labelText) {
       .replace(/([([{])\s+/g, '$1')
       .replace(/\s+([)\]}])/g, '$1');
     const cleaned = stripNoisePrefix(entry);
-    if (!cleaned) continue;
+    if (!cleaned) return;
 
     // "RAISING AGENTS [INS 503(ii), 500(ii)]" -> one entry per code.
     const bracket = findLastBracketGroup(cleaned);
@@ -365,7 +378,7 @@ export function parseIngredients(labelText) {
             categoryHint,
           });
         }
-        continue;
+        return;
       }
     }
 
@@ -389,17 +402,16 @@ export function parseIngredients(labelText) {
       }
     }
 
-    // "INVERT SUGAR SYRUP [SUGAR, CITRIC ACID]" — the bracket lists what
-    // the ingredient is made of. Keep the ingredient name for matching and
-    // record its components separately, rather than mangling them together.
-    let subIngredients = [];
+    // "SEASONING (ONION POWDER, MALTODEXTRIN, SUGAR, ...)" — a bracket
+    // listing multiple named items behind a group name. Parse each
+    // sub-item as its own real ingredient and drop the generic wrapper,
+    // rather than merging them into one vague, under-researched entry.
     const compound = findLastBracketGroup(nameText);
     if (compound && compound.inner.includes(',') && nameText.slice(0, compound.start).trim()) {
-      subIngredients = compound.inner
-        .split(',')
-        .map((s) => s.trim().toLowerCase())
-        .filter(Boolean);
-      nameText = nameText.slice(0, compound.start) + nameText.slice(compound.end + 1);
+      for (const subEntry of splitTopLevel(compound.inner)) {
+        processEntry(subEntry);
+      }
+      return;
     }
 
     let name = nameText
@@ -409,11 +421,11 @@ export function parseIngredients(labelText) {
       .trim();
 
     if (!name && insCode) name = `INS ${insCode}`;
-    if (!name) continue;
-    if (name.replace(/[^a-z]/gi, '').length < 2) continue;   // OCR noise
+    if (!name) return;
+    if (name.replace(/[^a-z]/gi, '').length < 2) return;   // OCR noise
     // A numeric INS code is already validated by its own pattern; a bare
     // name is not, so reject anything that reads like a typed sentence.
-    if (!insCode && !looksLikeIngredientName(name)) continue;
+    if (!insCode && !looksLikeIngredientName(name)) return;
 
     const canonicalName = normalizeName(name);
     add({
@@ -422,9 +434,12 @@ export function parseIngredients(labelText) {
       lookupKeys: buildLookupKeys(name, insCode),
       insCode,
       percentage,
-      subIngredients,
       categoryHint: null,
     });
+  };
+
+  for (const rawEntry of splitTopLevel(labelText)) {
+    processEntry(rawEntry);
   }
 
   return out;
