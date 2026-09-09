@@ -133,7 +133,17 @@ async function fetchPage(searchTerm, page) {
   }
 }
 
+// Flip to false to resume. While true, the function still fires on
+// schedule (Netlify's dashboard will keep showing it as active) but does
+// nothing -- no Open Food Facts requests, no Gemini calls, no writes.
+const SEED_PAUSED = true;
+
 export const handler = schedule('* * * * *', async () => {
+  if (SEED_PAUSED) {
+    console.log('[seed] Paused -- set SEED_PAUSED to false in netlify/functions/seed-products.js to resume.');
+    return { statusCode: 200 };
+  }
+
   if (!isSupabaseConfigured) {
     console.error('[seed] Supabase is not configured -- set VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY in Netlify env vars.');
     return { statusCode: 200 };
