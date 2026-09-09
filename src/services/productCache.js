@@ -16,6 +16,40 @@ export function textKey(ingredientsText) {
 }
 
 /**
+ * Find already-analyzed products by name, for the search suggestions.
+ * These are free and instant to open (the report is already saved), so
+ * they're worth showing above live database results.
+ */
+export async function searchCachedProducts(query, { limit = 5 } = {}) {
+  if (!isSupabaseConfigured) return [];
+
+  const cleaned = (query || '').trim();
+  if (cleaned.length < 2) return [];
+
+  // Escape LIKE wildcards so a typed "%" searches for a literal "%"
+  // instead of silently matching everything.
+  const pattern = `%${cleaned.replace(/[\\%_]/g, '\\$&')}%`;
+
+  const { data, error } = await supabase
+    .from('product_reports')
+    .select('lookup_key, product_name, report')
+    .ilike('product_name', pattern)
+    .limit(limit);
+
+  if (error || !data) return [];
+
+  return data
+    .filter((row) => row.product_name)
+    .map((row) => ({
+      lookupKey: row.lookup_key,
+      productName: row.product_name,
+      brand: row.report?.brand || null,
+      score: typeof row.report?.overallScore === 'number' ? row.report.overallScore : null,
+      verdict: row.report?.verdict || null,
+    }));
+}
+
+/**
  * Look up a cached report by its key. Returns null on a cache miss,
  * on error, or if Supabase isn't configured yet — callers should treat
  * null the same as "no cache, go ahead and call the AI".

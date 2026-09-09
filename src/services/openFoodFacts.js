@@ -4,6 +4,7 @@
 // the product is already known. No API key needed.
 
 const BASE_URL = 'https://world.openfoodfacts.org/api/v2/product';
+const SEARCH_URL = 'https://world.openfoodfacts.org/cgi/search.pl';
 
 // Being crowdsourced, some Open Food Facts entries have nutrition facts
 // (energy, protein, etc.) mistakenly saved in the ingredients field
@@ -85,6 +86,71 @@ export async function lookupBarcode(barcode) {
     ingredientsText: rawIngredients,
     offIngredients: data.product.ingredients || null,
   };
+}
+
+/**
+ * Search Indian products by name, for the type-ahead suggestions on the
+ * home screen. Only returns products we can actually analyze — an entry
+ * with no usable ingredients list would just dead-end the user after
+ * they picked it, so it's filtered out here rather than shown.
+ */
+export async function searchProductsByName(query, { limit = 8 } = {}) {
+  const cleaned = (query || '').trim();
+  if (cleaned.length < 2) return [];
+
+  const params = new URLSearchParams({
+    search_terms: cleaned,
+    search_simple: '1',
+    action: 'process',
+    json: '1',
+    page_size: '24',
+    countries_tags_en: 'India',
+    fields: 'code,product_name,brands,ingredients_text,ingredients',
+  });
+
+  // This endpoint returns intermittent 503s under load — the identical
+  // query often succeeds moments later. One quick retry absorbs most of
+  // them; more than that would make the type-ahead feel sluggish.
+  let response = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 400));
+    try {
+      response = await fetch(`${SEARCH_URL}?${params.toString()}`);
+    } catch {
+      throw new Error('Could not reach the product database. Check your connection and try again.');
+    }
+    if (response.ok) break;
+  }
+  if (!response?.ok) {
+    throw new Error('Product search is busy right now. Try again in a moment.');
+  }
+
+  const data = await response.json();
+  const results = [];
+  const seen = new Set();
+
+  for (const p of data?.products || []) {
+    if (results.length >= limit) break;
+    if (!p.code || !p.product_name?.trim()) continue;
+    if (!p.ingredients_text || !looksLikeValidIngredients(p.ingredients_text)) continue;
+
+    // Open Food Facts carries a lot of near-duplicate entries for the
+    // same product — collapse them so the list isn't three identical rows.
+    const name = p.product_name.trim();
+    const dedupeKey = `${name.toLowerCase()}|${(p.brands || '').toLowerCase()}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+
+    results.push({
+      code: p.code,
+      productName: name,
+      brand: p.brands ? p.brands.split(',')[0].trim() || null : null,
+      ingredientsText: p.ingredients_text,
+      offIngredients: p.ingredients || null,
+    });
+  }
+
+  return results;
 }
 
 function normalizeForMatch(str) {

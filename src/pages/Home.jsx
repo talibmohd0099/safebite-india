@@ -1,21 +1,25 @@
 // src/pages/Home.jsx
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { extractIngredientsFromImage } from '../services/geminiService';
 import { analyzeText } from '../services/analyzeText';
-import { lookupBarcode } from '../services/openFoodFacts';
-import { getCachedReport, saveReport, barcodeKey, textKey } from '../services/productCache';
+import { lookupBarcode, searchProductsByName } from '../services/openFoodFacts';
+import { getCachedReport, saveReport, barcodeKey, textKey, searchCachedProducts } from '../services/productCache';
 import { saveToHistory } from '../utils/storage';
 import LoadingScreen from '../components/LoadingScreen';
 
 export default function Home() {
-  const [mode, setMode] = useState('text'); // 'text' | 'image' | 'barcode'
+  const [mode, setMode] = useState('search'); // 'search' | 'text' | 'image' | 'barcode'
   const [text, setText] = useState('');
   const [textProductName, setTextProductName] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [barcodeInput, setBarcodeInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [suggestions, setSuggestions] = useState({ cached: [], off: [] });
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Analyzing ingredients...');
   const [error, setError] = useState('');
@@ -27,6 +31,102 @@ export default function Home() {
   const [review, setReview] = useState(null); // { productName, ingredientsText, notes, readable }
   const [reviewText, setReviewText] = useState('');
   const [reviewProductName, setReviewProductName] = useState('');
+
+  // Type-ahead search. Debounced so a fast typist doesn't fire a request
+  // per keystroke, and cancellable so a slow earlier response can't
+  // overwrite the results for what the user has since typed.
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setSuggestions({ cached: [], off: [] });
+      setSearching(false);
+      setSearchError('');
+      return;
+    }
+
+    setSearching(true);
+    let cancelled = false;
+
+    const timer = setTimeout(async () => {
+      let offFailed = '';
+      const [cached, off] = await Promise.all([
+        searchCachedProducts(q).catch(() => []),
+        searchProductsByName(q).catch((err) => {
+          offFailed = err.message;
+          return [];
+        }),
+      ]);
+
+      if (cancelled) return;
+
+      // Don't offer a fresh lookup for something already analyzed —
+      // it'd just be a slower duplicate of the row right above it.
+      const cachedKeys = new Set(cached.map((c) => c.lookupKey));
+      setSuggestions({
+        cached,
+        off: off.filter((o) => !cachedKeys.has(barcodeKey(o.code))),
+      });
+      setSearchError(cached.length === 0 ? offFailed : '');
+      setSearching(false);
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchQuery]);
+
+  const openCachedSuggestion = async (item) => {
+    setError('');
+    setLoading(true);
+    setLoadingMessage('Loading saved report...');
+    try {
+      const cached = await getCachedReport(item.lookupKey);
+      if (!cached) {
+        setError("Couldn't load that saved report. Try another result, or paste the ingredients instead.");
+        setLoading(false);
+        return;
+      }
+      cached.lookupKey = item.lookupKey;
+      const id = saveToHistory(cached, 'search');
+      navigate(`/result/${id}`);
+    } catch (err) {
+      setError(err.message || 'Something went wrong. Please try again.');
+      setLoading(false);
+    }
+  };
+
+  const openSearchResult = async (item) => {
+    setError('');
+    const key = barcodeKey(item.code);
+    setLoading(true);
+    setLoadingMessage('Checking cache...');
+    try {
+      const cached = await getCachedReport(key);
+      if (cached) {
+        cached.lookupKey = key;
+        const id = saveToHistory(cached, 'search');
+        navigate(`/result/${id}`);
+        return;
+      }
+
+      // Never analyzed before — hand off to the same review step the
+      // barcode flow uses, so the ingredients get checked against the
+      // real pack before we score anything.
+      startReview({
+        productName: item.productName,
+        brand: item.brand,
+        ingredientsText: item.ingredientsText,
+        offIngredients: item.offIngredients,
+        source: 'barcode',
+        lookupKey: key,
+      });
+      setLoading(false);
+    } catch (err) {
+      setError(err.message || 'Something went wrong. Please try again.');
+      setLoading(false);
+    }
+  };
 
   const handleImageSelect = (file) => {
     if (!file?.type.startsWith('image/')) {
@@ -285,43 +385,108 @@ export default function Home() {
           Is your food <span className="text-green-600">actually safe?</span>
         </h1>
         <p className="text-slate-500 text-base max-w-md mx-auto">
-          Upload a food label or paste ingredients — get an instant health score with plain-English explanation.
+          Search a product by name, or paste its ingredients — get an instant health score with plain-English explanation.
         </p>
       </div>
 
       {/* Mode Toggle */}
       <div className="flex bg-slate-100 rounded-xl p-1 mb-6">
-        <button
-          onClick={() => { setMode('text'); setError(''); }}
-          className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-            mode === 'text'
-              ? 'bg-white text-green-700 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          📝 Paste
-        </button>
-        <button
-          onClick={() => { setMode('image'); setError(''); }}
-          className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-            mode === 'image'
-              ? 'bg-white text-green-700 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          📷 Photo
-        </button>
-        <button
-          onClick={() => { setMode('barcode'); setError(''); }}
-          className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-            mode === 'barcode'
-              ? 'bg-white text-green-700 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          🔢 Barcode
-        </button>
+        {[
+          { id: 'search', label: '🔍 Search' },
+          { id: 'text', label: '📝 Paste' },
+          { id: 'image', label: '📷 Photo' },
+          { id: 'barcode', label: '🔢 Barcode' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => { setMode(tab.id); setError(''); }}
+            className={`flex-1 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+              mode === tab.id
+                ? 'bg-white text-green-700 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
+
+      {/* Search Mode */}
+      {mode === 'search' && (
+        <div className="mb-4">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
+            Search for a product by name:
+          </label>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="e.g. Maggi, Parle-G, Aloo Bhujia"
+            autoComplete="off"
+            className="w-full p-4 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder:text-slate-400"
+          />
+
+          {searching && (
+            <p className="text-xs text-slate-400 mt-2 px-1">Searching…</p>
+          )}
+
+          {!searching && searchError && suggestions.cached.length === 0 && suggestions.off.length === 0 && (
+            <p className="text-xs text-amber-600 mt-2 px-1">{searchError}</p>
+          )}
+
+          {!searching && !searchError && searchQuery.trim().length >= 2 &&
+            suggestions.cached.length === 0 && suggestions.off.length === 0 && (
+            <p className="text-xs text-slate-400 mt-2 px-1">
+              No products found with a readable ingredients list. Try a different spelling, or use Paste / Photo to enter the ingredients yourself.
+            </p>
+          )}
+
+          {(suggestions.cached.length > 0 || suggestions.off.length > 0) && (
+            <div className="mt-2 border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 bg-white">
+              {suggestions.cached.map((item) => (
+                <button
+                  key={item.lookupKey}
+                  onClick={() => openCachedSuggestion(item)}
+                  className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center justify-between gap-3"
+                >
+                  <span className="min-w-0">
+                    {item.brand && (
+                      <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        {item.brand}
+                      </span>
+                    )}
+                    <span className="block text-sm text-slate-700 truncate">{item.productName}</span>
+                  </span>
+                  {typeof item.score === 'number' && (
+                    <span className="flex-shrink-0 text-xs font-bold text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
+                      {item.score}/100
+                    </span>
+                  )}
+                </button>
+              ))}
+
+              {suggestions.off.map((item) => (
+                <button
+                  key={item.code}
+                  onClick={() => openSearchResult(item)}
+                  className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
+                >
+                  {item.brand && (
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      {item.brand}
+                    </span>
+                  )}
+                  <span className="block text-sm text-slate-700 truncate">{item.productName}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <p className="text-xs text-slate-400 mt-2">
+            Results come from a free open product database. Products already scored show their score instantly — the rest you'll get to check before analyzing.
+          </p>
+        </div>
+      )}
 
       {/* Text Mode */}
       {mode === 'text' && (
@@ -422,14 +587,16 @@ export default function Home() {
         </div>
       )}
 
-      {/* Analyze Button */}
-      <button
-        onClick={handleAnalyze}
-        disabled={loading}
-        className="w-full py-4 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-base rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-green-200"
-      >
-        {mode === 'barcode' ? '🔍 Look Up Product' : '🔍 Analyze Ingredients'}
-      </button>
+      {/* Analyze Button — search mode acts on picking a result instead */}
+      {mode !== 'search' && (
+        <button
+          onClick={handleAnalyze}
+          disabled={loading}
+          className="w-full py-4 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-base rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-green-200"
+        >
+          {mode === 'barcode' ? '🔍 Look Up Product' : '🔍 Analyze Ingredients'}
+        </button>
+      )}
 
       {/* How it works */}
       <div className="mt-10">
