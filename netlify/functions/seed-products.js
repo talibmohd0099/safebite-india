@@ -116,15 +116,20 @@ async function fetchPage(searchTerm, page) {
     fields: 'product_name,ingredients_text,code',
   });
 
+  // Returns null on a failed request (network error, Open Food Facts
+  // temporarily down) so the caller can tell that apart from a real
+  // "zero results" response -- otherwise a transient hiccup gets
+  // mistaken for "nothing left here" and permanently marks the company
+  // exhausted after one bad network moment.
   try {
     const response = await fetch(`${OFF_SEARCH_URL}?${params.toString()}`, {
       headers: { 'User-Agent': OFF_USER_AGENT },
     });
-    if (!response.ok) return [];
+    if (!response.ok) return null;
     const data = await response.json();
-    return data?.products || [];
+    return data?.products ?? null;
   } catch {
-    return [];
+    return null;
   }
 }
 
@@ -144,6 +149,11 @@ export const handler = schedule('* * * * *', async () => {
   }
 
   const products = await fetchPage(target.searchTerm, progress.next_page);
+
+  if (products === null) {
+    console.warn(`[seed] ${target.company}: Open Food Facts request failed this run -- will retry page ${progress.next_page} next time.`);
+    return { statusCode: 200 };
+  }
 
   if (products.length === 0) {
     await saveProgress({ ...progress, exhausted: true });
