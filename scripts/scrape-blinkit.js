@@ -98,6 +98,16 @@ async function save(products) {
 }
 
 async function main() {
+  // Check credentials before scraping anything. Discovering this at the
+  // save step instead means throwing away a full run's work — which is
+  // exactly what happened to the first four scheduled runs.
+  if (!DRY_RUN && !client()) {
+    console.error('Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY.');
+    console.error('Set them as repository secrets (Settings -> Secrets and variables -> Actions), or use --dry-run.');
+    process.exitCode = 1;
+    return;
+  }
+
   const sitemaps = await getProductSitemaps();
   if (!sitemaps) {
     console.error('Could not fetch the Blinkit sitemap index. Check your connection and try again.');
