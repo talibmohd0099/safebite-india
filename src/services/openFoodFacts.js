@@ -42,7 +42,7 @@ export async function lookupBarcode(barcode) {
   const cleaned = barcode.trim();
   if (!cleaned) return { found: false };
 
-  const url = `${BASE_URL}/${encodeURIComponent(cleaned)}.json?fields=product_name,ingredients_text,brands,ingredients`;
+  const url = `${BASE_URL}/${encodeURIComponent(cleaned)}.json?fields=product_name,ingredients_text,brands,ingredients,image_front_url`;
 
   let response;
   try {
@@ -67,12 +67,14 @@ export async function lookupBarcode(barcode) {
   // "Sunfeast, Sunfeast is sold by ITC Limited") -- take just the first,
   // cleanest-looking entry.
   const brand = data.product.brands ? data.product.brands.split(',')[0].trim() || null : null;
+  const imageUrl = data.product.image_front_url || null;
 
   if (!looksLikeValidIngredients(rawIngredients)) {
     return {
       found: true,
       productName,
       brand,
+      imageUrl,
       ingredientsText: '',
       readable: false,
       notes: `This product's database entry looks wrong — it has "${rawIngredients.trim()}" listed instead of real ingredients (a mix-up in the crowdsourced data, not your scan). We found the product name, but please type or paste the actual ingredients from the pack below.`,
@@ -83,6 +85,7 @@ export async function lookupBarcode(barcode) {
     found: true,
     productName,
     brand,
+    imageUrl,
     ingredientsText: rawIngredients,
     offIngredients: data.product.ingredients || null,
   };
@@ -105,7 +108,7 @@ export async function searchProductsByName(query, { limit = 8 } = {}) {
     json: '1',
     page_size: '24',
     countries_tags_en: 'India',
-    fields: 'code,product_name,brands,ingredients_text,ingredients',
+    fields: 'code,product_name,brands,ingredients_text,ingredients,image_front_url',
   });
 
   // This endpoint returns intermittent 503s under load — the identical
@@ -145,6 +148,7 @@ export async function searchProductsByName(query, { limit = 8 } = {}) {
       code: p.code,
       productName: name,
       brand: p.brands ? p.brands.split(',')[0].trim() || null : null,
+      imageUrl: p.image_front_url || null,
       ingredientsText: p.ingredients_text,
       offIngredients: p.ingredients || null,
     });

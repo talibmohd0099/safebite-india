@@ -165,7 +165,7 @@ async function discoverPage(searchTerm, page) {
 
 /** Detail: the actual ingredients for one product, by barcode. */
 async function fetchProductDetail(code) {
-  const params = new URLSearchParams({ fields: 'product_name,ingredients_text,code,brands,ingredients' });
+  const params = new URLSearchParams({ fields: 'product_name,ingredients_text,code,brands,ingredients,image_front_url' });
   const data = await fetchJsonWithRetries(`${OFF_DETAIL_URL}/${encodeURIComponent(code)}.json?${params.toString()}`, OFF_DETAIL_RETRIES);
   return data?.product ?? null;
 }
@@ -221,7 +221,7 @@ class TransientGeminiFailureSignal extends StopRunSignal {}
 async function analyzeWithRetry(product, companyName) {
   for (let attempt = 1; attempt <= RATE_LIMIT_RETRIES; attempt++) {
     try {
-      const { report } = await analyzeText(product.ingredients_text, product.product_name, primaryBrand(product.brands), product.ingredients);
+      const { report } = await analyzeText(product.ingredients_text, product.product_name, primaryBrand(product.brands), product.ingredients, product.image_front_url);
       return report;
     } catch (err) {
       if (isTransientGeminiError(err)) {

@@ -22,6 +22,7 @@
   --separator: rgba(60, 60, 67, 0.20);
   --fill: rgba(120, 120, 128, 0.12);
   --tint: #007aff;
+  --tint-bg: rgba(0, 122, 255, 0.12);
 
   --v-very-healthy: #1e8e3e;
   --v-good: #34c759;
@@ -46,6 +47,7 @@
     --separator: rgba(84, 84, 88, 0.65);
     --fill: rgba(120, 120, 128, 0.24);
     --tint: #0a84ff;
+    --tint-bg: rgba(10, 132, 255, 0.18);
 
     /* Deep greens go muddy on black, so the ramp lightens rather than
        darkens at the healthy end. */

@@ -23,7 +23,7 @@ import { applyOffPercentEstimates } from './openFoodFacts.js';
  * shared product cache (the ingredient itself is already cached in the
  * ingredients table, so caching it again as a "product" is redundant).
  */
-export async function analyzeText(rawText, productName, brand, offIngredients) {
+export async function analyzeText(rawText, productName, brand, offIngredients, imageUrl) {
   // Only for parsing -- the caller keeps showing the user their real,
   // original scanned/typed text regardless of what happens here.
   let textToParse = rawText;
@@ -52,7 +52,7 @@ export async function analyzeText(rawText, productName, brand, offIngredients) {
     throw new Error("Couldn't research these ingredients right now. Please try again.");
   }
 
-  const report = buildReport(ingredients, { productName, brand });
+  const report = buildReport(ingredients, { productName, brand, imageUrl });
   report.allergens = allergens;
 
   // Single-ingredient lookups don't need a "product" summary at all --

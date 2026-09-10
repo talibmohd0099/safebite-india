@@ -5,6 +5,7 @@ import { getHistoryById, updateHistoryProductName, getScoreColor, getIngredientS
 import { updateProductName } from '../services/productCache';
 import ScoreCircle from '../components/ScoreCircle';
 import IngredientCard from '../components/IngredientCard';
+import ProductImage from '../components/ProductImage';
 
 function SectionHeader({ children, action }) {
   return (
@@ -26,11 +27,24 @@ function Group({ children, className = '' }) {
   );
 }
 
-function BulletRow({ color, children }) {
+// A compact card for "Watch out for" / "Good things" -- sized to sit
+// side by side so both read in one glance instead of two separate
+// full-width scrolls.
+function ListCard({ title, dotColor, items }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3 min-h-[44px]">
-      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
-      <span className="text-[17px] leading-snug" style={{ color: 'var(--label-1)' }}>{children}</span>
+    <div className="rounded-[14px] p-3.5" style={{ background: 'var(--bg-card)' }}>
+      <p className="flex items-center gap-1.5 text-[14px] font-semibold mb-2.5" style={{ color: 'var(--label-1)' }}>
+        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: dotColor }} />
+        {title}
+      </p>
+      <ul className="space-y-1.5">
+        {items.map((item, i) => (
+          <li key={i} className="text-[13px] leading-snug pl-3 relative" style={{ color: 'var(--label-1)' }}>
+            <span className="absolute left-0 top-[7px] w-1 h-1 rounded-full" style={{ background: 'var(--label-3)' }} />
+            {item}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -79,10 +93,10 @@ export default function Result() {
   // counts can never disagree with the colours shown next to each row.
   const severityOf = (ing) => getIngredientSeverity(ing).label;
   const tiers = [
-    { key: 'Harmful', label: 'Harmful', color: 'var(--v-very-poor)' },
-    { key: 'Concerning', label: 'Concerning', color: 'var(--v-poor)' },
-    { key: 'Highly processed', label: 'Processed', color: 'var(--v-moderate)' },
-    { key: 'Fine', label: 'Fine', color: 'var(--v-good)' },
+    { key: 'Harmful', label: 'Harmful', color: 'var(--v-very-poor)', bg: 'var(--v-very-poor-bg)', icon: '⚠' },
+    { key: 'Concerning', label: 'Concerning', color: 'var(--v-poor)', bg: 'var(--v-poor-bg)', icon: '!' },
+    { key: 'Highly processed', label: 'Processed', color: 'var(--v-moderate)', bg: 'var(--v-moderate-bg)', icon: '−' },
+    { key: 'Fine', label: 'Fine', color: 'var(--v-good)', bg: 'var(--v-good-bg)', icon: '✓' },
   ].map((t) => ({ ...t, count: ingredients.filter((i) => severityOf(i) === t.key).length }));
 
   const flaggedCount = ingredients.filter((i) => ['Harmful', 'Concerning'].includes(severityOf(i))).length;
@@ -109,49 +123,60 @@ export default function Result() {
       </button>
 
       {/* Title */}
-      <div className="px-5 pt-1 pb-5">
-        {result.brand && !editingName && (
-          <p className="text-[13px] font-semibold mb-0.5" style={{ color: 'var(--label-2)' }}>
-            {result.brand.toUpperCase()}
-          </p>
-        )}
+      <div className="px-5 pt-1 pb-5 flex gap-3.5 items-start">
+        <div className="flex-1 min-w-0">
+          {result.brand && !editingName && (
+            <p className="text-[13px] font-semibold mb-0.5" style={{ color: 'var(--label-2)' }}>
+              {result.brand.toUpperCase()}
+            </p>
+          )}
 
-        {editingName ? (
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              autoFocus
-              value={nameInput}
-              onChange={(e) => setNameInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') saveName();
-                if (e.key === 'Escape') setEditingName(false);
-              }}
-              placeholder="Enter product name"
-              className="flex-1 min-w-0 text-[28px] font-bold tracking-tight bg-transparent border-b-2 focus:outline-none"
-              style={{ color: 'var(--label-1)', borderColor: 'var(--tint)' }}
-            />
-            <button onClick={saveName} className="text-[17px]" style={{ color: 'var(--tint)' }} aria-label="Save name">Done</button>
-          </div>
-        ) : (
-          <h1 className="text-[34px] leading-[1.1] font-bold tracking-tight flex items-start gap-2" style={{ color: 'var(--label-1)' }}>
-            <span className="min-w-0">{result.productName || 'Unknown Product'}</span>
-            <button
-              onClick={startEditingName}
-              className="text-[15px] mt-2.5 flex-shrink-0"
-              style={{ color: 'var(--tint)' }}
-              aria-label="Edit product name"
+          {editingName ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                autoFocus
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') saveName();
+                  if (e.key === 'Escape') setEditingName(false);
+                }}
+                placeholder="Enter product name"
+                className="flex-1 min-w-0 text-[26px] font-bold tracking-tight bg-transparent border-b-2 focus:outline-none"
+                style={{ color: 'var(--label-1)', borderColor: 'var(--tint)' }}
+              />
+              <button onClick={saveName} className="text-[17px]" style={{ color: 'var(--tint)' }} aria-label="Save name">Done</button>
+            </div>
+          ) : (
+            <h1 className="text-[26px] leading-[1.15] font-bold tracking-tight flex items-start gap-2 mb-2" style={{ color: 'var(--label-1)' }}>
+              <span className="min-w-0">{result.productName || 'Unknown Product'}</span>
+              <button
+                onClick={startEditingName}
+                className="text-[14px] mt-1.5 flex-shrink-0"
+                style={{ color: 'var(--tint)' }}
+                aria-label="Edit product name"
+              >
+                Edit
+              </button>
+            </h1>
+          )}
+
+          {result.productName === 'Unknown Product' && !editingName ? (
+            <p className="text-[13px]" style={{ color: 'var(--v-poor)' }}>
+              We couldn't identify this product — tap Edit to name it yourself.
+            </p>
+          ) : (
+            <span
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
+              style={{ background: 'var(--fill)', color: 'var(--label-2)' }}
             >
-              Edit
-            </button>
-          </h1>
-        )}
+              📦 Packaged Food
+            </span>
+          )}
+        </div>
 
-        {result.productName === 'Unknown Product' && !editingName && (
-          <p className="text-[13px] mt-1.5" style={{ color: 'var(--v-poor)' }}>
-            We couldn't identify this product — tap Edit to name it yourself.
-          </p>
-        )}
+        <ProductImage src={result.imageUrl} />
       </div>
 
       {/* Score hero */}
@@ -187,9 +212,17 @@ export default function Result() {
         <>
           <SectionHeader>Summary</SectionHeader>
           <Group>
-            <p className="px-4 py-3.5 text-[15px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
-              {result.summary}
-            </p>
+            <div className="flex gap-3 items-start px-4 py-3.5">
+              <span
+                className="w-9 h-9 rounded-[10px] flex-shrink-0 flex items-center justify-center text-[16px]"
+                style={{ background: 'var(--tint-bg)' }}
+              >
+                📄
+              </span>
+              <p className="text-[15px] leading-relaxed pt-1" style={{ color: 'var(--label-1)' }}>
+                {result.summary}
+              </p>
+            </div>
           </Group>
         </>
       )}
@@ -219,7 +252,13 @@ export default function Result() {
                     color: active ? '#fff' : 'var(--label-1)',
                   }}
                 >
-                  <span className="block text-[24px] font-bold leading-none tracking-tight" style={{ color: active ? '#fff' : tier.color }}>
+                  <span
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold mx-auto mb-1.5"
+                    style={{ background: active ? 'rgba(255,255,255,0.25)' : tier.bg, color: active ? '#fff' : tier.color }}
+                  >
+                    {tier.icon}
+                  </span>
+                  <span className="block text-[20px] font-bold leading-none tracking-tight" style={{ color: active ? '#fff' : tier.color }}>
                     {tier.count}
                   </span>
                   <span className="block text-[11px] mt-1" style={{ color: active ? '#fff' : 'var(--label-2)' }}>
@@ -237,34 +276,34 @@ export default function Result() {
         <>
           <SectionHeader>Our recommendation</SectionHeader>
           <Group>
-            <p className="px-4 py-3.5 text-[15px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
-              {result.recommendation}
-            </p>
+            <div className="flex gap-3 items-center px-4 py-3.5">
+              <span
+                className="w-9 h-9 rounded-[10px] flex-shrink-0 flex items-center justify-center text-[16px]"
+                style={{ background: 'var(--v-good-bg)' }}
+              >
+                💡
+              </span>
+              <p className="text-[15px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
+                {result.recommendation}
+              </p>
+            </div>
           </Group>
         </>
       )}
 
-      {/* Flags */}
-      {result.flags?.length > 0 && (
+      {/* Flags + Positives — side by side when both exist, so "at a
+          glance" actually reads as one glance rather than two scrolls */}
+      {(result.flags?.length > 0 || result.positives?.length > 0) && (
         <>
-          <SectionHeader>Watch out for</SectionHeader>
-          <Group>
-            {result.flags.map((flag, i) => (
-              <BulletRow key={i} color="var(--v-poor)">{flag}</BulletRow>
-            ))}
-          </Group>
-        </>
-      )}
-
-      {/* Positives */}
-      {result.positives?.length > 0 && (
-        <>
-          <SectionHeader>Good things</SectionHeader>
-          <Group>
-            {result.positives.map((pos, i) => (
-              <BulletRow key={i} color="var(--v-good)">{pos}</BulletRow>
-            ))}
-          </Group>
+          <SectionHeader>At a glance</SectionHeader>
+          <div className={`grid gap-2.5 mx-4 ${result.flags?.length > 0 && result.positives?.length > 0 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {result.flags?.length > 0 && (
+              <ListCard title="Watch out for" dotColor="var(--v-poor)" items={result.flags} />
+            )}
+            {result.positives?.length > 0 && (
+              <ListCard title="Good things" dotColor="var(--v-good)" items={result.positives} />
+            )}
+          </div>
         </>
       )}
 

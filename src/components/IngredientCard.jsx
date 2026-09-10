@@ -1,8 +1,35 @@
 // src/components/IngredientCard.jsx
-// One row in the ingredients list: severity dot, name, one-line reason,
-// expanding in place to the full detail.
+// One row in the ingredients list: a colour-tinted category icon, name,
+// one-line reason, expanding in place to the full detail.
 import { useState } from 'react';
 import { getIngredientSeverity } from '../utils/storage';
+
+// Deliberately generic for anything not clearly one of these -- guessing
+// a specific food icon for an ambiguous "other" category would be more
+// misleading than a neutral placeholder.
+const CATEGORY_ICONS = {
+  natural: '🌿',
+  protein: '🥩',
+  spice: '🌶️',
+  'flavour enhancer': '👅',
+  flavour: '👃',
+  flavor: '👃',
+  'acidity regulator': '⚗️',
+  sweetener: '🍬',
+  oil: '🫗',
+  fat: '🧈',
+  preservative: '🧪',
+  antioxidant: '🛡️',
+  emulsifier: '🧴',
+  color: '🎨',
+  colorant: '🎨',
+  'raising agent': '🫧',
+  stabilizer: '🧷',
+};
+
+function categoryIcon(category) {
+  return CATEGORY_ICONS[(category || '').toLowerCase()] || '🔹';
+}
 
 function Badge({ label, value }) {
   if (!value) return null;
@@ -28,9 +55,11 @@ export default function IngredientCard({ ingredient }) {
         className="w-full flex items-center gap-3 px-4 py-3 text-left min-h-[44px]"
       >
         <span
-          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-          style={{ background: severity.color }}
-        />
+          className="w-9 h-9 rounded-[10px] flex-shrink-0 flex items-center justify-center text-[17px]"
+          style={{ background: severity.bg }}
+        >
+          {categoryIcon(ingredient.category)}
+        </span>
 
         <span className="flex-1 min-w-0">
           <span className="block text-[17px] leading-snug tracking-[-0.01em]" style={{ color: 'var(--label-1)' }}>
@@ -54,7 +83,7 @@ export default function IngredientCard({ ingredient }) {
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 pl-[38px] space-y-3">
+        <div className="px-4 pb-4 pl-[64px] space-y-3">
           <span
             className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full"
             style={{ background: severity.bg, color: severity.color }}
