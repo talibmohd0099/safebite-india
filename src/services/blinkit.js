@@ -48,15 +48,23 @@ const NOISE_ATTRIBUTES = /gst|hsn|tax|case|polybag|guidelines|warehouse|_weight|
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export async function fetchText(url, retries = 3) {
+  let lastFailure = null;
+
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
       if (res.ok) return await res.text();
-    } catch {
-      // network hiccup — fall through and retry
+      lastFailure = `HTTP ${res.status} ${res.statusText}`;
+    } catch (err) {
+      lastFailure = `${err.name}: ${err.message}`;
     }
     if (attempt < retries) await sleep(attempt * 1200);
   }
+
+  // Surfaced so a genuine block (403/429) is visible instead of looking
+  // identical to a transient network blip -- both currently just return
+  // null to the caller, but only one of them is worth investigating.
+  if (lastFailure) console.error(`[blinkit] fetch failed for ${url}: ${lastFailure}`);
   return null;
 }
 
