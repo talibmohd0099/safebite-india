@@ -13,11 +13,17 @@ name: Scrape Blinkit
 # rather than re-scraping their opening products every time.
 
 on:
-  schedule:
-    # Every 2 hours. GitHub queues scheduled jobs on a best-effort basis,
-    # so runs can start a few minutes late — harmless here, since the
-    # cursor means nothing is lost by an irregular schedule.
-    - cron: '0 */2 * * *'
+  # Schedule is OFF (2026-09-10): Blinkit is now returning 403 Forbidden
+  # on every request, including from the machine that scraped it
+  # successfully all session — that's an active block, most likely from
+  # request volume during development, not a code problem. Firing every
+  # 2 hours against a site that's already blocking us risks extending
+  # or worsening it. Uncomment once there's reason to believe the block
+  # has lifted (try a manual "Run workflow" first to check).
+  #
+  # schedule:
+  #   - cron: '0 */2 * * *'
+  #
   # Adds a "Run workflow" button on the Actions tab for running it on demand.
   workflow_dispatch:
     inputs:
