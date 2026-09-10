@@ -21,9 +21,15 @@ import { supabase, isSupabaseConfigured } from '../../src/services/supabaseClien
 import { analyzeText } from '../../src/services/analyzeText.js';
 import { barcodeKey, saveReport } from '../../src/services/productCache.js';
 
-// Stay well under Netlify's function execution limit -- if we're not done
-// with a page in time, we just pick it back up next run.
+// Stay well under Netlify's function execution limit -- shared across
+// every round in one invocation, so doubling ROUNDS_PER_RUN below never
+// doubles how long the function can run for; it just fits more (smaller)
+// rounds into the same ceiling.
 const TIME_BUDGET_MS = 8000;
+// Netlify's cron floor is once a minute -- "twice a minute" isn't a
+// schedule Netlify can run, so this does two companies' worth of work
+// inside each once-a-minute invocation instead.
+const ROUNDS_PER_RUN = 2;
 const OFF_PAGE_SIZE = 20;
 const OFF_SEARCH_URL = 'https://world.openfoodfacts.org/cgi/search.pl';
 const OFF_USER_AGENT = 'SafeBiteIndia-SeedJob/1.0 (+background product seeder)';
@@ -89,11 +95,13 @@ function looksLikeValidIngredients(text) {
 }
 
 // No stored "whose turn is it" pointer needed -- the clock decides, so a
-// skipped/delayed invocation just costs that one company its turn, never
-// gets the whole rotation stuck.
-function pickCompanyForThisRun() {
-  const slot = Math.floor(Date.now() / 60000);
-  return COMPANIES[slot % COMPANIES.length];
+// skipped/delayed invocation just costs those companies their turn,
+// never gets the whole rotation stuck. Each minute advances the
+// rotation by ROUNDS_PER_RUN companies rather than 1, so raising that
+// number speeds up the whole rotation without needing a faster cron.
+function companiesForThisRun() {
+  const baseSlot = Math.floor(Date.now() / 60000) * ROUNDS_PER_RUN;
+  return Array.from({ length: ROUNDS_PER_RUN }, (_, i) => COMPANIES[(baseSlot + i) % COMPANIES.length]);
 }
 
 async function getProgress(company) {
@@ -145,39 +153,30 @@ async function fetchPage(searchTerm, page) {
 // Flip to false to resume. While true, the function still fires on
 // schedule (Netlify's dashboard will keep showing it as active) but does
 // nothing -- no Open Food Facts requests, no Gemini calls, no writes.
-const SEED_PAUSED = true;
+const SEED_PAUSED = false;
 
-export const handler = schedule('* * * * *', async () => {
-  if (SEED_PAUSED) {
-    console.log('[seed] Paused -- set SEED_PAUSED to false in netlify/functions/seed-products.js to resume.');
-    return { statusCode: 200 };
-  }
-
-  if (!isSupabaseConfigured) {
-    console.error('[seed] Supabase is not configured -- set VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY in Netlify env vars.');
-    return { statusCode: 200 };
-  }
-
-  const startedAt = Date.now();
-  const target = pickCompanyForThisRun();
+/** One company's turn: one page, respecting the shared deadline for how
+ * many products get analyzed. Returns nothing -- logs its own outcome so
+ * multiple rounds in one invocation each get a clear log line. */
+async function runRound(target, deadline) {
   const progress = await getProgress(target.company);
 
   if (progress.exhausted) {
-    console.log(`[seed] ${target.company}: already fully seeded (${progress.products_saved} products saved so far). Nothing to do this run.`);
-    return { statusCode: 200 };
+    console.log(`[seed] ${target.company}: already fully seeded (${progress.products_saved} products saved so far). Nothing to do this round.`);
+    return;
   }
 
   const products = await fetchPage(target.searchTerm, progress.next_page);
 
   if (products === null) {
     console.warn(`[seed] ${target.company}: Open Food Facts request failed this run -- will retry page ${progress.next_page} next time.`);
-    return { statusCode: 200 };
+    return;
   }
 
   if (products.length === 0) {
     await saveProgress({ ...progress, exhausted: true });
     console.log(`[seed] ${target.company}: no more products on page ${progress.next_page} -- marking exhausted.`);
-    return { statusCode: 200 };
+    return;
   }
 
   const candidates = products.filter((p) => p.code && p.product_name && looksLikeValidIngredients(p.ingredients_text));
@@ -196,8 +195,8 @@ export const handler = schedule('* * * * *', async () => {
     const key = barcodeKey(product.code);
     if (existing.has(key)) continue;
 
-    if (Date.now() - startedAt > TIME_BUDGET_MS) {
-      processedAll = false; // ran out of time -- stay on this page next run
+    if (Date.now() > deadline) {
+      processedAll = false; // ran out of the shared time budget -- stay on this page next run
       break;
     }
 
@@ -225,6 +224,25 @@ export const handler = schedule('* * * * *', async () => {
   });
 
   console.log(`[seed] ${target.company} page ${progress.next_page}: saved ${saved} new product(s), ${existing.size} already known.`);
+}
+
+export const handler = schedule('* * * * *', async () => {
+  if (SEED_PAUSED) {
+    console.log('[seed] Paused -- set SEED_PAUSED to false in netlify/functions/seed-products.js to resume.');
+    return { statusCode: 200 };
+  }
+
+  if (!isSupabaseConfigured) {
+    console.error('[seed] Supabase is not configured -- set VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY in Netlify env vars.');
+    return { statusCode: 200 };
+  }
+
+  const deadline = Date.now() + TIME_BUDGET_MS;
+
+  for (const target of companiesForThisRun()) {
+    if (Date.now() > deadline) break; // out of shared budget -- remaining rounds wait for next invocation
+    await runRound(target, deadline);
+  }
 
   return { statusCode: 200 };
 });
