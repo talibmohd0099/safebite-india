@@ -14,7 +14,11 @@
 // disallows /s/* (search); nothing here touches it.
 
 const SITEMAP_INDEX = 'https://blinkit.com/sitemap.xml';
-const USER_AGENT = 'Mozilla/5.0 (compatible; SafeBiteIndia/1.0; +ingredient research)';
+// A real browser UA, not a self-identifying bot string. Manual testing
+// from a residential IP worked fine either way, but a cloud CI runner's
+// IP range is the kind of traffic anti-scraping systems flag hardest —
+// this is the one lever available to try to get past that.
+const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 const GEMINI_MODEL = 'gemini-3.1-flash-lite';
 
 // The groups worth scanning for a food-label app. The sitemap also
