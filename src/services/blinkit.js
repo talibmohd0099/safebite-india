@@ -1,9 +1,8 @@
 // src/services/blinkit.js
 //
-// Shared Blinkit scraping logic, used by both the manual bulk script
-// (scripts/scrape-blinkit.js) and the scheduled job
-// (netlify/functions/seed-blinkit.js) so the parsing can't drift apart
-// between them.
+// Shared Blinkit scraping logic, used by scripts/scrape-blinkit.js (both
+// its manual --category mode and its cursor-aware --all mode, which the
+// GitHub Actions workflow runs on a schedule).
 //
 // Not imported by any app code — it never reaches the browser bundle.
 //

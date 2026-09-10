@@ -1,0 +1,65 @@
+name: Seed Open Food Facts Products
+
+# Runs the Open Food Facts product seeder on a schedule, free of charge.
+#
+# This used to be a Netlify Scheduled Function firing every minute,
+# processing 1-2 companies per invocation because of Netlify's per-run
+# time limit. The Netlify site has been deleted (no more hosting for
+# background jobs there at all), so this moves to GitHub Actions --
+# same move already made for the Blinkit scraper, and for the same
+# reason: a background job doesn't need a web host, and Actions
+# minutes are free and unlimited on a public repo.
+#
+# Without Netlify's tight per-invocation limit, each run now walks every
+# company in the list rather than 1-2 of them, so this needs a much
+# lower frequency than "every minute" -- every 30 minutes gives each
+# company several turns a day while staying well clear of Gemini's
+# free-tier rate limits (the script paces and retries around those
+# itself, see scripts/seed-off-products.js).
+
+on:
+  schedule:
+    # Every 30 minutes. GitHub queues scheduled jobs on a best-effort
+    # basis, so runs can start a bit late -- harmless here, since each
+    # company's own page cursor means nothing is lost by an irregular
+    # schedule.
+    - cron: '*/30 * * * *'
+  # Adds a "Run workflow" button on the Actions tab for running it on demand.
+  workflow_dispatch:
+    inputs:
+      company:
+        description: 'Only this company (leave blank for all)'
+        required: false
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    # Generous: 25 companies, each with a handful of new products at
+    # most, but Gemini rate-limit backoffs can each cost up to 30s.
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Supabase's client needs native WebSocket support, which is
+          # only stable from Node 22 onward -- Node 20 fails immediately
+          # with "native WebSocket not found" (hit this exact issue on
+          # the Blinkit workflow first).
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Seed
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+        run: |
+          if [ -n "${{ github.event.inputs.company }}" ]; then
+            node scripts/seed-off-products.js --company "${{ github.event.inputs.company }}"
+          else
+            node scripts/seed-off-products.js
+          fi
