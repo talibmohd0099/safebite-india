@@ -185,28 +185,38 @@ async function saveProgress(progress) {
   if (error) console.warn('[seed] Could not save progress:', error.message);
 }
 
-function isRateLimitError(err) {
-  return /quota|rate limit|429/i.test(err?.message || '');
+// Two different Gemini failure phrasings need the same treatment: a
+// 429/quota message (rate limit or the daily free-tier cap) and a
+// "currently experiencing high demand" / overloaded message (Gemini's
+// wording for a temporary capacity issue, unrelated to any cap). Both
+// are transient and worth retrying -- only the *permanent* skip path
+// (a genuinely broken/unparseable product) should give up immediately.
+// The first version of this only matched quota/429 wording, so "high
+// demand" fell through to the permanent-skip path and got silently,
+// permanently lost instead of retried.
+function isTransientGeminiError(err) {
+  return /quota|rate limit|429|high demand|overloaded|unavailable|503|internal error/i.test(err?.message || '');
 }
 
 // Thrown to stop the whole run early and cleanly -- caught in main(),
 // never bubbles up as a real crash.
 class StopRunSignal extends Error {}
 
-// A per-minute burst would normally clear within RATE_LIMIT_WAIT_MS -- if
-// it's still failing after that many retries, it's almost certainly the
-// free tier's per-DAY cap (500 requests/day), not a brief blip. There is
-// no point continuing to hammer it for every remaining product/company in
-// this run; the daily cap only clears tomorrow, and the 30-minute cron
-// will pick this back up regardless.
-class QuotaExhaustedSignal extends StopRunSignal {}
+// A brief burst (rate limit, or a short overload spell) would normally
+// clear within RATE_LIMIT_WAIT_MS. If it's still failing after that many
+// retries, there's no point continuing to hammer it for every remaining
+// product/company in this run -- whatever's causing it (today's
+// free-tier cap, or Gemini being generally overloaded right now) will
+// still be true a few seconds from now, and the 30-minute cron will pick
+// this back up regardless.
+class TransientGeminiFailureSignal extends StopRunSignal {}
 
 /**
- * A rate-limited product isn't a real failure -- it's the same product,
- * a bit later. Waits out a per-minute window and retries; if it's still
- * failing after all retries, signals the caller to stop the whole run
- * rather than waste more time (and GitHub Actions minutes) on a cap that
- * won't clear until tomorrow.
+ * A rate-limited or momentarily-overloaded product isn't a real failure
+ * -- it's the same product, a bit later. Waits out a short window and
+ * retries; if it's still failing after all retries, signals the caller
+ * to stop the whole run rather than waste more time (and GitHub Actions
+ * minutes) on something that won't clear within this run anyway.
  */
 async function analyzeWithRetry(product, companyName) {
   for (let attempt = 1; attempt <= RATE_LIMIT_RETRIES; attempt++) {
@@ -214,13 +224,13 @@ async function analyzeWithRetry(product, companyName) {
       const { report } = await analyzeText(product.ingredients_text, product.product_name, primaryBrand(product.brands), product.ingredients);
       return report;
     } catch (err) {
-      if (isRateLimitError(err)) {
+      if (isTransientGeminiError(err)) {
         if (attempt < RATE_LIMIT_RETRIES) {
-          console.warn(`  Rate-limited on "${product.product_name}" (${companyName}) -- waiting ${RATE_LIMIT_WAIT_MS / 1000}s (attempt ${attempt}/${RATE_LIMIT_RETRIES})...`);
+          console.warn(`  Gemini temporarily unavailable for "${product.product_name}" (${companyName}) -- waiting ${RATE_LIMIT_WAIT_MS / 1000}s (attempt ${attempt}/${RATE_LIMIT_RETRIES}): ${err.message}`);
           await sleep(RATE_LIMIT_WAIT_MS);
           continue;
         }
-        throw new QuotaExhaustedSignal(`Still rate-limited after ${RATE_LIMIT_RETRIES} attempts -- likely today's free-tier daily cap, not a brief blip.`);
+        throw new TransientGeminiFailureSignal(`Still failing after ${RATE_LIMIT_RETRIES} attempts (${err.message}) -- likely today's free-tier cap or a longer overload spell, not a brief blip.`);
       }
       console.error(`  Skipped "${product.product_name}" (${companyName}):`, err.message);
       return null;
