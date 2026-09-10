@@ -35,6 +35,10 @@ const REQUEST_GAP_MS = 1000; // be polite between companies
 const GEMINI_PACING_MS = 2000; // between products, so a burst of new ones doesn't trip the per-minute limit
 const RATE_LIMIT_RETRIES = 3;
 const RATE_LIMIT_WAIT_MS = 30000; // Gemini's free-tier window is per-minute; 30s reliably clears it
+// Open Food Facts' search.pl measured at ~33% success per request right
+// now -- 6 attempts brings "all of them fail" down to roughly 8%,
+// versus roughly 29% at the old 3 attempts.
+const OFF_FETCH_RETRIES = 6;
 
 // Keeps a single run (scheduled every 30 min, or triggered manually) from
 // spending the whole day's free-tier budget by itself -- this job shares
@@ -122,7 +126,13 @@ async function fetchPage(searchTerm, page) {
   // "zero results" response -- otherwise a transient hiccup gets
   // mistaken for "nothing left here" and permanently marks the company
   // exhausted after one bad network moment.
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  //
+  // Open Food Facts' search.pl is genuinely unreliable: measured
+  // directly, only ~33% of requests succeeded (503s the rest of the
+  // time). With that failure rate, 3 attempts in a row still have
+  // roughly a 1-in-3 chance of all failing -- OFF_FETCH_RETRIES is
+  // higher specifically to bring that down.
+  for (let attempt = 1; attempt <= OFF_FETCH_RETRIES; attempt++) {
     try {
       const response = await fetch(`${OFF_SEARCH_URL}?${params.toString()}`, {
         headers: { 'User-Agent': OFF_USER_AGENT },
@@ -134,7 +144,7 @@ async function fetchPage(searchTerm, page) {
     } catch {
       // fall through and retry
     }
-    if (attempt < 3) await sleep(attempt * 1200);
+    if (attempt < OFF_FETCH_RETRIES) await sleep(attempt * 1200);
   }
   return null;
 }
