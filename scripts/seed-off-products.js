@@ -36,6 +36,13 @@ const GEMINI_PACING_MS = 2000; // between products, so a burst of new ones doesn
 const RATE_LIMIT_RETRIES = 3;
 const RATE_LIMIT_WAIT_MS = 30000; // Gemini's free-tier window is per-minute; 30s reliably clears it
 
+// Keeps a single run (scheduled every 30 min, or triggered manually) from
+// spending the whole day's free-tier budget by itself -- this job shares
+// the same Gemini key as real users of the live app, who must always
+// come first. 25 companies x several runs/day naturally makes steady
+// progress without this needing to be large.
+const MAX_PRODUCTS_PER_RUN = 25;
+
 // Major Indian FMCG food companies/brands, matched against Open Food Facts.
 // Add more here any time -- nothing else needs to change.
 const COMPANIES = [
@@ -151,11 +158,24 @@ function isRateLimitError(err) {
   return /quota|rate limit|429/i.test(err?.message || '');
 }
 
+// Thrown to stop the whole run early and cleanly -- caught in main(),
+// never bubbles up as a real crash.
+class StopRunSignal extends Error {}
+
+// A per-minute burst would normally clear within RATE_LIMIT_WAIT_MS -- if
+// it's still failing after that many retries, it's almost certainly the
+// free tier's per-DAY cap (500 requests/day), not a brief blip. There is
+// no point continuing to hammer it for every remaining product/company in
+// this run; the daily cap only clears tomorrow, and the 30-minute cron
+// will pick this back up regardless.
+class QuotaExhaustedSignal extends StopRunSignal {}
+
 /**
  * A rate-limited product isn't a real failure -- it's the same product,
- * a bit later. Skipping it outright would silently lose it forever,
- * since the page cursor advances regardless of individual product
- * outcomes. Waits out Gemini's per-minute window and retries instead.
+ * a bit later. Waits out a per-minute window and retries; if it's still
+ * failing after all retries, signals the caller to stop the whole run
+ * rather than waste more time (and GitHub Actions minutes) on a cap that
+ * won't clear until tomorrow.
  */
 async function analyzeWithRetry(product, companyName) {
   for (let attempt = 1; attempt <= RATE_LIMIT_RETRIES; attempt++) {
@@ -163,10 +183,13 @@ async function analyzeWithRetry(product, companyName) {
       const { report } = await analyzeText(product.ingredients_text, product.product_name, primaryBrand(product.brands), product.ingredients);
       return report;
     } catch (err) {
-      if (isRateLimitError(err) && attempt < RATE_LIMIT_RETRIES) {
-        console.warn(`  Rate-limited on "${product.product_name}" (${companyName}) -- waiting ${RATE_LIMIT_WAIT_MS / 1000}s (attempt ${attempt}/${RATE_LIMIT_RETRIES})...`);
-        await sleep(RATE_LIMIT_WAIT_MS);
-        continue;
+      if (isRateLimitError(err)) {
+        if (attempt < RATE_LIMIT_RETRIES) {
+          console.warn(`  Rate-limited on "${product.product_name}" (${companyName}) -- waiting ${RATE_LIMIT_WAIT_MS / 1000}s (attempt ${attempt}/${RATE_LIMIT_RETRIES})...`);
+          await sleep(RATE_LIMIT_WAIT_MS);
+          continue;
+        }
+        throw new QuotaExhaustedSignal(`Still rate-limited after ${RATE_LIMIT_RETRIES} attempts -- likely today's free-tier daily cap, not a brief blip.`);
       }
       console.error(`  Skipped "${product.product_name}" (${companyName}):`, err.message);
       return null;
@@ -175,7 +198,7 @@ async function analyzeWithRetry(product, companyName) {
   return null;
 }
 
-async function runCompany(target, dryRun) {
+async function runCompany(target, dryRun, budget) {
   const progress = await getProgress(target.company);
 
   if (progress.exhausted) {
@@ -206,6 +229,7 @@ async function runCompany(target, dryRun) {
   }
 
   let saved = 0;
+  let stoppedEarly = false;
   for (const product of candidates) {
     const key = barcodeKey(product.code);
     if (existing.has(key)) continue;
@@ -216,7 +240,25 @@ async function runCompany(target, dryRun) {
       continue;
     }
 
-    const report = await analyzeWithRetry(product, target.company);
+    if (budget.remaining <= 0) {
+      console.log(`  ${target.company}: hit this run's ${MAX_PRODUCTS_PER_RUN}-product cap -- stopping here, resuming next run.`);
+      stoppedEarly = true;
+      break;
+    }
+
+    let report;
+    try {
+      report = await analyzeWithRetry(product, target.company);
+    } catch (err) {
+      if (err instanceof StopRunSignal) {
+        console.warn(`  ${target.company}: ${err.message} Stopping the whole run here -- next scheduled run will pick back up on this same page.`);
+        stoppedEarly = true;
+        break;
+      }
+      throw err;
+    }
+    budget.remaining--;
+
     if (report) {
       await saveReport({
         lookupKey: key,
@@ -231,17 +273,27 @@ async function runCompany(target, dryRun) {
     await sleep(GEMINI_PACING_MS); // proactive pacing, not just reacting to 429s
   }
 
-  const isLastPage = products.length < OFF_PAGE_SIZE;
-  if (!dryRun) {
+  // Only advance the page cursor / mark exhausted on a clean, complete
+  // pass -- if we bailed early (cap or quota), leave next_page untouched
+  // so this exact page gets retried next run instead of silently losing
+  // whatever wasn't reached yet.
+  if (!dryRun && !stoppedEarly) {
+    const isLastPage = products.length < OFF_PAGE_SIZE;
     await saveProgress({
       company: target.company,
       next_page: progress.next_page + 1,
       exhausted: isLastPage,
       products_saved: progress.products_saved + saved,
     });
+  } else if (saved > 0) {
+    // Still record whatever we did manage to save, just without moving
+    // the page forward or touching "exhausted".
+    await saveProgress({ ...progress, products_saved: progress.products_saved + saved });
   }
 
-  console.log(`  ${target.company} page ${progress.next_page}: saved ${saved} new product(s), ${existing.size} already known.`);
+  console.log(`  ${target.company} page ${progress.next_page}: saved ${saved} new product(s), ${existing.size} already known.${stoppedEarly ? ' (stopped early)' : ''}`);
+
+  if (stoppedEarly) throw new StopRunSignal('Run budget or quota reached.');
 }
 
 async function main() {
@@ -263,10 +315,20 @@ async function main() {
     return;
   }
 
-  console.log(`Walking ${targets.length} compan${targets.length === 1 ? 'y' : 'ies'}${dryRun ? ' (dry run)' : ''}.\n`);
+  console.log(`Walking ${targets.length} compan${targets.length === 1 ? 'y' : 'ies'}${dryRun ? ' (dry run)' : ''}, up to ${MAX_PRODUCTS_PER_RUN} new products this run.\n`);
+
+  const budget = { remaining: MAX_PRODUCTS_PER_RUN };
 
   for (const target of targets) {
-    await runCompany(target, dryRun);
+    try {
+      await runCompany(target, dryRun, budget);
+    } catch (err) {
+      if (err instanceof StopRunSignal) {
+        console.log('\nStopping the run here rather than continuing to the remaining companies -- next scheduled run picks back up cleanly.');
+        break;
+      }
+      throw err;
+    }
     await sleep(REQUEST_GAP_MS);
   }
 
