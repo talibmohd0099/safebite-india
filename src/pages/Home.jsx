@@ -390,20 +390,12 @@ export default function Home() {
     <div className="max-w-2xl mx-auto px-4 py-8">
 
       {/* Hero */}
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-2 bg-green-50 border border-green-200 rounded-full px-4 py-1.5 mb-4">
-          <span className="text-green-600 text-sm font-medium">🇮🇳 Built for India · FSSAI + EU Standards</span>
-        </div>
-        <h1 className="text-3xl font-extrabold text-slate-800 mb-2 leading-tight">
-          Is your food <span className="text-green-600">actually safe?</span>
-        </h1>
-        <p className="text-slate-500 text-base max-w-md mx-auto">
-          Search a product by name, or paste its ingredients — get an instant health score with plain-English explanation.
-        </p>
-      </div>
+      <h1 className="text-xl font-bold text-slate-800 text-center mb-4">
+        Is your food <span className="text-green-600">actually safe?</span>
+      </h1>
 
       {/* Mode Toggle */}
-      <div className="flex bg-slate-100 rounded-xl p-1 mb-6">
+      <div className="flex bg-slate-100 rounded-xl p-1 mb-4">
         {[
           { id: 'search', label: '🔍 Search' },
           { id: 'text', label: '📝 Paste' },
@@ -413,7 +405,7 @@ export default function Home() {
           <button
             key={tab.id}
             onClick={() => { setMode(tab.id); setError(''); }}
-            className={`flex-1 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+            className={`flex-1 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
               mode === tab.id
                 ? 'bg-white text-green-700 shadow-sm'
                 : 'text-slate-500 hover:text-slate-700'
@@ -427,9 +419,6 @@ export default function Home() {
       {/* Search Mode */}
       {mode === 'search' && (
         <div className="mb-4">
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
-            Search for a product by name:
-          </label>
           <input
             type="text"
             value={searchQuery}
@@ -683,31 +672,6 @@ export default function Home() {
         </button>
       )}
 
-      {/* How it works */}
-      <div className="mt-10">
-        <h2 className="text-lg font-bold text-slate-800 mb-4 text-center">How it works</h2>
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { icon: '📷', title: 'Upload or paste', desc: 'Photo, barcode, or ingredient text from the pack' },
-            { icon: '🤖', title: 'AI Analysis', desc: 'Checked against FSSAI + EU/EFSA rules' },
-            { icon: '📊', title: 'Get your score', desc: '0–100 score with plain-English report' },
-          ].map((step, i) => (
-            <div key={i} className="bg-white rounded-xl border border-slate-200 p-3 text-center">
-              <div className="text-2xl mb-1">{step.icon}</div>
-              <div className="font-semibold text-xs text-slate-800 mb-0.5">{step.title}</div>
-              <div className="text-xs text-slate-400 leading-tight">{step.desc}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Gap we fill */}
-      <div className="mt-6 bg-slate-800 rounded-xl p-4 text-white text-sm">
-        <p className="font-semibold mb-1">🇮🇳 Why SafeBite?</p>
-        <p className="text-slate-300 text-xs leading-relaxed">
-          Apps like Yuka don't recognize Indian brands or FSSAI regulations. SafeBite is built from the ground up for India — understanding Indian packaged food the way international apps never could.
-        </p>
-      </div>
     </div>
   );
 }
