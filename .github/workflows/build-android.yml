@@ -1,0 +1,64 @@
+name: Build Android APK
+
+# Builds a debug APK of the app (via Capacitor, wrapping the same React
+# app that runs on GitHub Pages) and publishes it to a rolling GitHub
+# Release, so there's always one stable link to download the latest
+# build from on a phone -- no Play Store account or signing keystore
+# needed for this, since it's a debug build meant for sideloading onto
+# your own device rather than store distribution.
+#
+# Manual only (not on every push) -- an Android build takes real CI
+# minutes and isn't needed until you actually want a fresh APK.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Build web assets for the native app
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+        # Capacitor serves the build from its own local root, not a
+        # GitHub Pages subpath -- a separate build mode (see
+        # vite.config.js) is what keeps this from loading blank.
+        run: npx vite build --mode capacitor
+
+      - name: Copy the build into the Android project
+        run: npx cap sync android
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Publish to a rolling "latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest-apk --yes --cleanup-tag || true
+          gh release create latest-apk android/app/build/outputs/apk/debug/app-debug.apk \
+            --title "SafeBite India -- latest Android build" \
+            --notes "Automatically built from the current main branch. This is a debug build for installing on your own phone (not from the Play Store), so Android will warn about an unverified app -- that's expected. On your phone: download app-debug.apk below, open it, and allow \"install from unknown sources\" if asked." \
+            --latest
