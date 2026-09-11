@@ -27,6 +27,34 @@ function Group({ children, className = '' }) {
   );
 }
 
+// iOS-style segmented control -- splits the page into two short views
+// (Overview / Ingredients) instead of one long scroll, so opening a
+// report always lands on a screen that fits without scrolling past a
+// long ingredient list first.
+function SegmentedControl({ value, onChange, options }) {
+  return (
+    <div className="mx-4 mt-4 p-1 rounded-[12px] flex gap-1" style={{ background: 'var(--fill)' }}>
+      {options.map((opt) => {
+        const active = value === opt.value;
+        return (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            className="flex-1 py-2 rounded-[9px] text-[14px] font-semibold transition-colors"
+            style={{
+              background: active ? 'var(--bg-card)' : 'transparent',
+              color: active ? 'var(--label-1)' : 'var(--label-2)',
+              boxShadow: active ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
+            }}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // A compact card for "Watch out for" / "Good things" -- sized to sit
 // side by side so both read in one glance instead of two separate
 // full-width scrolls.
@@ -54,6 +82,7 @@ export default function Result() {
   const navigate = useNavigate();
   const [result, setResult] = useState(null);
   const [filter, setFilter] = useState('all');
+  const [view, setView] = useState('overview');
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
 
@@ -207,8 +236,17 @@ export default function Result() {
         </div>
       )}
 
+      <SegmentedControl
+        value={view}
+        onChange={setView}
+        options={[
+          { value: 'overview', label: 'Overview' },
+          { value: 'ingredients', label: `Ingredients (${ingredients.length})` },
+        ]}
+      />
+
       {/* Summary */}
-      {result.summary && (
+      {view === 'overview' && result.summary && (
         <>
           <SectionHeader>Summary</SectionHeader>
           <Group>
@@ -227,25 +265,20 @@ export default function Result() {
         </>
       )}
 
-      {/* Breakdown — also the ingredient filter */}
-      {ingredients.length > 0 && (
+      {/* Breakdown — tapping a tile jumps to the Ingredients tab filtered to that category */}
+      {view === 'overview' && ingredients.length > 0 && (
         <>
-          <SectionHeader
-            action={filter !== 'all' && (
-              <button onClick={() => setFilter('all')} className="text-[13px]" style={{ color: 'var(--tint)' }}>
-                Show all
-              </button>
-            )}
-          >
-            Breakdown
-          </SectionHeader>
+          <SectionHeader>Breakdown</SectionHeader>
           <div className="mx-4 grid grid-cols-4 gap-2">
             {tiers.map((tier) => {
               const active = filter === tier.key;
               return (
                 <button
                   key={tier.key}
-                  onClick={() => setFilter(active ? 'all' : tier.key)}
+                  onClick={() => {
+                    setFilter(tier.key);
+                    setView('ingredients');
+                  }}
                   className="rounded-[14px] py-3 px-1 text-center transition-colors"
                   style={{
                     background: active ? tier.color : 'var(--bg-card)',
@@ -272,7 +305,7 @@ export default function Result() {
       )}
 
       {/* Recommendation */}
-      {result.recommendation && (
+      {view === 'overview' && result.recommendation && (
         <>
           <SectionHeader>Our recommendation</SectionHeader>
           <Group>
@@ -293,7 +326,7 @@ export default function Result() {
 
       {/* Flags + Positives — side by side when both exist, so "at a
           glance" actually reads as one glance rather than two scrolls */}
-      {(result.flags?.length > 0 || result.positives?.length > 0) && (
+      {view === 'overview' && (result.flags?.length > 0 || result.positives?.length > 0) && (
         <>
           <SectionHeader>At a glance</SectionHeader>
           <div className={`grid gap-2.5 mx-4 ${result.flags?.length > 0 && result.positives?.length > 0 ? 'grid-cols-2' : 'grid-cols-1'}`}>
@@ -308,37 +341,47 @@ export default function Result() {
       )}
 
       {/* Ingredients */}
-      <SectionHeader>
-        {filter === 'all'
-          ? `All ${ingredients.length} ingredients`
-          : `${filteredIngredients.length} ${filter.toLowerCase()}`}
-      </SectionHeader>
-      {filteredIngredients.length === 0 ? (
-        <Group>
-          <p className="px-4 py-4 text-[15px] text-center" style={{ color: 'var(--label-2)' }}>
-            None in this category.
-          </p>
-        </Group>
-      ) : (
-        <Group>
-          {filteredIngredients.map((ingredient, i) => (
-            <IngredientCard key={i} ingredient={ingredient} />
-          ))}
-        </Group>
-      )}
-
-      {/* Raw label */}
-      {result.ingredientsText && (
+      {view === 'ingredients' && (
         <>
-          <SectionHeader>As read from the label</SectionHeader>
-          <Group>
-            <p className="px-4 py-3.5 text-[13px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: 'var(--label-2)' }}>
-              {result.ingredientsText}
-            </p>
-          </Group>
-          <p className="px-5 pt-2 text-[13px] leading-relaxed" style={{ color: 'var(--label-3)' }}>
-            Compare this against the list above — if something on your pack isn't here, it was missed while reading the label.
-          </p>
+          <SectionHeader
+            action={filter !== 'all' && (
+              <button onClick={() => setFilter('all')} className="text-[13px]" style={{ color: 'var(--tint)' }}>
+                Show all
+              </button>
+            )}
+          >
+            {filter === 'all'
+              ? `All ${ingredients.length} ingredients`
+              : `${filteredIngredients.length} ${filter.toLowerCase()}`}
+          </SectionHeader>
+          {filteredIngredients.length === 0 ? (
+            <Group>
+              <p className="px-4 py-4 text-[15px] text-center" style={{ color: 'var(--label-2)' }}>
+                None in this category.
+              </p>
+            </Group>
+          ) : (
+            <Group>
+              {filteredIngredients.map((ingredient, i) => (
+                <IngredientCard key={i} ingredient={ingredient} />
+              ))}
+            </Group>
+          )}
+
+          {/* Raw label */}
+          {result.ingredientsText && (
+            <>
+              <SectionHeader>As read from the label</SectionHeader>
+              <Group>
+                <p className="px-4 py-3.5 text-[13px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: 'var(--label-2)' }}>
+                  {result.ingredientsText}
+                </p>
+              </Group>
+              <p className="px-5 pt-2 text-[13px] leading-relaxed" style={{ color: 'var(--label-3)' }}>
+                Compare this against the list above — if something on your pack isn't here, it was missed while reading the label.
+              </p>
+            </>
+          )}
         </>
       )}
 
