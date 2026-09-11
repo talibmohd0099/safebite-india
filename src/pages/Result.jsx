@@ -360,6 +360,35 @@ export default function Result() {
                 None in this category.
               </p>
             </Group>
+          ) : filter === 'all' ? (
+            // Grouped by severity (worst first) rather than label order --
+            // easier to scan "what's actually wrong with this" at a glance.
+            // The filtered single-category view below keeps a flat list
+            // since every card in it already shares one severity.
+            tiers
+              .filter((tier) => tier.count > 0)
+              .map((tier) => (
+                <div key={tier.key}>
+                  <div className="flex items-center gap-2 px-5 pb-1.5 pt-5">
+                    <span
+                      className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                      style={{ background: tier.bg, color: tier.color }}
+                    >
+                      {tier.icon}
+                    </span>
+                    <span className="text-[13px] font-semibold" style={{ color: tier.color }}>
+                      {tier.label} · {tier.count}
+                    </span>
+                  </div>
+                  <Group>
+                    {ingredients
+                      .filter((ingredient) => severityOf(ingredient) === tier.key)
+                      .map((ingredient, i) => (
+                        <IngredientCard key={i} ingredient={ingredient} />
+                      ))}
+                  </Group>
+                </div>
+              ))
           ) : (
             <Group>
               {filteredIngredients.map((ingredient, i) => (
