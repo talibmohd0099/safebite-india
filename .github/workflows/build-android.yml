@@ -51,7 +51,13 @@ jobs:
 
       - name: Build debug APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        # gradlew's executable bit is now set in git, but a defensive
+        # chmod costs nothing and survives anyone re-committing this
+        # file from a Windows machine (which doesn't track that bit)
+        # and accidentally clearing it again.
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
 
       - name: Publish to a rolling "latest" release
         env:
