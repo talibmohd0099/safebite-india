@@ -27,13 +27,22 @@ export async function searchCachedProducts(query, { limit = 5 } = {}) {
   if (cleaned.length < 2) return [];
 
   // Escape LIKE wildcards so a typed "%" searches for a literal "%"
-  // instead of silently matching everything.
-  const pattern = `%${cleaned.replace(/[\\%_]/g, '\\$&')}%`;
+  // instead of silently matching everything. Also strip "," and "()" --
+  // this value now sits inside an unquoted .or() filter string below,
+  // where those characters are structural syntax (condition separator /
+  // grouping), not literal search characters. A product search has no
+  // legitimate need for them anyway, so dropping them is simpler and
+  // safer than trying to escape them correctly for that mini-language.
+  const pattern = `%${cleaned.replace(/[,()]/g, ' ').replace(/[\\%_]/g, '\\$&')}%`;
 
+  // Match on brand too, not just product name -- searching "Nestlé"
+  // should find Maggi/KitKat even though neither name contains the
+  // word "Nestlé". Brand lives inside the report JSON, not its own
+  // column, hence the report->>brand path in the OR filter.
   const { data, error } = await supabase
     .from('product_reports')
     .select('lookup_key, product_name, report')
-    .ilike('product_name', pattern)
+    .or(`product_name.ilike.${pattern},report->>brand.ilike.${pattern}`)
     .limit(limit);
 
   if (error || !data) return [];
@@ -79,6 +88,50 @@ export async function browseCategoryProducts(keywords, { limit = 24 } = {}) {
       score: typeof row.report?.overallScore === 'number' ? row.report.overallScore : null,
       verdict: row.report?.verdict || null,
     }));
+}
+
+/**
+ * The most-scanned products, reduced to short search terms (brand name
+ * when we have one, otherwise the full product name) for the home
+ * screen's "Popular searches" pills. Real usage data, not a hardcoded
+ * guess -- it'll naturally shift over time as more people scan things.
+ */
+// Brand text comes straight from Open Food Facts' crowdsourced data, so
+// casing is inconsistent ("bingo", "ITC", "Parle"). Only fix the clearly
+// broken cases (all one case) -- a genuine mixed-case brand name is
+// more likely right than a generic title-case pass would be.
+function normalizeCasing(label) {
+  if (label === label.toUpperCase() || label === label.toLowerCase()) {
+    return label.replace(/\w\S*/g, (w) => w[0].toUpperCase() + w.slice(1).toLowerCase());
+  }
+  return label;
+}
+
+export async function getPopularSearchTerms(limit = 8) {
+  if (!isSupabaseConfigured) return [];
+
+  const { data, error } = await supabase
+    .from('product_reports')
+    .select('product_name, report, scan_count')
+    .order('scan_count', { ascending: false })
+    .limit(limit * 6); // over-fetch so de-duping brands + skipping long names still leaves enough
+
+  if (error || !data) return [];
+
+  const seen = new Set();
+  const terms = [];
+  for (const row of data) {
+    // A search pill should read like a brand, not a full product name --
+    // skip anything too long for that rather than showing an oddly long tile.
+    const label = row.report?.brand?.length <= 18 ? row.report.brand : null;
+    if (!label) continue;
+    const key = label.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    terms.push(normalizeCasing(label));
+    if (terms.length >= limit) break;
+  }
+  return terms;
 }
 
 /**

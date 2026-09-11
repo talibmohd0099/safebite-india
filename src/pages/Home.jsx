@@ -4,10 +4,29 @@ import { useNavigate } from 'react-router-dom';
 import { extractIngredientsFromImage } from '../services/geminiService';
 import { analyzeText } from '../services/analyzeText';
 import { lookupBarcode, searchProductsByName } from '../services/openFoodFacts';
-import { getCachedReport, saveReport, barcodeKey, textKey, searchCachedProducts, browseCategoryProducts } from '../services/productCache';
+import { getCachedReport, saveReport, barcodeKey, textKey, searchCachedProducts, browseCategoryProducts, getPopularSearchTerms } from '../services/productCache';
 import { saveToHistory } from '../utils/storage';
 import LoadingScreen from '../components/LoadingScreen';
 import { CATEGORIES } from '../data/categories';
+
+function BarcodeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="w-5 h-5">
+      <rect x="2" y="4" width="2" height="16" fill="white" />
+      <rect x="6" y="4" width="1" height="16" fill="white" />
+      <rect x="9" y="4" width="3" height="16" fill="white" />
+      <rect x="14" y="4" width="1" height="16" fill="white" />
+      <rect x="17" y="4" width="2" height="16" fill="white" />
+      <rect x="21" y="4" width="1" height="16" fill="white" />
+    </svg>
+  );
+}
+
+const QUICK_ACTIONS = [
+  { id: 'image', label: 'Photo', iconBg: 'bg-blue-500', icon: <span className="text-lg">📷</span> },
+  { id: 'barcode', label: 'Barcode', iconBg: 'bg-slate-800', icon: <BarcodeIcon /> },
+  { id: 'text', label: 'Paste', iconBg: 'bg-blue-500', icon: <span className="text-lg">📄</span> },
+];
 
 export default function Home() {
   const [mode, setMode] = useState('search'); // 'search' | 'text' | 'image' | 'barcode'
@@ -24,11 +43,19 @@ export default function Home() {
   const [activeCategory, setActiveCategory] = useState(null);
   const [categoryResults, setCategoryResults] = useState([]);
   const [categoryLoading, setCategoryLoading] = useState(false);
+  const [popularTerms, setPopularTerms] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Analyzing ingredients...');
   const [error, setError] = useState('');
   const fileInputRef = useRef(null);
+  const searchInputRef = useRef(null);
   const navigate = useNavigate();
+
+  // Real usage data for the "Popular searches" pills -- loaded once, not
+  // worth the type-ahead effect's debounce/cancellation machinery.
+  useEffect(() => {
+    getPopularSearchTerms(8).then(setPopularTerms);
+  }, []);
 
   // Review step: set after an image is read or a barcode is looked up,
   // so the user can check/fix the ingredients text before we analyze it.
@@ -387,55 +414,95 @@ export default function Home() {
   }
 
   return (
-    <div className="page-in max-w-2xl mx-auto px-4 py-8">
+    <div className="page-in max-w-2xl mx-auto px-4 pb-8">
 
-      {/* Hero */}
-      <h1 className="text-xl font-bold text-slate-800 text-center mb-4">
-        Is your food <span className="text-green-600">actually safe?</span>
-      </h1>
-
-      {/* Mode Toggle */}
-      <div className="flex bg-slate-100 rounded-xl p-1 mb-4">
-        {[
-          { id: 'search', label: '🔍 Search' },
-          { id: 'text', label: '📝 Paste' },
-          { id: 'image', label: '📷 Photo' },
-          { id: 'barcode', label: '🔢 Barcode' },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => { setMode(tab.id); setError(''); }}
-            className={`tap-scale flex-1 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
-              mode === tab.id
-                ? 'bg-white text-green-700 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Search Mode */}
       {mode === 'search' && (
-        <div className="mb-4">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="e.g. Maggi, Parle-G, Aloo Bhujia"
-            autoComplete="off"
-            className="w-full p-4 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder:text-slate-400"
-          />
+        <>
+          {/* Hero band */}
+          <div className="-mx-4 px-4 pt-6 pb-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-b-[28px]">
+            <h1 className="text-white text-[17px] font-bold text-center opacity-95">
+              Is your food actually safe?
+            </h1>
+          </div>
+
+          {/* Search bar */}
+          <div className="-mt-5 mb-5 relative z-10">
+            <div className="flex items-center gap-3 bg-white rounded-2xl shadow-lg shadow-slate-200 border border-slate-100 px-4 py-3">
+              <span className="text-slate-400 text-lg flex-shrink-0">🔍</span>
+              <div className="flex-1 min-w-0">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search a product"
+                  autoComplete="off"
+                  className="w-full text-[15px] font-semibold text-slate-800 placeholder:text-slate-800 bg-transparent focus:outline-none"
+                />
+                {searchQuery.length === 0 && (
+                  <p className="text-xs text-slate-400 -mt-0.5">Maggi, Parle-G, Oreo...</p>
+                )}
+              </div>
+              <button
+                onClick={() => searchInputRef.current?.focus()}
+                aria-label="Search"
+                className="tap-scale w-10 h-10 rounded-full bg-green-600 hover:bg-green-700 flex items-center justify-center text-white text-base flex-shrink-0"
+              >
+                🔍
+              </button>
+            </div>
+          </div>
+
+          {/* Quick actions: Photo / Barcode / Paste -- shown while idle,
+              so search stays the primary action but the other three ways
+              in are one tap away instead of buried in a tab bar. */}
+          {searchQuery.trim().length === 0 && (
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              {QUICK_ACTIONS.map((action) => (
+                <button
+                  key={action.id}
+                  onClick={() => { setMode(action.id); setError(''); }}
+                  className="tap-scale flex flex-col items-center gap-2 py-4 rounded-2xl border border-slate-100 bg-white shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <span className={`w-10 h-10 rounded-xl flex items-center justify-center text-white ${action.iconBg}`}>
+                    {action.icon}
+                  </span>
+                  <span className="text-xs font-semibold text-slate-700">{action.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Popular searches -- real scan-count data, not a guess. */}
+          {searchQuery.trim().length === 0 && popularTerms.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2 px-0.5">
+                <p className="text-sm font-bold text-slate-800">Popular searches</p>
+                <span className="text-xs font-semibold text-green-600">See all</span>
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+                {popularTerms.map((term, i) => (
+                  <button
+                    key={term}
+                    onClick={() => setSearchQuery(term)}
+                    style={{ animationDelay: `${i * 30}ms` }}
+                    className="item-in tap-scale flex-shrink-0 px-4 py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition-colors"
+                  >
+                    {term}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Browse by category -- shown while the search box is empty, so
               there's something to explore before typing anything. */}
           {searchQuery.trim().length === 0 && (
             activeCategory ? (
-              <div className="mt-4">
+              <div className="mb-6">
                 <button
                   onClick={() => { setActiveCategory(null); setCategoryResults([]); }}
-                  className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-3 transition-colors"
+                  className="tap-scale flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-3 transition-colors"
                 >
                   ← All categories
                 </button>
@@ -481,22 +548,23 @@ export default function Home() {
                 )}
               </div>
             ) : (
-              <div className="mt-4">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2 px-1">
-                  Browse by category
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-2 px-0.5">
+                  <p className="text-sm font-bold text-slate-800">Explore food</p>
+                  <span className="text-xs font-semibold text-green-600">See all</span>
+                </div>
+                <div className="grid grid-cols-4 gap-2">
                   {CATEGORIES.map((cat, i) => (
                     <button
                       key={cat.id}
                       onClick={() => openCategory(cat)}
                       style={{ animationDelay: `${i * 40}ms` }}
-                      className="item-in tap-scale flex flex-col items-center gap-2 px-3 py-4 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 hover:shadow-lg hover:-translate-y-1 transition-all text-center"
+                      className={`item-in tap-scale flex flex-col items-center gap-1.5 py-3 px-1 rounded-2xl transition-transform hover:-translate-y-0.5 text-center ${cat.bg}`}
                     >
-                      <span className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl ${cat.bg}`}>
+                      <span className={`w-9 h-9 rounded-full flex items-center justify-center text-base ${cat.iconBg}`}>
                         {cat.icon}
                       </span>
-                      <span className="text-xs font-semibold text-slate-700 leading-tight">{cat.label}</span>
+                      <span className="text-[10.5px] font-semibold text-slate-700 leading-tight">{cat.label}</span>
                     </button>
                   ))}
                 </div>
@@ -565,7 +633,18 @@ export default function Home() {
           <p className="text-xs text-slate-400 mt-2">
             Results come from a free open product database. Products already scored show their score instantly — the rest you'll get to check before analyzing.
           </p>
-        </div>
+        </>
+      )}
+
+      {/* Back link -- Photo/Barcode/Paste replace the search view entirely,
+          so they need their own way back to it now that there's no tab bar. */}
+      {mode !== 'search' && (
+        <button
+          onClick={() => { setMode('search'); setError(''); }}
+          className="tap-scale flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 pt-5 pb-2 transition-colors"
+        >
+          ← Back to search
+        </button>
       )}
 
       {/* Text Mode */}
