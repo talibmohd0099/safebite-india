@@ -23,7 +23,27 @@ function verdictFor(score) {
 // "moderate". Same idea, softer, for "concerning": it should never read
 // as "Very Healthy" just because nothing else pulled the average down.
 const HARMFUL_SCORE_CAP = 24;   // forces the "Very Poor" tier
+const HARMFUL_SCORE_FLOOR = 5;  // worst case within that forced tier
 const CONCERNING_SCORE_CAP = 64; // forces at most "Moderate"
+const CONCERNING_SCORE_FLOOR = 48; // worst case within that forced tier
+
+// A plain `Math.min(score, cap)` flattens every product that crosses the
+// cap onto the exact same number, no matter how different their real
+// ingredient profiles are -- found in production doing exactly that:
+// 167 of 338 seeded products all showing 64/100, because "has a trace of
+// a concerning ingredient" is common but the resulting score always
+// landed on the same fixed point instead of varying with how clean the
+// rest of the product actually is. Squeezes whatever WOULD have scored
+// above the cap down into [floor, cap] instead, preserving relative
+// order: a product that's clean apart from one trace concerning
+// ingredient still lands near the top of its forced tier, while one with
+// real penalty piling up elsewhere (that also happens to cross the cap)
+// lands lower within it, instead of both looking identical.
+function squeezeToCap(score, cap, floor) {
+  if (score <= cap) return score;
+  const t = (score - cap) / (100 - cap);
+  return Math.round(floor + t * (cap - floor));
+}
 
 // Categories that are, by regulatory nature, almost always dosed in
 // fractions of a percent -- nobody prints "0.01% TBHQ" on a pack, but
@@ -60,9 +80,9 @@ function computeScore(ingredients) {
   let score = Math.max(0, Math.min(100, Math.round(100 - totalPenalty)));
 
   if (ingredients.some((i) => i.status === 'harmful')) {
-    score = Math.min(score, HARMFUL_SCORE_CAP);
+    score = squeezeToCap(score, HARMFUL_SCORE_CAP, HARMFUL_SCORE_FLOOR);
   } else if (ingredients.some((i) => i.status === 'concerning')) {
-    score = Math.min(score, CONCERNING_SCORE_CAP);
+    score = squeezeToCap(score, CONCERNING_SCORE_CAP, CONCERNING_SCORE_FLOOR);
   }
 
   return score;
