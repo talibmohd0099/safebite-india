@@ -16,7 +16,7 @@ export default function About() {
   }, [location.hash]);
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
+    <div className="page-in max-w-2xl mx-auto px-4 py-8">
       <div className="text-center mb-8">
         <div className="w-16 h-16 bg-green-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">
           🛡️
@@ -174,7 +174,7 @@ export default function About() {
 
       <button
         onClick={() => navigate('/')}
-        className="w-full py-3.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-colors"
+        className="tap-scale w-full py-3.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-colors"
       >
         🔍 Start Scanning
       </button>

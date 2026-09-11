@@ -40,7 +40,7 @@ function SegmentedControl({ value, onChange, options }) {
           <button
             key={opt.value}
             onClick={() => onChange(opt.value)}
-            className="flex-1 py-2 rounded-[9px] text-[14px] font-semibold transition-colors"
+            className="tap-scale flex-1 py-2 rounded-[9px] text-[14px] font-semibold transition-colors"
             style={{
               background: active ? 'var(--bg-card)' : 'transparent',
               color: active ? 'var(--label-1)' : 'var(--label-2)',
@@ -137,12 +137,12 @@ export default function Result() {
   const reportId = `SB-${(result.id || '').toString().slice(-8).toUpperCase()}`;
 
   return (
-    <div className="max-w-[560px] mx-auto pb-12" style={{ background: 'var(--bg-grouped)' }}>
+    <div className="page-in max-w-[560px] mx-auto pb-12" style={{ background: 'var(--bg-grouped)' }}>
 
       {/* Nav */}
       <button
         onClick={() => navigate('/')}
-        className="flex items-center gap-1.5 px-4 pt-3 pb-1 text-[17px]"
+        className="tap-scale flex items-center gap-1.5 px-4 pt-3 pb-1 text-[17px]"
         style={{ color: 'var(--tint)' }}
       >
         <svg viewBox="0 0 12 20" fill="none" className="w-3 h-5">
@@ -279,7 +279,7 @@ export default function Result() {
                     setFilter(tier.key);
                     setView('ingredients');
                   }}
-                  className="rounded-[14px] py-3 px-1 text-center transition-colors"
+                  className="tap-scale rounded-[14px] py-3 px-1 text-center transition-colors"
                   style={{
                     background: active ? tier.color : 'var(--bg-card)',
                     color: active ? '#fff' : 'var(--label-1)',
@@ -384,7 +384,7 @@ export default function Result() {
                     {ingredients
                       .filter((ingredient) => severityOf(ingredient) === tier.key)
                       .map((ingredient, i) => (
-                        <IngredientCard key={i} ingredient={ingredient} />
+                        <IngredientCard key={i} ingredient={ingredient} style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }} />
                       ))}
                   </Group>
                 </div>
@@ -392,7 +392,7 @@ export default function Result() {
           ) : (
             <Group>
               {filteredIngredients.map((ingredient, i) => (
-                <IngredientCard key={i} ingredient={ingredient} />
+                <IngredientCard key={i} ingredient={ingredient} style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }} />
               ))}
             </Group>
           )}
@@ -430,7 +430,7 @@ export default function Result() {
       <div className="px-4 pt-6">
         <button
           onClick={() => navigate('/')}
-          className="w-full py-3.5 rounded-[14px] text-[17px] font-semibold text-white"
+          className="tap-scale w-full py-3.5 rounded-[14px] text-[17px] font-semibold text-white"
           style={{ background: 'var(--tint)' }}
         >
           Scan another product

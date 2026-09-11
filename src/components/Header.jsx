@@ -30,7 +30,7 @@ export default function Header() {
             <Link
               key={item.path}
               to={item.path}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`tap-scale px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 location.pathname === item.path
                   ? 'bg-green-100 text-green-700'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'

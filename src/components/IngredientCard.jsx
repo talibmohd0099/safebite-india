@@ -43,16 +43,16 @@ function Badge({ label, value }) {
   );
 }
 
-export default function IngredientCard({ ingredient }) {
+export default function IngredientCard({ ingredient, style }) {
   const [expanded, setExpanded] = useState(false);
   const severity = getIngredientSeverity(ingredient);
   const researchUrl = `https://www.google.com/search?q=${encodeURIComponent(`${ingredient.name} food ingredient health effects`)}`;
 
   return (
-    <div>
+    <div className="item-in" style={style}>
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-3 px-4 py-3 text-left min-h-[44px]"
+        className="tap-scale w-full flex items-center gap-3 px-4 py-3 text-left min-h-[44px]"
       >
         <span
           className="w-9 h-9 rounded-[10px] flex-shrink-0 flex items-center justify-center text-[17px]"
@@ -83,7 +83,7 @@ export default function IngredientCard({ ingredient }) {
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 pl-[64px] space-y-3">
+        <div className="item-in px-4 pb-4 pl-[64px] space-y-3">
           <span
             className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full"
             style={{ background: severity.bg, color: severity.color }}

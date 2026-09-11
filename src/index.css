@@ -117,3 +117,36 @@ body {
 .pulse-ring {
   animation: pulse-ring 1.5s ease-out infinite;
 }
+
+/* Page-level entrance. Every page's root element gets this class, so a
+   route swap fades/rises in softly instead of an instant hard cut --
+   no router-level transition library needed, since a CSS `animation`
+   (unlike a `transition`) plays automatically the moment a new page's
+   root element is created. */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.page-in {
+  animation: page-in 0.35s ease-out both;
+}
+
+/* Staggered list-item entrance -- pair with an inline
+   `animationDelay` per row (e.g. `${i * 40}ms`) so a list reveals
+   top-to-bottom instead of popping in all at once. */
+@keyframes item-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.item-in {
+  animation: item-in 0.3s ease-out both;
+}
+
+/* Shared tap feedback for anything clickable -- a quick, subtle
+   press-down instead of a dead instant click. */
+.tap-scale {
+  transition: transform 0.15s ease;
+}
+.tap-scale:active {
+  transform: scale(0.96);
+}

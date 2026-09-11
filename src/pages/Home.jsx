@@ -317,7 +317,7 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="max-w-2xl mx-auto px-4">
+      <div className="page-in max-w-2xl mx-auto px-4">
         <LoadingScreen message={loadingMessage} />
       </div>
     );
@@ -327,10 +327,10 @@ export default function Home() {
   // so the user can fix anything the scan missed before we analyze it.
   if (review) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-8">
+      <div className="page-in max-w-2xl mx-auto px-4 py-8">
         <button
           onClick={cancelReview}
-          className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-4 transition-colors"
+          className="tap-scale flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-4 transition-colors"
         >
           ← Start over
         </button>
@@ -378,7 +378,7 @@ export default function Home() {
 
         <button
           onClick={handleConfirmReview}
-          className="w-full mt-4 py-4 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-base rounded-xl transition-colors shadow-md shadow-green-200"
+          className="tap-scale w-full mt-4 py-4 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-base rounded-xl transition-colors shadow-md shadow-green-200"
         >
           ✅ Looks good — Analyze
         </button>
@@ -387,7 +387,7 @@ export default function Home() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
+    <div className="page-in max-w-2xl mx-auto px-4 py-8">
 
       {/* Hero */}
       <h1 className="text-xl font-bold text-slate-800 text-center mb-4">
@@ -405,7 +405,7 @@ export default function Home() {
           <button
             key={tab.id}
             onClick={() => { setMode(tab.id); setError(''); }}
-            className={`flex-1 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+            className={`tap-scale flex-1 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
               mode === tab.id
                 ? 'bg-white text-green-700 shadow-sm'
                 : 'text-slate-500 hover:text-slate-700'
@@ -455,11 +455,12 @@ export default function Home() {
 
                 {!categoryLoading && categoryResults.length > 0 && (
                   <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 bg-white">
-                    {categoryResults.map((item) => (
+                    {categoryResults.map((item, i) => (
                       <button
                         key={item.lookupKey}
                         onClick={() => openCachedSuggestion(item)}
-                        className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center justify-between gap-3"
+                        style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }}
+                        className="item-in tap-scale w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center justify-between gap-3"
                       >
                         <span className="min-w-0">
                           {item.brand && (
@@ -484,14 +485,17 @@ export default function Home() {
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2 px-1">
                   Browse by category
                 </p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  {CATEGORIES.map((cat) => (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {CATEGORIES.map((cat, i) => (
                     <button
                       key={cat.id}
                       onClick={() => openCategory(cat)}
-                      className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-colors text-left"
+                      style={{ animationDelay: `${i * 40}ms` }}
+                      className="item-in tap-scale flex flex-col items-center gap-2 px-3 py-4 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 hover:shadow-lg hover:-translate-y-1 transition-all text-center"
                     >
-                      <span className="text-lg flex-shrink-0">{cat.icon}</span>
+                      <span className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl ${cat.bg}`}>
+                        {cat.icon}
+                      </span>
                       <span className="text-xs font-semibold text-slate-700 leading-tight">{cat.label}</span>
                     </button>
                   ))}
@@ -517,11 +521,12 @@ export default function Home() {
 
           {(suggestions.cached.length > 0 || suggestions.off.length > 0) && (
             <div className="mt-2 border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 bg-white">
-              {suggestions.cached.map((item) => (
+              {suggestions.cached.map((item, i) => (
                 <button
                   key={item.lookupKey}
                   onClick={() => openCachedSuggestion(item)}
-                  className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center justify-between gap-3"
+                  style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }}
+                  className="item-in tap-scale w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center justify-between gap-3"
                 >
                   <span className="min-w-0">
                     {item.brand && (
@@ -539,11 +544,12 @@ export default function Home() {
                 </button>
               ))}
 
-              {suggestions.off.map((item) => (
+              {suggestions.off.map((item, i) => (
                 <button
                   key={item.code}
                   onClick={() => openSearchResult(item)}
-                  className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
+                  style={{ animationDelay: `${Math.min((suggestions.cached.length + i) * 30, 300)}ms` }}
+                  className="item-in tap-scale w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
                 >
                   {item.brand && (
                     <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">
@@ -666,7 +672,7 @@ export default function Home() {
         <button
           onClick={handleAnalyze}
           disabled={loading}
-          className="w-full py-4 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-base rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-green-200"
+          className="tap-scale w-full py-4 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-base rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-green-200"
         >
           {mode === 'barcode' ? '🔍 Look Up Product' : '🔍 Analyze Ingredients'}
         </button>

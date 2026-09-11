@@ -23,7 +23,7 @@ export default function History() {
 
   if (history.length === 0) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
+      <div className="page-in max-w-2xl mx-auto px-4 py-16 text-center">
         <div className="text-6xl mb-4">📋</div>
         <h2 className="text-xl font-bold text-slate-700 mb-2">No scans yet</h2>
         <p className="text-slate-400 text-sm mb-6">
@@ -31,7 +31,7 @@ export default function History() {
         </p>
         <button
           onClick={() => navigate('/')}
-          className="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-xl transition-colors"
+          className="tap-scale bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-xl transition-colors"
         >
           🔍 Scan your first product
         </button>
@@ -40,7 +40,7 @@ export default function History() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
+    <div className="page-in max-w-2xl mx-auto px-4 py-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Scan History</h1>
@@ -48,14 +48,14 @@ export default function History() {
         </div>
         <button
           onClick={handleClearAll}
-          className="text-xs text-red-400 hover:text-red-600 font-medium transition-colors"
+          className="tap-scale text-xs text-red-400 hover:text-red-600 font-medium transition-colors"
         >
           Clear all
         </button>
       </div>
 
       <div className="space-y-3">
-        {history.map((entry) => {
+        {history.map((entry, i) => {
           const date = new Date(entry.savedAt).toLocaleDateString('en-IN', {
             day: 'numeric', month: 'short', year: 'numeric'
           });
@@ -64,7 +64,8 @@ export default function History() {
             <div
               key={entry.id}
               onClick={() => navigate(`/result/${entry.id}`)}
-              className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-4 cursor-pointer hover:border-green-300 hover:shadow-sm transition-all"
+              style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }}
+              className="item-in tap-scale bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-4 cursor-pointer hover:border-green-300 hover:shadow-sm transition-all"
             >
               {/* Mini score */}
               <ScoreCircle score={entry.overallScore || 0} size="small" />
