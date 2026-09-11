@@ -52,6 +52,16 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
     throw new Error("Couldn't research these ingredients right now. Please try again.");
   }
 
+  // A single-ingredient search (e.g. someone typing a random word or a
+  // typo) isn't a real product -- if Gemini itself couldn't recognize it
+  // as a food ingredient at all, don't fabricate a score/verdict for it.
+  // A genuinely unfamiliar ingredient *within* a real multi-ingredient
+  // product still gets scored -- this only applies when it's the only
+  // thing being looked up.
+  if (parsed.length === 1 && ingredients[0].recognized === false) {
+    throw new Error(`"${ingredients[0].name}" doesn't look like a real food ingredient. Please check the spelling and try again.`);
+  }
+
   const report = buildReport(ingredients, { productName, brand, imageUrl });
   report.allergens = allergens;
 

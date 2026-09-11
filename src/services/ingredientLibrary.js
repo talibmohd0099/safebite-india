@@ -62,6 +62,7 @@ function rowToIngredient(row, parsedItem) {
     scientificName: row.scientific_name,
     penalty: row.penalty,
     percentage: parsedItem.percentage,
+    recognized: row.recognized !== false,
     fromCache: true,
   };
 }
@@ -85,6 +86,7 @@ async function saveResearched(records) {
     commonly_found_in: r.commonlyFoundIn || [],
     synonyms: r.synonyms || [],
     penalty: typeof r.penalty === 'number' ? r.penalty : 0,
+    recognized: r.recognized !== false,
   }));
 
   try {
@@ -164,6 +166,7 @@ export async function resolveIngredients(parsed) {
         scientificName: record.scientificName,
         penalty: record.penalty,
         percentage: item.percentage,
+        recognized: record.recognized !== false,
         fromCache: false,
       };
       researchedCount++;

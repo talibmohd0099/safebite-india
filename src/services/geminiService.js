@@ -198,6 +198,7 @@ Each array element must be exactly this shape:
 {
   "canonicalName": "the exact lowercase key you were given for this ingredient",
   "displayName": "Properly Cased Name",
+  "recognized": true,
   "insCode": "322" or null,
   "scientificName": "chemical/scientific name, or null if it's a whole food",
   "category": "preservative | sweetener | color | emulsifier | flavour | acidity regulator | antioxidant | stabilizer | raising agent | oil | fat | protein | spice | vitamin | natural | other",
@@ -211,6 +212,8 @@ Each array element must be exactly this shape:
   "synonyms": ["other names/spellings this appears under on labels, lowercase"],
   "penalty": 0
 }
+
+Set "recognized" to false ONLY when the given name is not a real food ingredient, additive, or edible substance at all -- a person's name, a random word, a typo, or gibberish (e.g. "Talib", "asdfgh", "xyz123"). Stay true for any real ingredient you're simply not fully certain about, obscure regional ingredients, or unusual INS codes -- research those normally. When recognized is false, still fill in every other field with your best-effort placeholder guess (the app will not score or display these, but every field must still be valid JSON).
 
 "penalty" is how much this ingredient should pull a product's health score down, 0-40. Judge NUTRITIONAL QUALITY, not just legal/safety status — an ingredient can be 100% legal and non-toxic and still deserve a real penalty because it's nutritionally poor (refined, stripped of fiber/nutrients, high glycemic impact). Being "not banned" does not mean "penalty near 0".
 - 0-2: genuinely whole/unrefined foods and harmless nutrients (water, whole wheat flour, vitamins, whole spices, fresh fruit/vegetable pieces)
