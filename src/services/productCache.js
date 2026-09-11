@@ -50,6 +50,38 @@ export async function searchCachedProducts(query, { limit = 5 } = {}) {
 }
 
 /**
+ * Browse already-scored products matching any of the given keywords
+ * against their product name -- the home screen's "browse by category"
+ * feature. Keywords are our own fixed list (src/data/categories.js),
+ * never user input, so building the OR filter directly is safe here
+ * (unlike searchCachedProducts, which has to escape a typed query).
+ */
+export async function browseCategoryProducts(keywords, { limit = 24 } = {}) {
+  if (!isSupabaseConfigured || !keywords?.length) return [];
+
+  const orFilter = keywords.map((k) => `product_name.ilike.%${k}%`).join(',');
+
+  const { data, error } = await supabase
+    .from('product_reports')
+    .select('lookup_key, product_name, report')
+    .or(orFilter)
+    .limit(limit);
+
+  if (error || !data) return [];
+
+  return data
+    .filter((row) => row.product_name)
+    .map((row) => ({
+      lookupKey: row.lookup_key,
+      productName: row.product_name,
+      brand: row.report?.brand || null,
+      imageUrl: row.report?.imageUrl || null,
+      score: typeof row.report?.overallScore === 'number' ? row.report.overallScore : null,
+      verdict: row.report?.verdict || null,
+    }));
+}
+
+/**
  * Look up a cached report by its key. Returns null on a cache miss,
  * on error, or if Supabase isn't configured yet — callers should treat
  * null the same as "no cache, go ahead and call the AI".

@@ -4,9 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { extractIngredientsFromImage } from '../services/geminiService';
 import { analyzeText } from '../services/analyzeText';
 import { lookupBarcode, searchProductsByName } from '../services/openFoodFacts';
-import { getCachedReport, saveReport, barcodeKey, textKey, searchCachedProducts } from '../services/productCache';
+import { getCachedReport, saveReport, barcodeKey, textKey, searchCachedProducts, browseCategoryProducts } from '../services/productCache';
 import { saveToHistory } from '../utils/storage';
 import LoadingScreen from '../components/LoadingScreen';
+import { CATEGORIES } from '../data/categories';
 
 export default function Home() {
   const [mode, setMode] = useState('search'); // 'search' | 'text' | 'image' | 'barcode'
@@ -20,6 +21,9 @@ export default function Home() {
   const [suggestions, setSuggestions] = useState({ cached: [], off: [] });
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
+  const [activeCategory, setActiveCategory] = useState(null);
+  const [categoryResults, setCategoryResults] = useState([]);
+  const [categoryLoading, setCategoryLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Analyzing ingredients...');
   const [error, setError] = useState('');
@@ -94,6 +98,14 @@ export default function Home() {
       setError(err.message || 'Something went wrong. Please try again.');
       setLoading(false);
     }
+  };
+
+  const openCategory = async (category) => {
+    setActiveCategory(category);
+    setCategoryLoading(true);
+    const results = await browseCategoryProducts(category.keywords);
+    setCategoryResults(results);
+    setCategoryLoading(false);
   };
 
   const openSearchResult = async (item) => {
@@ -426,6 +438,78 @@ export default function Home() {
             autoComplete="off"
             className="w-full p-4 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder:text-slate-400"
           />
+
+          {/* Browse by category -- shown while the search box is empty, so
+              there's something to explore before typing anything. */}
+          {searchQuery.trim().length === 0 && (
+            activeCategory ? (
+              <div className="mt-4">
+                <button
+                  onClick={() => { setActiveCategory(null); setCategoryResults([]); }}
+                  className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-3 transition-colors"
+                >
+                  ← All categories
+                </button>
+                <p className="text-sm font-semibold text-slate-700 mb-2">
+                  {activeCategory.icon} {activeCategory.label}
+                </p>
+
+                {categoryLoading && (
+                  <p className="text-xs text-slate-400 px-1">Loading…</p>
+                )}
+
+                {!categoryLoading && categoryResults.length === 0 && (
+                  <p className="text-xs text-slate-400 px-1">
+                    Nothing scored in this category yet — check back as more products get added.
+                  </p>
+                )}
+
+                {!categoryLoading && categoryResults.length > 0 && (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 bg-white">
+                    {categoryResults.map((item) => (
+                      <button
+                        key={item.lookupKey}
+                        onClick={() => openCachedSuggestion(item)}
+                        className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center justify-between gap-3"
+                      >
+                        <span className="min-w-0">
+                          {item.brand && (
+                            <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                              {item.brand}
+                            </span>
+                          )}
+                          <span className="block text-sm text-slate-700 truncate">{item.productName}</span>
+                        </span>
+                        {typeof item.score === 'number' && (
+                          <span className="flex-shrink-0 text-xs font-bold text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
+                            {item.score}/100
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="mt-4">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2 px-1">
+                  Browse by category
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {CATEGORIES.map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => openCategory(cat)}
+                      className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-colors text-left"
+                    >
+                      <span className="text-lg flex-shrink-0">{cat.icon}</span>
+                      <span className="text-xs font-semibold text-slate-700 leading-tight">{cat.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
+          )}
 
           {searching && (
             <p className="text-xs text-slate-400 mt-2 px-1">Searching…</p>
