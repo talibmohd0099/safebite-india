@@ -1,0 +1,47 @@
+name: Generate Product Reports
+
+# Phase 2 of the seeding pipeline: takes products already saved by
+# discover-off-products.yml and turns them into real scored reports,
+# via the app's own analysis pipeline (Gemini only for genuinely unknown
+# ingredients and the one-line AI summary).
+#
+# Runs as its own job, on its own schedule, deliberately separate from
+# discovery -- Gemini's free-tier rate limit is the only real bottleneck
+# in this whole pipeline, and it should only ever slow this job down,
+# never block new products from being discovered and saved.
+
+on:
+  schedule:
+    # Every 30 minutes -- shares the same Gemini key as real users of the
+    # live app, who must always come first, so this stays modest rather
+    # than racing to clear the backlog as fast as possible.
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    # A run can spend up to (RATE_LIMIT_RETRIES x RATE_LIMIT_WAIT_MS) per
+    # product while waiting out a rate limit, times MAX_REPORTS_PER_RUN --
+    # generous headroom so a run is never cut off mid-way.
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Supabase's client needs native WebSocket support, which is
+          # only stable from Node 22 onward -- Node 20 fails immediately
+          # with "native WebSocket not found".
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Generate reports
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+        run: node scripts/generate-reports.js

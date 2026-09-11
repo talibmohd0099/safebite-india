@@ -1,0 +1,57 @@
+name: Discover Open Food Facts Products
+
+# Phase 1 of the seeding pipeline: walks the Indian FMCG companies and
+# saves their real products (name, brand, ingredients, image) into the
+# `products` table. No AI here at all -- see generate-reports.yml for the
+# separate job that turns these into scored reports. Splitting the two
+# means a Gemini slowdown never blocks new products from being found and
+# saved; discovery just runs at full Open Food Facts speed every time.
+#
+# Runs on GitHub Actions (free and effectively unlimited on a public
+# repo) since there's no Netlify site anymore.
+
+on:
+  schedule:
+    # Every 30 minutes. GitHub queues scheduled jobs on a best-effort
+    # basis, so runs can start a bit late -- harmless here, since each
+    # company's own page cursor means nothing is lost by an irregular
+    # schedule.
+    - cron: '*/30 * * * *'
+  # Adds a "Run workflow" button on the Actions tab for running it on demand.
+  workflow_dispatch:
+    inputs:
+      company:
+        description: 'Only this company (leave blank for all)'
+        required: false
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    # No Gemini pacing here, so this is bounded only by how many Open
+    # Food Facts requests fit in the timeout -- generous, but this
+    # script also stops itself early once it hits its own per-run cap.
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Supabase's client needs native WebSocket support, which is
+          # only stable from Node 22 onward -- Node 20 fails immediately
+          # with "native WebSocket not found".
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Discover
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -n "${{ github.event.inputs.company }}" ]; then
+            node scripts/discover-off-products.js --company "${{ github.event.inputs.company }}"
+          else
+            node scripts/discover-off-products.js
+          fi

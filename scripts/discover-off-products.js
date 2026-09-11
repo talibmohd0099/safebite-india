@@ -1,23 +1,19 @@
-// scripts/seed-off-products.js
+// scripts/discover-off-products.js
 //
-// Walks the Indian FMCG companies, pulls their real products from Open
-// Food Facts, and runs each new one through the app's own analysis
-// pipeline (src/services/analyzeText.js): parse -> resolve ingredients
-// via Supabase (Gemini only for genuinely unknown ones) -> score ->
-// save to product_reports.
+// Phase 1 of the seeding pipeline: walks the Indian FMCG companies,
+// pulls their real products from Open Food Facts, and saves the raw
+// facts (name, brand, ingredients text, image) into the `products`
+// table (supabase/products_schema.sql). No AI, no scoring -- that's
+// scripts/generate-reports.js's job, running as its own separate
+// GitHub Actions workflow.
 //
-// This used to be a Netlify Scheduled Function firing every minute. The
-// Netlify site has been deleted, so this now runs as a GitHub Actions
-// workflow instead (.github/workflows/seed-off-products.yml) -- same
-// move already made for the Blinkit scraper, and for the same reason:
-// a background job doesn't need a web host, and GitHub Actions is free
-// on a public repo.
-//
-// Netlify's per-invocation time limit no longer applies, so unlike the
-// old function (1-2 companies per minute), this walks every company in
-// one run -- each only pulls one page (its next unprocessed page,
-// tracked in seed_progress), so a full run is naturally bounded rather
-// than needing an artificial per-run cap.
+// This used to do discovery AND report generation in one script. Gemini
+// was the only slow, rate-limited part of that -- and a single
+// overloaded/rate-limited product could abort the ENTIRE run, including
+// every other company's products that had nothing to do with it. Since
+// this script never touches Gemini at all, that failure mode is gone
+// here by construction, and discovery can run through the whole company
+// list quickly and reliably every time.
 //
 // Product discovery and ingredient detail are two separate Open Food
 // Facts calls (see discoverPage/fetchProductDetail below) -- the old
@@ -27,13 +23,13 @@
 // and moves discovery onto Open Food Facts' newer search API instead.
 //
 // Usage:
-//   node scripts/seed-off-products.js
-//   node scripts/seed-off-products.js --company "Britannia Industries"
-//   node scripts/seed-off-products.js --dry-run
+//   node scripts/discover-off-products.js
+//   node scripts/discover-off-products.js --company "Britannia Industries"
+//   node scripts/discover-off-products.js --dry-run
 
-import { analyzeText } from '../src/services/analyzeText.js';
-import { barcodeKey, saveReport } from '../src/services/productCache.js';
-import { supabase, isSupabaseConfigured } from '../src/services/supabaseClient.js';
+import { barcodeKey } from '../src/services/productCache.js';
+import { existingLookupKeys, saveProduct } from '../src/services/productsRepo.js';
+import { isSupabaseConfigured, supabase } from '../src/services/supabaseClient.js';
 
 const OFF_PAGE_SIZE = 20;
 // Discovery ("which India products exist for this brand") and detail
@@ -47,20 +43,15 @@ const OFF_PAGE_SIZE = 20;
 const OFF_DISCOVERY_URL = 'https://search.openfoodfacts.org/search';
 const OFF_DETAIL_URL = 'https://world.openfoodfacts.org/api/v2/product';
 const OFF_USER_AGENT = 'SafeBiteIndia-SeedJob/1.0 (+background product seeder)';
-const REQUEST_GAP_MS = 1000; // be polite between companies
-const OFF_DETAIL_GAP_MS = 400; // polite spacing between per-product detail fetches
-const GEMINI_PACING_MS = 2000; // between products, so a burst of new ones doesn't trip the per-minute limit
-const RATE_LIMIT_RETRIES = 3;
-const RATE_LIMIT_WAIT_MS = 30000; // Gemini's free-tier window is per-minute; 30s reliably clears it
+const REQUEST_GAP_MS = 500; // be polite between companies
+const OFF_DETAIL_GAP_MS = 300; // polite spacing between per-product detail fetches
 const OFF_DISCOVERY_RETRIES = 6; // discovery has shown real, if occasional, instability
 const OFF_DETAIL_RETRIES = 3; // detail has been fully reliable in testing; kept modest, not zero
 
-// Keeps a single run (scheduled every 30 min, or triggered manually) from
-// spending the whole day's free-tier budget by itself -- this job shares
-// the same Gemini key as real users of the live app, who must always
-// come first. 25 companies x several runs/day naturally makes steady
-// progress without this needing to be large.
-const MAX_PRODUCTS_PER_RUN = 25;
+// No Gemini in this script at all, so the old 25-per-run cap (sized
+// around Gemini pacing) doesn't apply -- this is now bounded only by how
+// many OFF requests fit in the job's timeout, which is generous.
+const MAX_PRODUCTS_PER_RUN = 300;
 
 // Major Indian FMCG food companies/brands, matched against Open Food Facts.
 // Add more here any time -- nothing else needs to change.
@@ -90,6 +81,35 @@ const COMPANIES = [
   { company: 'MDH Spices', searchTerm: 'MDH' },
   { company: 'Tata Sampann', searchTerm: 'Tata Sampann' },
   { company: 'Adani Wilmar Fortune', searchTerm: 'Fortune oil' },
+
+  // Added once discovery ran out of new products for every company
+  // above -- every one of them was showing "fully seeded already" with
+  // nothing left to find, so growth had genuinely stalled, not just
+  // slowed. These are real, distinct Indian FMCG brands not already
+  // covered by a search term above, verified to actually return
+  // India-tagged hits on Open Food Facts before adding (a few obvious
+  // candidates -- Del Monte, Top Ramen, India Gate, Too Yumm, Act II,
+  // Wai Wai, Paper Boat, Ching's Secret -- turned out to have zero
+  // entries there at all, a real coverage gap in OFF's crowdsourced
+  // data, not a search-term bug, so left out rather than added as dead
+  // weight).
+  { company: 'Priyagold', searchTerm: 'Priyagold' },
+  { company: 'ITC Yippee', searchTerm: 'Yippee' },
+  { company: 'Parle Agro Frooti', searchTerm: 'Frooti' },
+  { company: 'Parle Agro Appy', searchTerm: 'Appy' },
+  { company: 'Gits Foods', searchTerm: 'Gits' },
+  { company: 'Bambino Agro', searchTerm: 'Bambino' },
+  { company: 'Weikfield Foods', searchTerm: 'Weikfield' },
+  { company: 'Catch Foods', searchTerm: 'Catch' },
+  { company: 'Kohinoor Foods', searchTerm: 'Kohinoor' },
+  { company: 'LT Foods Daawat', searchTerm: 'Daawat' },
+  { company: 'HUL Horlicks', searchTerm: 'Horlicks' },
+  { company: 'Mondelez Bournvita', searchTerm: 'Bournvita' },
+  { company: 'Zydus Complan', searchTerm: 'Complan' },
+  { company: 'Agro Tech Sundrop', searchTerm: 'Sundrop' },
+  { company: 'Rasna', searchTerm: 'Rasna' },
+  { company: 'Vadilal Industries', searchTerm: 'Vadilal' },
+  { company: 'Danone Epigamia', searchTerm: 'Epigamia' },
 ];
 
 // Being crowdsourced, some Open Food Facts entries have nutrition facts
@@ -173,7 +193,7 @@ async function fetchProductDetail(code) {
 async function getProgress(company) {
   const { data, error } = await supabase.from('seed_progress').select('*').eq('company', company).maybeSingle();
   if (error) {
-    console.warn(`[seed] Could not read progress for ${company}:`, error.message);
+    console.warn(`[discover] Could not read progress for ${company}:`, error.message);
   }
   return data || { company, next_page: 1, exhausted: false, products_saved: 0 };
 }
@@ -182,62 +202,12 @@ async function saveProgress(progress) {
   const { error } = await supabase
     .from('seed_progress')
     .upsert({ ...progress, updated_at: new Date().toISOString() }, { onConflict: 'company' });
-  if (error) console.warn('[seed] Could not save progress:', error.message);
-}
-
-// Two different Gemini failure phrasings need the same treatment: a
-// 429/quota message (rate limit or the daily free-tier cap) and a
-// "currently experiencing high demand" / overloaded message (Gemini's
-// wording for a temporary capacity issue, unrelated to any cap). Both
-// are transient and worth retrying -- only the *permanent* skip path
-// (a genuinely broken/unparseable product) should give up immediately.
-// The first version of this only matched quota/429 wording, so "high
-// demand" fell through to the permanent-skip path and got silently,
-// permanently lost instead of retried.
-function isTransientGeminiError(err) {
-  return /quota|rate limit|429|high demand|overloaded|unavailable|503|internal error/i.test(err?.message || '');
+  if (error) console.warn('[discover] Could not save progress:', error.message);
 }
 
 // Thrown to stop the whole run early and cleanly -- caught in main(),
 // never bubbles up as a real crash.
 class StopRunSignal extends Error {}
-
-// A brief burst (rate limit, or a short overload spell) would normally
-// clear within RATE_LIMIT_WAIT_MS. If it's still failing after that many
-// retries, there's no point continuing to hammer it for every remaining
-// product/company in this run -- whatever's causing it (today's
-// free-tier cap, or Gemini being generally overloaded right now) will
-// still be true a few seconds from now, and the 30-minute cron will pick
-// this back up regardless.
-class TransientGeminiFailureSignal extends StopRunSignal {}
-
-/**
- * A rate-limited or momentarily-overloaded product isn't a real failure
- * -- it's the same product, a bit later. Waits out a short window and
- * retries; if it's still failing after all retries, signals the caller
- * to stop the whole run rather than waste more time (and GitHub Actions
- * minutes) on something that won't clear within this run anyway.
- */
-async function analyzeWithRetry(product, companyName) {
-  for (let attempt = 1; attempt <= RATE_LIMIT_RETRIES; attempt++) {
-    try {
-      const { report } = await analyzeText(product.ingredients_text, product.product_name, primaryBrand(product.brands), product.ingredients, product.image_front_url);
-      return report;
-    } catch (err) {
-      if (isTransientGeminiError(err)) {
-        if (attempt < RATE_LIMIT_RETRIES) {
-          console.warn(`  Gemini temporarily unavailable for "${product.product_name}" (${companyName}) -- waiting ${RATE_LIMIT_WAIT_MS / 1000}s (attempt ${attempt}/${RATE_LIMIT_RETRIES}): ${err.message}`);
-          await sleep(RATE_LIMIT_WAIT_MS);
-          continue;
-        }
-        throw new TransientGeminiFailureSignal(`Still failing after ${RATE_LIMIT_RETRIES} attempts (${err.message}) -- likely today's free-tier cap or a longer overload spell, not a brief blip.`);
-      }
-      console.error(`  Skipped "${product.product_name}" (${companyName}):`, err.message);
-      return null;
-    }
-  }
-  return null;
-}
 
 async function runCompany(target, dryRun, budget) {
   const progress = await getProgress(target.company);
@@ -266,10 +236,7 @@ async function runCompany(target, dryRun, budget) {
   let existing = new Set();
   if (!dryRun) {
     const codes = hits.filter((h) => h.code).map((h) => barcodeKey(h.code));
-    if (codes.length > 0) {
-      const { data } = await supabase.from('product_reports').select('lookup_key').in('lookup_key', codes);
-      existing = new Set((data || []).map((r) => r.lookup_key));
-    }
+    if (codes.length > 0) existing = await existingLookupKeys(codes);
   }
 
   let saved = 0;
@@ -280,7 +247,7 @@ async function runCompany(target, dryRun, budget) {
     if (existing.has(key)) continue;
 
     if (dryRun) {
-      console.log(`  ${target.company}: would analyze "${hit.product_name || hit.code}"`);
+      console.log(`  ${target.company}: would save "${hit.product_name || hit.code}"`);
       saved++;
       continue;
     }
@@ -295,35 +262,21 @@ async function runCompany(target, dryRun, budget) {
     await sleep(OFF_DETAIL_GAP_MS);
     if (!detail || !looksLikeValidIngredients(detail.ingredients_text)) continue;
 
-    let report;
-    try {
-      report = await analyzeWithRetry(detail, target.company);
-    } catch (err) {
-      if (err instanceof StopRunSignal) {
-        console.warn(`  ${target.company}: ${err.message} Stopping the whole run here -- next scheduled run will pick back up on this same page.`);
-        stoppedEarly = true;
-        break;
-      }
-      throw err;
-    }
+    await saveProduct({
+      lookupKey: key,
+      source: 'barcode',
+      productName: detail.product_name,
+      brand: primaryBrand(detail.brands),
+      ingredientsText: detail.ingredients_text,
+      offIngredients: detail.ingredients,
+      imageUrl: detail.image_front_url,
+    });
     budget.remaining--;
-
-    if (report) {
-      await saveReport({
-        lookupKey: key,
-        source: 'barcode',
-        productName: detail.product_name,
-        ingredientsText: detail.ingredients_text,
-        report,
-      });
-      saved++;
-    }
-
-    await sleep(GEMINI_PACING_MS); // proactive pacing, not just reacting to 429s
+    saved++;
   }
 
   // Only advance the page cursor / mark exhausted on a clean, complete
-  // pass -- if we bailed early (cap or quota), leave next_page untouched
+  // pass -- if we bailed early (hit the cap), leave next_page untouched
   // so this exact page gets retried next run instead of silently losing
   // whatever wasn't reached yet.
   if (!dryRun && !stoppedEarly) {
@@ -342,7 +295,7 @@ async function runCompany(target, dryRun, budget) {
 
   console.log(`  ${target.company} page ${progress.next_page}: saved ${saved} new product(s), ${existing.size} already known.${stoppedEarly ? ' (stopped early)' : ''}`);
 
-  if (stoppedEarly) throw new StopRunSignal('Run budget or quota reached.');
+  if (stoppedEarly) throw new StopRunSignal('Run budget reached.');
 }
 
 async function main() {
@@ -381,7 +334,7 @@ async function main() {
     await sleep(REQUEST_GAP_MS);
   }
 
-  console.log('\nDone.');
+  console.log('\nDone. Run scripts/generate-reports.js (its own workflow) to turn newly-saved products into reports.');
 }
 
 main().catch((err) => {
