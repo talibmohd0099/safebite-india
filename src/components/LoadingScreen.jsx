@@ -1,5 +1,6 @@
 // src/components/LoadingScreen.jsx
 import { useEffect, useState } from 'react';
+import ScanBadge from './ScanBadge';
 
 const STEPS = [
   { icon: '📷', label: 'Reading the label' },
@@ -36,12 +37,10 @@ export default function LoadingScreen({ message = 'Analyzing ingredients...' }) 
 
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4">
-      {/* Pulsing shield */}
-      <div className="relative w-20 h-20 mb-6">
-        <div className="absolute inset-0 rounded-full bg-green-200 pulse-ring" />
-        <div className="absolute inset-0 rounded-full bg-green-100 flex items-center justify-center">
-          <span className="text-3xl">🛡️</span>
-        </div>
+      {/* Scanning is literally what's happening right now -- same badge
+          as the home hero, larger, as the centerpiece here. */}
+      <div className="mb-6">
+        <ScanBadge size={80} tone="soft" />
       </div>
 
       <h2 className="text-xl font-bold text-slate-800 mb-1 text-center">{message}</h2>
