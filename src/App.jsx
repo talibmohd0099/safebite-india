@@ -14,10 +14,14 @@ import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-route
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import Header from './components/Header';
+import BottomTabBar from './components/BottomTabBar';
 import Home from './pages/Home';
 import Result from './pages/Result';
 import History from './pages/History';
 import About from './pages/About';
+import Browse from './pages/Browse';
+import Category from './pages/Category';
+import PopularSearches from './pages/PopularSearches';
 
 // The Android app's hardware/gesture back button doesn't do anything by
 // default in a Capacitor WebView -- without this, it would just sit
@@ -57,8 +61,12 @@ export default function App() {
             <Route path="/result/:id" element={<Result />} />
             <Route path="/history" element={<History />} />
             <Route path="/about" element={<About />} />
+            <Route path="/browse" element={<Browse />} />
+            <Route path="/category/:id" element={<Category />} />
+            <Route path="/popular" element={<PopularSearches />} />
           </Routes>
         </main>
+        <BottomTabBar />
       </div>
     </HashRouter>
   );

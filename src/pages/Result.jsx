@@ -137,7 +137,7 @@ export default function Result() {
   const reportId = `SB-${(result.id || '').toString().slice(-8).toUpperCase()}`;
 
   return (
-    <div className="page-in max-w-[560px] mx-auto pb-12" style={{ background: 'var(--bg-grouped)' }}>
+    <div className="page-in max-w-[560px] mx-auto pb-24" style={{ background: 'var(--bg-grouped)' }}>
 
       {/* Nav */}
       <button

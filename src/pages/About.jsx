@@ -16,7 +16,7 @@ export default function About() {
   }, [location.hash]);
 
   return (
-    <div className="page-in max-w-2xl mx-auto px-4 py-8">
+    <div className="page-in max-w-2xl mx-auto px-4 py-8 pb-24">
       <div className="text-center mb-8">
         <div className="w-16 h-16 bg-green-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">
           🛡️

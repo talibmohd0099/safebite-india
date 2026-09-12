@@ -46,7 +46,7 @@ export default function History() {
 
   if (history.length === 0) {
     return (
-      <div className="page-in max-w-2xl mx-auto px-4 py-16 text-center">
+      <div className="page-in max-w-2xl mx-auto px-4 py-16 pb-24 text-center">
         <div className="text-6xl mb-4">📋</div>
         <h2 className="text-xl font-bold text-slate-700 mb-2">No scans yet</h2>
         <p className="text-slate-400 text-sm mb-6">
@@ -65,7 +65,7 @@ export default function History() {
   const filtered = filter === 'All' ? history : history.filter((e) => bucketFor(e.overallScore || 0) === filter);
 
   return (
-    <div className="page-in max-w-2xl mx-auto px-4 py-6">
+    <div className="page-in max-w-2xl mx-auto px-4 py-6 pb-24">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Your food history</h1>

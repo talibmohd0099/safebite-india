@@ -1,34 +1,30 @@
 // src/pages/Home.jsx
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { extractIngredientsFromImage } from '../services/geminiService';
 import { analyzeText } from '../services/analyzeText';
 import { lookupBarcode, searchProductsByName } from '../services/openFoodFacts';
-import { getCachedReport, saveReport, barcodeKey, textKey, searchCachedProducts, browseCategoryProducts, getPopularSearchTerms } from '../services/productCache';
+import { getCachedReport, saveReport, barcodeKey, textKey, searchCachedProducts, getPopularSearchTerms } from '../services/productCache';
 import { saveToHistory } from '../utils/storage';
 import LoadingScreen from '../components/LoadingScreen';
+import CategoryIcon from '../components/CategoryIcon';
 import { CATEGORIES } from '../data/categories';
 
 function BarcodeIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="w-5 h-5">
-      <rect x="2" y="4" width="2" height="16" fill="white" />
-      <rect x="6" y="4" width="1" height="16" fill="white" />
-      <rect x="9" y="4" width="3" height="16" fill="white" />
-      <rect x="14" y="4" width="1" height="16" fill="white" />
-      <rect x="17" y="4" width="2" height="16" fill="white" />
-      <rect x="21" y="4" width="1" height="16" fill="white" />
+    <svg viewBox="0 0 24 24" className="w-4 h-4">
+      <rect x="2" y="4" width="2" height="16" fill="currentColor" />
+      <rect x="6" y="4" width="1" height="16" fill="currentColor" />
+      <rect x="9" y="4" width="3" height="16" fill="currentColor" />
+      <rect x="14" y="4" width="1" height="16" fill="currentColor" />
+      <rect x="17" y="4" width="2" height="16" fill="currentColor" />
+      <rect x="21" y="4" width="1" height="16" fill="currentColor" />
     </svg>
   );
 }
 
-const QUICK_ACTIONS = [
-  { id: 'image', label: 'Photo', iconBg: 'bg-blue-500', icon: <span className="text-lg">📷</span> },
-  { id: 'barcode', label: 'Barcode', iconBg: 'bg-slate-800', icon: <BarcodeIcon /> },
-  { id: 'text', label: 'Paste', iconBg: 'bg-blue-500', icon: <span className="text-lg">📄</span> },
-];
-
 export default function Home() {
+  const [searchParams] = useSearchParams();
   const [mode, setMode] = useState('search'); // 'search' | 'text' | 'image' | 'barcode'
   const [text, setText] = useState('');
   const [textProductName, setTextProductName] = useState('');
@@ -36,13 +32,10 @@ export default function Home() {
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [barcodeInput, setBarcodeInput] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [suggestions, setSuggestions] = useState({ cached: [], off: [] });
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
-  const [activeCategory, setActiveCategory] = useState(null);
-  const [categoryResults, setCategoryResults] = useState([]);
-  const [categoryLoading, setCategoryLoading] = useState(false);
   const [popularTerms, setPopularTerms] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Analyzing ingredients...');
@@ -125,14 +118,6 @@ export default function Home() {
       setError(err.message || 'Something went wrong. Please try again.');
       setLoading(false);
     }
-  };
-
-  const openCategory = async (category) => {
-    setActiveCategory(category);
-    setCategoryLoading(true);
-    const results = await browseCategoryProducts(category.keywords);
-    setCategoryResults(results);
-    setCategoryLoading(false);
   };
 
   const openSearchResult = async (item) => {
@@ -344,7 +329,7 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="page-in max-w-2xl mx-auto px-4">
+      <div className="page-in max-w-2xl mx-auto px-4 pb-24">
         <LoadingScreen message={loadingMessage} />
       </div>
     );
@@ -354,7 +339,7 @@ export default function Home() {
   // so the user can fix anything the scan missed before we analyze it.
   if (review) {
     return (
-      <div className="page-in max-w-2xl mx-auto px-4 py-8">
+      <div className="page-in max-w-2xl mx-auto px-4 py-8 pb-24">
         <button
           onClick={cancelReview}
           className="tap-scale flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-4 transition-colors"
@@ -414,7 +399,7 @@ export default function Home() {
   }
 
   return (
-    <div className="page-in max-w-2xl mx-auto px-4 pb-8">
+    <div className="page-in max-w-2xl mx-auto px-4 pb-24">
 
       {mode === 'search' && (
         <>
@@ -426,7 +411,7 @@ export default function Home() {
           </div>
 
           {/* Search bar */}
-          <div className="-mt-5 mb-5 relative z-10">
+          <div className="-mt-5 mb-4 relative z-10">
             <div className="flex items-center gap-3 bg-white rounded-2xl shadow-lg shadow-slate-200 border border-slate-100 px-4 py-3">
               <span className="text-slate-400 text-lg flex-shrink-0">🔍</span>
               <div className="flex-1 min-w-0">
@@ -453,23 +438,34 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Quick actions: Photo / Barcode / Paste -- shown while idle,
-              so search stays the primary action but the other three ways
-              in are one tap away instead of buried in a tab bar. */}
+          {/* Quick actions -- Photo is the primary/most common flow, so it
+              gets the bigger green pill; Barcode/Paste are secondary,
+              smaller, and share the row instead of each getting a full
+              card -- keeps Popular searches/Explore food within reach
+              without scrolling. */}
           {searchQuery.trim().length === 0 && (
-            <div className="grid grid-cols-3 gap-3 mb-6">
-              {QUICK_ACTIONS.map((action) => (
-                <button
-                  key={action.id}
-                  onClick={() => { setMode(action.id); setError(''); }}
-                  className="tap-scale flex flex-col items-center gap-2 py-4 rounded-2xl border border-slate-100 bg-white shadow-sm hover:shadow-md transition-shadow"
-                >
-                  <span className={`w-10 h-10 rounded-xl flex items-center justify-center text-white ${action.iconBg}`}>
-                    {action.icon}
-                  </span>
-                  <span className="text-xs font-semibold text-slate-700">{action.label}</span>
-                </button>
-              ))}
+            <div className="flex gap-2 mb-5">
+              <button
+                onClick={() => { setMode('image'); setError(''); }}
+                className="tap-scale flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white shadow-sm shadow-green-200 transition-colors"
+              >
+                <span className="text-base">📷</span>
+                <span className="text-sm font-bold">Scan Photo</span>
+              </button>
+              <button
+                onClick={() => { setMode('barcode'); setError(''); }}
+                className="tap-scale flex items-center justify-center gap-1.5 px-4 py-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors"
+              >
+                <BarcodeIcon />
+                <span className="text-xs font-semibold">Barcode</span>
+              </button>
+              <button
+                onClick={() => { setMode('text'); setError(''); }}
+                className="tap-scale flex items-center justify-center gap-1.5 px-4 py-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors"
+              >
+                <span className="text-sm">📄</span>
+                <span className="text-xs font-semibold">Paste</span>
+              </button>
             </div>
           )}
 
@@ -478,19 +474,29 @@ export default function Home() {
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2 px-0.5">
                 <p className="text-sm font-bold text-slate-800">Popular searches</p>
-                <span className="text-xs font-semibold text-green-600">See all</span>
+                <button onClick={() => navigate('/popular')} className="tap-scale text-xs font-semibold text-green-600">
+                  See all
+                </button>
               </div>
-              <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-                {popularTerms.map((term, i) => (
-                  <button
-                    key={term}
-                    onClick={() => setSearchQuery(term)}
-                    style={{ animationDelay: `${i * 30}ms` }}
-                    className="item-in tap-scale flex-shrink-0 px-4 py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition-colors"
-                  >
-                    {term}
-                  </button>
-                ))}
+              <div className="relative">
+                <div className="flex gap-2 overflow-x-auto pb-1 pr-8" style={{ scrollbarWidth: 'none' }}>
+                  {popularTerms.map((term, i) => (
+                    <button
+                      key={term}
+                      onClick={() => setSearchQuery(term)}
+                      style={{ animationDelay: `${i * 30}ms` }}
+                      className="item-in tap-scale flex-shrink-0 px-4 py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition-colors"
+                    >
+                      {term}
+                    </button>
+                  ))}
+                </div>
+                {/* Fade hints there's more to scroll to -- the row has no
+                    other visual cue that it doesn't just end there. */}
+                <div
+                  className="pointer-events-none absolute top-0 right-0 bottom-1 w-10"
+                  style={{ background: 'linear-gradient(to right, transparent, var(--bg-grouped))' }}
+                />
               </div>
             </div>
           )}
@@ -498,78 +504,29 @@ export default function Home() {
           {/* Browse by category -- shown while the search box is empty, so
               there's something to explore before typing anything. */}
           {searchQuery.trim().length === 0 && (
-            activeCategory ? (
-              <div className="mb-6">
-                <button
-                  onClick={() => { setActiveCategory(null); setCategoryResults([]); }}
-                  className="tap-scale flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-3 transition-colors"
-                >
-                  ← All categories
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2 px-0.5">
+                <p className="text-sm font-bold text-slate-800">Explore food</p>
+                <button onClick={() => navigate('/browse')} className="tap-scale text-xs font-semibold text-green-600">
+                  See all
                 </button>
-                <p className="text-sm font-semibold text-slate-700 mb-2">
-                  {activeCategory.icon} {activeCategory.label}
-                </p>
-
-                {categoryLoading && (
-                  <p className="text-xs text-slate-400 px-1">Loading…</p>
-                )}
-
-                {!categoryLoading && categoryResults.length === 0 && (
-                  <p className="text-xs text-slate-400 px-1">
-                    Nothing scored in this category yet — check back as more products get added.
-                  </p>
-                )}
-
-                {!categoryLoading && categoryResults.length > 0 && (
-                  <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 bg-white">
-                    {categoryResults.map((item, i) => (
-                      <button
-                        key={item.lookupKey}
-                        onClick={() => openCachedSuggestion(item)}
-                        style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }}
-                        className="item-in tap-scale w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center justify-between gap-3"
-                      >
-                        <span className="min-w-0">
-                          {item.brand && (
-                            <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                              {item.brand}
-                            </span>
-                          )}
-                          <span className="block text-sm text-slate-700 truncate">{item.productName}</span>
-                        </span>
-                        {typeof item.score === 'number' && (
-                          <span className="flex-shrink-0 text-xs font-bold text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
-                            {item.score}/100
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
-            ) : (
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-2 px-0.5">
-                  <p className="text-sm font-bold text-slate-800">Explore food</p>
-                  <span className="text-xs font-semibold text-green-600">See all</span>
-                </div>
-                <div className="grid grid-cols-4 gap-2">
-                  {CATEGORIES.map((cat, i) => (
-                    <button
-                      key={cat.id}
-                      onClick={() => openCategory(cat)}
-                      style={{ animationDelay: `${i * 40}ms` }}
-                      className={`item-in tap-scale flex flex-col items-center gap-1.5 py-3 px-1 rounded-2xl transition-transform hover:-translate-y-0.5 text-center ${cat.bg}`}
-                    >
-                      <span className={`w-9 h-9 rounded-full flex items-center justify-center text-base ${cat.iconBg}`}>
-                        {cat.icon}
-                      </span>
-                      <span className="text-[10.5px] font-semibold text-slate-700 leading-tight">{cat.label}</span>
-                    </button>
-                  ))}
-                </div>
+              <div className="grid grid-cols-4 gap-2">
+                {CATEGORIES.map((cat, i) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => navigate(`/category/${cat.id}`)}
+                    style={{ animationDelay: `${i * 40}ms` }}
+                    className={`item-in tap-scale flex flex-col items-center gap-1.5 py-3 px-1 rounded-2xl transition-transform hover:-translate-y-0.5 text-center ${cat.bg}`}
+                  >
+                    <span className={`w-9 h-9 rounded-full flex items-center justify-center ${cat.iconBg} ${cat.iconColor}`}>
+                      <CategoryIcon id={cat.id} className="w-5 h-5" />
+                    </span>
+                    <span className="text-[10.5px] font-semibold text-slate-700 leading-tight">{cat.label}</span>
+                  </button>
+                ))}
               </div>
-            )
+            </div>
           )}
 
           {searching && (
@@ -630,8 +587,8 @@ export default function Home() {
             </div>
           )}
 
-          <p className="text-xs text-slate-400 mt-2">
-            Results come from a free open product database. Products already scored show their score instantly — the rest you'll get to check before analyzing.
+          <p className="text-[11px] text-slate-400 mt-3 text-center">
+            Powered by a free open product database · already-scored items load instantly
           </p>
         </>
       )}
