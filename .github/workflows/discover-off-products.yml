@@ -1,11 +1,19 @@
 name: Discover Open Food Facts Products
 
-# Phase 1 of the seeding pipeline: walks the Indian FMCG companies and
-# saves their real products (name, brand, ingredients, image) into the
-# `products` table. No AI here at all -- see generate-reports.yml for the
-# separate job that turns these into scored reports. Splitting the two
-# means a Gemini slowdown never blocks new products from being found and
-# saved; discovery just runs at full Open Food Facts speed every time.
+# Phase 1 of the seeding pipeline: walks Open Food Facts by food CATEGORY
+# (biscuits, snacks, beverages, ...) and saves real India-tagged products
+# (name, brand, ingredients, image) into the `products` table. No AI here
+# at all -- see generate-reports.yml for the separate job that turns
+# these into scored reports. Splitting the two means a Gemini slowdown
+# never blocks new products from being found and saved; discovery just
+# runs at full Open Food Facts speed every time.
+#
+# This used to walk a fixed list of ~42 brand names instead -- that hit a
+# hard ceiling once every brand's own catalog was fully walked, since a
+# brand list can only ever be as big as whoever maintains it. Category
+# tags aren't tied to a brand list, so this doesn't run into that same
+# wall, and it also picks up smaller/regional brands the old list never
+# had a search term for.
 #
 # Runs on GitHub Actions (free and effectively unlimited on a public
 # repo) since there's no Netlify site anymore.
@@ -14,14 +22,14 @@ on:
   schedule:
     # Every 30 minutes. GitHub queues scheduled jobs on a best-effort
     # basis, so runs can start a bit late -- harmless here, since each
-    # company's own page cursor means nothing is lost by an irregular
+    # category's own page cursor means nothing is lost by an irregular
     # schedule.
     - cron: '*/30 * * * *'
   # Adds a "Run workflow" button on the Actions tab for running it on demand.
   workflow_dispatch:
     inputs:
-      company:
-        description: 'Only this company (leave blank for all)'
+      category:
+        description: 'Only this category (leave blank for all)'
         required: false
 
 jobs:
@@ -50,8 +58,8 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
-          if [ -n "${{ github.event.inputs.company }}" ]; then
-            node scripts/discover-off-products.js --company "${{ github.event.inputs.company }}"
+          if [ -n "${{ github.event.inputs.category }}" ]; then
+            node scripts/discover-off-products.js --category "${{ github.event.inputs.category }}"
           else
             node scripts/discover-off-products.js
           fi

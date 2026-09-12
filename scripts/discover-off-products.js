@@ -1,19 +1,30 @@
 // scripts/discover-off-products.js
 //
-// Phase 1 of the seeding pipeline: walks the Indian FMCG companies,
-// pulls their real products from Open Food Facts, and saves the raw
-// facts (name, brand, ingredients text, image) into the `products`
-// table (supabase/products_schema.sql). No AI, no scoring -- that's
-// scripts/generate-reports.js's job, running as its own separate
-// GitHub Actions workflow.
+// Phase 1 of the seeding pipeline: walks Open Food Facts by FOOD
+// CATEGORY (biscuits, snacks, beverages, ...) rather than by brand name,
+// and saves the raw facts (name, brand, ingredients text, image) into
+// the `products` table (supabase/products_schema.sql). No AI, no
+// scoring -- that's scripts/generate-reports.js's job, running as its
+// own separate GitHub Actions workflow.
+//
+// This used to walk a fixed list of ~42 Indian FMCG brand names instead.
+// That worked at first, but it's a hard ceiling by construction -- every
+// brand's real catalog on Open Food Facts is finite, and once all of
+// them hit "no more pages," growth stops completely regardless of how
+// much more India-tagged food actually exists there (it does: e.g.
+// categories_tags:"en:snacks" alone returns 1000+ India-tagged products,
+// several times the total this pipeline had collected across all 42
+// brands combined). Category tags aren't tied to a brand list at all,
+// so this doesn't hit that same wall, and it picks up smaller/regional
+// brands the old list never had a search term for.
 //
 // This used to do discovery AND report generation in one script. Gemini
 // was the only slow, rate-limited part of that -- and a single
 // overloaded/rate-limited product could abort the ENTIRE run, including
-// every other company's products that had nothing to do with it. Since
+// every other category's products that had nothing to do with it. Since
 // this script never touches Gemini at all, that failure mode is gone
-// here by construction, and discovery can run through the whole company
-// list quickly and reliably every time.
+// here by construction, and discovery can run through the whole
+// category list quickly and reliably every time.
 //
 // Product discovery and ingredient detail are two separate Open Food
 // Facts calls (see discoverPage/fetchProductDetail below) -- the old
@@ -24,7 +35,7 @@
 //
 // Usage:
 //   node scripts/discover-off-products.js
-//   node scripts/discover-off-products.js --company "Britannia Industries"
+//   node scripts/discover-off-products.js --category "Snacks"
 //   node scripts/discover-off-products.js --dry-run
 
 import { barcodeKey } from '../src/services/productCache.js';
@@ -32,84 +43,62 @@ import { existingLookupKeys, saveProduct } from '../src/services/productsRepo.js
 import { isSupabaseConfigured, supabase } from '../src/services/supabaseClient.js';
 
 const OFF_PAGE_SIZE = 20;
-// Discovery ("which India products exist for this brand") and detail
+// Discovery ("which India products exist in this category") and detail
 // ("what are this barcode's ingredients") are deliberately two different
 // endpoints. The legacy cgi/search.pl did both in one call, but measured
 // directly it only succeeded ~33% of the time (503s the rest). The
-// newer search-a-licious API (search.openfoodfacts.org) tested 5/5 for
-// discovery; it doesn't return ingredients, so detail still comes from
-// the same v2 per-barcode endpoint src/services/openFoodFacts.js already
-// uses for live scans -- the part of this pipeline that was never flaky.
+// newer search-a-licious API (search.openfoodfacts.org) tested reliably
+// for discovery; it doesn't return ingredients, so detail still comes
+// from the same v2 per-barcode endpoint src/services/openFoodFacts.js
+// already uses for live scans -- the part of this pipeline that was
+// never flaky.
 const OFF_DISCOVERY_URL = 'https://search.openfoodfacts.org/search';
 const OFF_DETAIL_URL = 'https://world.openfoodfacts.org/api/v2/product';
 const OFF_USER_AGENT = 'SafeBiteIndia-SeedJob/1.0 (+background product seeder)';
-const REQUEST_GAP_MS = 500; // be polite between companies
+const REQUEST_GAP_MS = 500; // be polite between categories
 const OFF_DETAIL_GAP_MS = 300; // polite spacing between per-product detail fetches
 const OFF_DISCOVERY_RETRIES = 6; // discovery has shown real, if occasional, instability
 const OFF_DETAIL_RETRIES = 3; // detail has been fully reliable in testing; kept modest, not zero
 
-// No Gemini in this script at all, so the old 25-per-run cap (sized
-// around Gemini pacing) doesn't apply -- this is now bounded only by how
-// many OFF requests fit in the job's timeout, which is generous.
+// No Gemini in this script at all, so this is bounded only by how many
+// OFF requests fit in the job's timeout, which is generous.
 const MAX_PRODUCTS_PER_RUN = 300;
 
-// Major Indian FMCG food companies/brands, matched against Open Food Facts.
-// Add more here any time -- nothing else needs to change.
-const COMPANIES = [
-  { company: 'Britannia Industries', searchTerm: 'Britannia' },
-  { company: 'Parle Products', searchTerm: 'Parle' },
-  { company: 'ITC Sunfeast', searchTerm: 'Sunfeast' },
-  { company: 'ITC Bingo', searchTerm: 'Bingo' },
-  { company: 'ITC Aashirvaad', searchTerm: 'Aashirvaad' },
-  { company: 'Nestle India Maggi', searchTerm: 'Maggi' },
-  { company: 'Nestle India KitKat', searchTerm: 'KitKat' },
-  { company: "Haldiram's", searchTerm: "Haldiram's" },
-  { company: 'Amul (GCMMF)', searchTerm: 'Amul' },
-  { company: 'MTR Foods', searchTerm: 'MTR' },
-  { company: 'Dabur India', searchTerm: 'Dabur' },
-  { company: 'Patanjali Ayurved', searchTerm: 'Patanjali' },
-  { company: 'Marico Saffola', searchTerm: 'Saffola' },
-  { company: 'HUL Kissan', searchTerm: 'Kissan' },
-  { company: 'HUL Knorr', searchTerm: 'Knorr' },
-  { company: 'HUL Bru', searchTerm: 'Bru' },
-  { company: 'Mondelez Cadbury', searchTerm: 'Cadbury' },
-  { company: "PepsiCo Lay's", searchTerm: "Lay's" },
-  { company: 'PepsiCo Kurkure', searchTerm: 'Kurkure' },
-  { company: 'Bikaji Foods', searchTerm: 'Bikaji' },
-  { company: 'Mother Dairy', searchTerm: 'Mother Dairy' },
-  { company: 'Everest Spices', searchTerm: 'Everest masala' },
-  { company: 'MDH Spices', searchTerm: 'MDH' },
-  { company: 'Tata Sampann', searchTerm: 'Tata Sampann' },
-  { company: 'Adani Wilmar Fortune', searchTerm: 'Fortune oil' },
-
-  // Added once discovery ran out of new products for every company
-  // above -- every one of them was showing "fully seeded already" with
-  // nothing left to find, so growth had genuinely stalled, not just
-  // slowed. These are real, distinct Indian FMCG brands not already
-  // covered by a search term above, verified to actually return
-  // India-tagged hits on Open Food Facts before adding (a few obvious
-  // candidates -- Del Monte, Top Ramen, India Gate, Too Yumm, Act II,
-  // Wai Wai, Paper Boat, Ching's Secret -- turned out to have zero
-  // entries there at all, a real coverage gap in OFF's crowdsourced
-  // data, not a search-term bug, so left out rather than added as dead
-  // weight).
-  { company: 'Priyagold', searchTerm: 'Priyagold' },
-  { company: 'ITC Yippee', searchTerm: 'Yippee' },
-  { company: 'Parle Agro Frooti', searchTerm: 'Frooti' },
-  { company: 'Parle Agro Appy', searchTerm: 'Appy' },
-  { company: 'Gits Foods', searchTerm: 'Gits' },
-  { company: 'Bambino Agro', searchTerm: 'Bambino' },
-  { company: 'Weikfield Foods', searchTerm: 'Weikfield' },
-  { company: 'Catch Foods', searchTerm: 'Catch' },
-  { company: 'Kohinoor Foods', searchTerm: 'Kohinoor' },
-  { company: 'LT Foods Daawat', searchTerm: 'Daawat' },
-  { company: 'HUL Horlicks', searchTerm: 'Horlicks' },
-  { company: 'Mondelez Bournvita', searchTerm: 'Bournvita' },
-  { company: 'Zydus Complan', searchTerm: 'Complan' },
-  { company: 'Agro Tech Sundrop', searchTerm: 'Sundrop' },
-  { company: 'Rasna', searchTerm: 'Rasna' },
-  { company: 'Vadilal Industries', searchTerm: 'Vadilal' },
-  { company: 'Danone Epigamia', searchTerm: 'Epigamia' },
+// Real Open Food Facts category tags, India-tagged product counts
+// verified live before adding any of these (a handful of plausible-
+// looking ones -- en:sweets, en:namkeens, en:papads, en:ready-meals --
+// turned out to return zero and were left out rather than added as dead
+// weight, same discipline the old brand list used).
+const CATEGORIES = [
+  { category: 'Biscuits', tag: 'en:biscuits' },
+  { category: 'Snacks', tag: 'en:snacks' },
+  { category: 'Beverages', tag: 'en:beverages' },
+  { category: 'Chocolates', tag: 'en:chocolates' },
+  { category: 'Spices', tag: 'en:spices' },
+  { category: 'Dairies', tag: 'en:dairies' },
+  { category: 'Instant noodles', tag: 'en:instant-noodles' },
+  { category: 'Chips and fries', tag: 'en:chips-and-fries' },
+  { category: 'Salty snacks', tag: 'en:salty-snacks' },
+  { category: 'Cereals and potatoes', tag: 'en:cereals-and-potatoes' },
+  { category: 'Breakfast cereals', tag: 'en:breakfast-cereals' },
+  { category: 'Sauces', tag: 'en:sauces' },
+  { category: 'Condiments', tag: 'en:condiments' },
+  { category: 'Vegetable oils', tag: 'en:vegetable-oils' },
+  { category: 'Flours', tag: 'en:flours' },
+  { category: 'Rices', tag: 'en:rices' },
+  { category: 'Pastas', tag: 'en:pastas' },
+  { category: 'Teas', tag: 'en:teas' },
+  { category: 'Coffees', tag: 'en:coffees' },
+  { category: 'Ice creams', tag: 'en:ice-creams' },
+  { category: 'Breads', tag: 'en:breads' },
+  { category: 'Cakes', tag: 'en:cakes' },
+  { category: 'Candies', tag: 'en:candies' },
+  { category: 'Pickles', tag: 'en:pickles' },
+  { category: 'Soups', tag: 'en:soups' },
+  { category: 'Milks', tag: 'en:milks' },
+  { category: 'Cheeses', tag: 'en:cheeses' },
+  { category: 'Yogurts', tag: 'en:yogurts' },
+  { category: 'Butters', tag: 'en:butters' },
 ];
 
 // Being crowdsourced, some Open Food Facts entries have nutrition facts
@@ -148,7 +137,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * Returns null on a failed request (network error, Open Food Facts
  * temporarily down) so the caller can tell that apart from a real
  * "zero results" response -- otherwise a transient hiccup gets mistaken
- * for "nothing left here" and permanently marks the company exhausted
+ * for "nothing left here" and permanently marks the category exhausted
  * after one bad network moment.
  */
 async function fetchJsonWithRetries(url, retries) {
@@ -165,14 +154,14 @@ async function fetchJsonWithRetries(url, retries) {
 }
 
 /**
- * Discovery: which India-tagged products exist for this brand. Returns
+ * Discovery: which India-tagged products exist in this category. Returns
  * only identifying fields (code, name, brand) -- search-a-licious
  * doesn't index ingredients, so those come from fetchProductDetail()
  * below, once we already know this product is worth fetching.
  */
-async function discoverPage(searchTerm, page) {
+async function discoverPage(tag, page) {
   const params = new URLSearchParams({
-    q: `${searchTerm} AND countries_tags:"en:india"`,
+    q: `categories_tags:"${tag}" AND countries_tags:"en:india"`,
     page: String(page),
     page_size: String(OFF_PAGE_SIZE),
     langs: 'en',
@@ -190,12 +179,12 @@ async function fetchProductDetail(code) {
   return data?.product ?? null;
 }
 
-async function getProgress(company) {
-  const { data, error } = await supabase.from('seed_progress').select('*').eq('company', company).maybeSingle();
+async function getProgress(category) {
+  const { data, error } = await supabase.from('seed_progress').select('*').eq('company', category).maybeSingle();
   if (error) {
-    console.warn(`[discover] Could not read progress for ${company}:`, error.message);
+    console.warn(`[discover] Could not read progress for ${category}:`, error.message);
   }
-  return data || { company, next_page: 1, exhausted: false, products_saved: 0 };
+  return data || { company: category, next_page: 1, exhausted: false, products_saved: 0 };
 }
 
 async function saveProgress(progress) {
@@ -209,30 +198,33 @@ async function saveProgress(progress) {
 // never bubbles up as a real crash.
 class StopRunSignal extends Error {}
 
-async function runCompany(target, dryRun, budget) {
-  const progress = await getProgress(target.company);
+async function runCategory(target, dryRun, budget) {
+  const progress = await getProgress(target.category);
 
   if (progress.exhausted) {
-    console.log(`  ${target.company}: fully seeded already (${progress.products_saved} saved). Skipping.`);
+    console.log(`  ${target.category}: fully seeded already (${progress.products_saved} saved). Skipping.`);
     return;
   }
 
-  const hits = await discoverPage(target.searchTerm, progress.next_page);
+  const hits = await discoverPage(target.tag, progress.next_page);
 
   if (hits === null) {
-    console.warn(`  ${target.company}: Open Food Facts request failed -- will retry page ${progress.next_page} next run.`);
+    console.warn(`  ${target.category}: Open Food Facts request failed -- will retry page ${progress.next_page} next run.`);
     return;
   }
 
   if (hits.length === 0) {
     if (!dryRun) await saveProgress({ ...progress, exhausted: true });
-    console.log(`  ${target.company}: no more products on page ${progress.next_page} -- marking exhausted.`);
+    console.log(`  ${target.category}: no more products on page ${progress.next_page} -- marking exhausted.`);
     return;
   }
 
   // Discovery alone already gives us the barcode, so check what we
   // already have BEFORE spending a detail-fetch request on it -- no
   // point looking up full details for a product we'd skip anyway.
+  // Products often carry more than one category tag, so this is also
+  // what keeps the same product from being re-saved once per category
+  // it happens to belong to.
   let existing = new Set();
   if (!dryRun) {
     const codes = hits.filter((h) => h.code).map((h) => barcodeKey(h.code));
@@ -247,13 +239,13 @@ async function runCompany(target, dryRun, budget) {
     if (existing.has(key)) continue;
 
     if (dryRun) {
-      console.log(`  ${target.company}: would save "${hit.product_name || hit.code}"`);
+      console.log(`  ${target.category}: would save "${hit.product_name || hit.code}"`);
       saved++;
       continue;
     }
 
     if (budget.remaining <= 0) {
-      console.log(`  ${target.company}: hit this run's ${MAX_PRODUCTS_PER_RUN}-product cap -- stopping here, resuming next run.`);
+      console.log(`  ${target.category}: hit this run's ${MAX_PRODUCTS_PER_RUN}-product cap -- stopping here, resuming next run.`);
       stoppedEarly = true;
       break;
     }
@@ -282,7 +274,7 @@ async function runCompany(target, dryRun, budget) {
   if (!dryRun && !stoppedEarly) {
     const isLastPage = hits.length < OFF_PAGE_SIZE;
     await saveProgress({
-      company: target.company,
+      company: target.category,
       next_page: progress.next_page + 1,
       exhausted: isLastPage,
       products_saved: progress.products_saved + saved,
@@ -293,7 +285,7 @@ async function runCompany(target, dryRun, budget) {
     await saveProgress({ ...progress, products_saved: progress.products_saved + saved });
   }
 
-  console.log(`  ${target.company} page ${progress.next_page}: saved ${saved} new product(s), ${existing.size} already known.${stoppedEarly ? ' (stopped early)' : ''}`);
+  console.log(`  ${target.category} page ${progress.next_page}: saved ${saved} new product(s), ${existing.size} already known.${stoppedEarly ? ' (stopped early)' : ''}`);
 
   if (stoppedEarly) throw new StopRunSignal('Run budget reached.');
 }
@@ -301,8 +293,8 @@ async function runCompany(target, dryRun, budget) {
 async function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes('--dry-run');
-  const companyIdx = args.indexOf('--company');
-  const onlyCompany = companyIdx !== -1 ? args[companyIdx + 1] : null;
+  const categoryIdx = args.indexOf('--category');
+  const onlyCategory = categoryIdx !== -1 ? args[categoryIdx + 1] : null;
 
   if (!isSupabaseConfigured) {
     console.error('Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY.');
@@ -310,23 +302,23 @@ async function main() {
     return;
   }
 
-  const targets = onlyCompany ? COMPANIES.filter((c) => c.company === onlyCompany) : COMPANIES;
+  const targets = onlyCategory ? CATEGORIES.filter((c) => c.category === onlyCategory) : CATEGORIES;
   if (targets.length === 0) {
-    console.error(`No company matching "${onlyCompany}".`);
+    console.error(`No category matching "${onlyCategory}".`);
     process.exitCode = 1;
     return;
   }
 
-  console.log(`Walking ${targets.length} compan${targets.length === 1 ? 'y' : 'ies'}${dryRun ? ' (dry run)' : ''}, up to ${MAX_PRODUCTS_PER_RUN} new products this run.\n`);
+  console.log(`Walking ${targets.length} categor${targets.length === 1 ? 'y' : 'ies'}${dryRun ? ' (dry run)' : ''}, up to ${MAX_PRODUCTS_PER_RUN} new products this run.\n`);
 
   const budget = { remaining: MAX_PRODUCTS_PER_RUN };
 
   for (const target of targets) {
     try {
-      await runCompany(target, dryRun, budget);
+      await runCategory(target, dryRun, budget);
     } catch (err) {
       if (err instanceof StopRunSignal) {
-        console.log('\nStopping the run here rather than continuing to the remaining companies -- next scheduled run picks back up cleanly.');
+        console.log('\nStopping the run here rather than continuing to the remaining categories -- next scheduled run picks back up cleanly.');
         break;
       }
       throw err;
