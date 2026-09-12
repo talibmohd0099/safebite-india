@@ -22,7 +22,7 @@ export default function PopularSearches() {
     <div className="page-in max-w-2xl mx-auto px-4 py-6 pb-24">
       <button
         onClick={() => navigate(-1)}
-        className="tap-scale flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-4 transition-colors"
+        className="tap-scale inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-4 transition-colors"
       >
         ← Back
       </button>

@@ -121,9 +121,10 @@ export async function getPopularSearchTerms(limit = 8) {
   const seen = new Set();
   const terms = [];
   for (const row of data) {
-    // A search pill should read like a brand, not a full product name --
-    // skip anything too long for that rather than showing an oddly long tile.
-    const label = row.report?.brand?.length <= 18 ? row.report.brand : null;
+    // Product name, not brand -- "Parle-G Gluco Biscuits" tells you what
+    // it actually is; "Parle" alone doesn't. Still skip anything too long
+    // to read as a pill.
+    const label = row.product_name?.length <= 32 ? row.product_name : null;
     if (!label) continue;
     const key = label.toLowerCase();
     if (seen.has(key)) continue;

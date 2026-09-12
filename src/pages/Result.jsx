@@ -142,7 +142,7 @@ export default function Result() {
       {/* Nav */}
       <button
         onClick={() => navigate('/')}
-        className="tap-scale flex items-center gap-1.5 px-4 pt-3 pb-1 text-[17px]"
+        className="tap-scale inline-flex items-center gap-1.5 px-4 pt-3 pb-1 text-[17px]"
         style={{ color: 'var(--tint)' }}
       >
         <svg viewBox="0 0 12 20" fill="none" className="w-3 h-5">

@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { browseCategoryProducts, getCachedReport } from '../services/productCache';
-import { saveToHistory } from '../utils/storage';
+import { saveToHistory, getScoreColor } from '../utils/storage';
 import { CATEGORIES } from '../data/categories';
 import ProductImage from '../components/ProductImage';
 
@@ -54,14 +54,17 @@ export default function Category() {
     <div className="page-in max-w-2xl mx-auto px-4 py-6 pb-24">
       <button
         onClick={() => navigate(-1)}
-        className="tap-scale flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-4 transition-colors"
+        className="tap-scale inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-4 transition-colors"
       >
         ← Back
       </button>
 
-      <div className="flex items-center gap-3 mb-5">
-        <img src={category.image} alt="" className="w-14 h-14 rounded-2xl object-cover flex-shrink-0" />
-        <h1 className="text-xl font-bold text-slate-800">{category.label}</h1>
+      {/* Full-width banner instead of a small icon + title row -- the
+          row was mostly empty space next to a 56px thumbnail. */}
+      <div className="relative rounded-2xl overflow-hidden mb-5" style={{ aspectRatio: '3 / 1' }}>
+        <img src={category.image} alt="" className="w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
+        <h1 className="absolute bottom-3 left-4 text-xl font-bold text-white">{category.label}</h1>
       </div>
 
       {loading && <p className="text-sm text-slate-400 px-1">Loading…</p>}
@@ -77,28 +80,31 @@ export default function Category() {
       )}
 
       {!loading && results.length > 0 && (
-        <div className="space-y-3">
-          {results.map((item, i) => (
-            <button
-              key={item.lookupKey}
-              onClick={() => openResult(item)}
-              style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}
-              className="item-in tap-scale w-full text-left bg-white rounded-2xl border border-slate-100 shadow-sm p-3 flex items-center gap-3 hover:shadow-md transition-all"
-            >
-              <ProductImage src={item.imageUrl} size={60} />
-              <span className="flex-1 min-w-0">
-                {item.brand && (
-                  <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.brand}</span>
-                )}
-                <span className="block text-sm font-semibold text-slate-700 truncate">{item.productName}</span>
-              </span>
-              {typeof item.score === 'number' && (
-                <span className="flex-shrink-0 text-xs font-bold text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
-                  {item.score}/100
+        <div className="grid grid-cols-3 gap-2.5">
+          {results.map((item, i) => {
+            const scoreColors = typeof item.score === 'number' ? getScoreColor(item.score) : null;
+            return (
+              <button
+                key={item.lookupKey}
+                onClick={() => openResult(item)}
+                style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}
+                className="item-in tap-scale bg-white rounded-2xl border border-slate-100 shadow-sm p-2 flex flex-col items-center gap-1.5 text-center hover:shadow-md transition-all"
+              >
+                <ProductImage src={item.imageUrl} size={90} />
+                <span className="text-[11px] font-semibold text-slate-700 leading-tight line-clamp-2 w-full">
+                  {item.productName}
                 </span>
-              )}
-            </button>
-          ))}
+                {scoreColors && (
+                  <span
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: scoreColors.bg, color: scoreColors.color }}
+                  >
+                    {item.score}/100
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

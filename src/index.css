@@ -161,3 +161,23 @@ body {
 .tap-scale:active {
   transform: scale(0.96);
 }
+
+/* Home screen's top hero band -- a slow, flowing gradient instead of a
+   flat fill, so the very first thing a user sees has some life to it.
+   Stays within the existing green brand palette rather than introducing
+   new colors. Off for anyone who's asked their OS to reduce motion. */
+@keyframes hero-flow {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.hero-animated {
+  background: linear-gradient(120deg, #16a34a, #22c55e, #059669, #10b981, #16a34a);
+  background-size: 300% 300%;
+  animation: hero-flow 10s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-animated {
+    animation: none;
+    background: linear-gradient(135deg, #22c55e, #059669);
+  }
+}

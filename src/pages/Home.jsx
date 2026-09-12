@@ -5,7 +5,7 @@ import { extractIngredientsFromImage } from '../services/geminiService';
 import { analyzeText } from '../services/analyzeText';
 import { lookupBarcode, searchProductsByName } from '../services/openFoodFacts';
 import { getCachedReport, saveReport, barcodeKey, textKey, searchCachedProducts, getPopularSearchTerms } from '../services/productCache';
-import { saveToHistory } from '../utils/storage';
+import { saveToHistory, getScoreColor } from '../utils/storage';
 import LoadingScreen from '../components/LoadingScreen';
 import { CATEGORIES } from '../data/categories';
 
@@ -341,7 +341,7 @@ export default function Home() {
       <div className="page-in max-w-2xl mx-auto px-4 py-8 pb-24">
         <button
           onClick={cancelReview}
-          className="tap-scale flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-4 transition-colors"
+          className="tap-scale inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-4 transition-colors"
         >
           ← Start over
         </button>
@@ -403,7 +403,7 @@ export default function Home() {
       {mode === 'search' && (
         <>
           {/* Hero band */}
-          <div className="-mx-4 px-4 pt-6 pb-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-b-[28px]">
+          <div className="hero-animated -mx-4 px-4 pt-6 pb-8 rounded-b-[28px]">
             <h1 className="text-white text-[17px] font-bold text-center opacity-95">
               Is your food actually safe?
             </h1>
@@ -471,12 +471,7 @@ export default function Home() {
           {/* Popular searches -- real scan-count data, not a guess. */}
           {searchQuery.trim().length === 0 && popularTerms.length > 0 && (
             <div className="mb-6">
-              <div className="flex items-center justify-between mb-2 px-0.5">
-                <p className="text-sm font-bold text-slate-800">Popular searches</p>
-                <button onClick={() => navigate('/popular')} className="tap-scale text-xs font-semibold text-green-600">
-                  See all
-                </button>
-              </div>
+              <p className="text-sm font-bold text-slate-800 mb-2 px-0.5">Popular searches</p>
               <div className="relative">
                 <div className="flex gap-2 overflow-x-auto pb-1 pr-8" style={{ scrollbarWidth: 'none' }}>
                   {popularTerms.map((term, i) => (
@@ -516,9 +511,15 @@ export default function Home() {
                     key={cat.id}
                     onClick={() => navigate(`/category/${cat.id}`)}
                     style={{ animationDelay: `${i * 40}ms` }}
-                    className="item-in tap-scale rounded-2xl overflow-hidden transition-transform hover:-translate-y-0.5 shadow-sm"
+                    className="item-in tap-scale flex items-center justify-center py-1"
                   >
-                    <img src={cat.image} alt={cat.label} className="w-full h-full object-cover aspect-[4/5]" />
+                    {/* 80% width, not 100% -- full-bleed tiles read as too
+                        large in this 2-column teaser grid. */}
+                    <img
+                      src={cat.image}
+                      alt={cat.label}
+                      className="w-4/5 aspect-[4/5] object-cover rounded-2xl shadow-sm transition-transform hover:-translate-y-0.5"
+                    />
                   </button>
                 ))}
               </div>
@@ -558,7 +559,10 @@ export default function Home() {
                     <span className="block text-sm text-slate-700 truncate">{item.productName}</span>
                   </span>
                   {typeof item.score === 'number' && (
-                    <span className="flex-shrink-0 text-xs font-bold text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
+                    <span
+                      className="flex-shrink-0 text-xs font-bold rounded-full px-2 py-0.5"
+                      style={{ background: getScoreColor(item.score).bg, color: getScoreColor(item.score).color }}
+                    >
                       {item.score}/100
                     </span>
                   )}
@@ -594,7 +598,7 @@ export default function Home() {
       {mode !== 'search' && (
         <button
           onClick={() => { setMode('search'); setError(''); }}
-          className="tap-scale flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 pt-5 pb-2 transition-colors"
+          className="tap-scale inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 pt-5 pb-2 transition-colors"
         >
           ← Back to search
         </button>
