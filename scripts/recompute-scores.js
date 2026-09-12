@@ -19,7 +19,41 @@
 //   node scripts/recompute-scores.js
 
 import { buildReport, isRuleBasedRecommendation } from '../src/services/scoringEngine.js';
+import { parseLabel } from '../src/services/ingredientParser.js';
+import { estimateQuantities } from '../src/services/quantityEstimator.js';
 import { supabase, isSupabaseConfigured } from '../src/services/supabaseClient.js';
+
+/**
+ * Re-parse a stored report's label text to recover the information that
+ * only the parser knows -- which ingredients shared one bracket, and what
+ * each one's estimated share of the product is -- and attach it to the
+ * already-researched ingredient objects.
+ *
+ * Returns null if the parse no longer lines up with what's stored, in
+ * which case the row is left alone rather than rescored against a
+ * mismatched ingredient list.
+ */
+function withRederivedQuantities(stored, ingredientsText) {
+  if (!ingredientsText) return null;
+
+  const { ingredients: parsed } = parseLabel(ingredientsText);
+  if (!parsed.length) return null;
+
+  const withQty = estimateQuantities(parsed);
+  const byName = new Map(withQty.map((p) => [p.displayName.toLowerCase(), p]));
+
+  const out = [];
+  for (const ingredient of stored) {
+    const match = byName.get((ingredient.name || '').toLowerCase());
+    if (!match) return null;
+    out.push({
+      ...ingredient,
+      percentage: typeof match.percentage === 'number' ? match.percentage : ingredient.percentage,
+      estimatedPercentage: match.estimatedPercentage,
+    });
+  }
+  return out;
+}
 
 const PAGE_SIZE = 500;
 
@@ -35,11 +69,19 @@ async function main() {
   let from = 0;
   let checked = 0;
   let changed = 0;
+  let unmatched = 0;
 
   while (true) {
+    // Ordered by id on purpose: this pages through the table WHILE
+    // updating rows in it, and without a stable sort Postgres is free to
+    // return rows in any order -- an updated row can move between pages
+    // and simply never be visited. That silently skipped rows on an
+    // earlier run (the same product still showed its old score after a
+    // "successful" pass).
     const { data, error } = await supabase
       .from('product_reports')
-      .select('id, product_name, report')
+      .select('id, product_name, ingredients_text, report')
+      .order('id', { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
 
     if (error) {
@@ -51,8 +93,16 @@ async function main() {
 
     for (const row of data) {
       checked++;
-      const ingredients = row.report?.ingredients;
-      if (!ingredients || ingredients.length === 0) continue;
+      const stored = row.report?.ingredients;
+      if (!stored || stored.length === 0) continue;
+
+      // Re-derive quantities from the label text rather than trusting the
+      // stored ingredient objects: bracket grouping and the position-based
+      // estimates live in the PARSER, so a row analysed before those
+      // existed has no way to benefit otherwise. Penalties/status are
+      // reused as-is, so this still costs nothing and calls no AI.
+      const ingredients = withRederivedQuantities(stored, row.ingredients_text);
+      if (!ingredients) { unmatched++; continue; }
 
       const fresh = buildReport(ingredients, {
         productName: row.report.productName,
@@ -95,6 +145,9 @@ async function main() {
   }
 
   console.log(`\nChecked ${checked} report(s), ${changed} changed${dryRun ? ' (dry run -- nothing written)' : ''}.`);
+  if (unmatched > 0) {
+    console.log(`${unmatched} left alone -- their label text no longer parses to the same ingredient list, so rescoring them would compare against the wrong thing.`);
+  }
 }
 
 main().catch((err) => {

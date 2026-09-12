@@ -64,8 +64,16 @@ const TRACE_CATEGORIES = new Set([
 // to the low end of that range instead of being treated as if they were
 // as significant as an unlabeled bulk ingredient.
 function quantityWeight(ingredient) {
-  if (typeof ingredient.percentage === 'number') {
-    return 0.5 + (ingredient.percentage / 100) * 0.5; // ranges 0.5x (trace) to 1.0x (100%)
+  // A real percentage (stated on the label, or from Open Food Facts)
+  // always wins. Failing that, use the position-based estimate from
+  // quantityEstimator -- which is what stops a trailing spice in a
+  // 39-ingredient list being charged like the frying oil.
+  const percentage = typeof ingredient.percentage === 'number'
+    ? ingredient.percentage
+    : ingredient.estimatedPercentage;
+
+  if (typeof percentage === 'number') {
+    return 0.5 + (percentage / 100) * 0.5; // ranges 0.5x (trace) to 1.0x (100%)
   }
   return TRACE_CATEGORIES.has((ingredient.category || '').toLowerCase()) ? 0.5 : 1;
 }

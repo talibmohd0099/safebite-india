@@ -62,6 +62,7 @@ function rowToIngredient(row, parsedItem) {
     scientificName: row.scientific_name,
     penalty: row.penalty,
     percentage: parsedItem.percentage,
+    estimatedPercentage: parsedItem.estimatedPercentage,
     recognized: row.recognized !== false,
     fromCache: true,
   };
@@ -166,6 +167,7 @@ export async function resolveIngredients(parsed) {
         scientificName: record.scientificName,
         penalty: record.penalty,
         percentage: item.percentage,
+        estimatedPercentage: item.estimatedPercentage,
         recognized: record.recognized !== false,
         fromCache: false,
       };

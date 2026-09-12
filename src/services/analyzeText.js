@@ -10,6 +10,7 @@ import { resolveIngredients } from './ingredientLibrary.js';
 import { buildReport } from './scoringEngine.js';
 import { generateProductInsights, repairLabelPunctuation } from './geminiService.js';
 import { applyOffPercentEstimates } from './openFoodFacts.js';
+import { estimateQuantities } from './quantityEstimator.js';
 
 /**
  * Analyze raw ingredients text end to end.
@@ -46,7 +47,12 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
     ? applyOffPercentEstimates(parsed, offIngredients)
     : parsed;
 
-  const { ingredients, knownCount, researchedCount } = await resolveIngredients(enrichedParsed);
+  // Whatever still has no percentage gets one estimated from its position
+  // in the list (labels are ordered by descending weight), so scoring
+  // stops treating a trailing spice as a full-strength component.
+  const withQuantities = estimateQuantities(enrichedParsed);
+
+  const { ingredients, knownCount, researchedCount } = await resolveIngredients(withQuantities);
 
   if (ingredients.length === 0) {
     throw new Error("Couldn't research these ingredients right now. Please try again.");

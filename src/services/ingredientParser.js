@@ -360,10 +360,20 @@ export function parseIngredients(labelText) {
   const out = [];
   const seen = new Set();
 
-  const add = (item) => {
+  // Everything expanded out of a single bracket belongs to one group.
+  // "Edible Vegetable Oil (Ricebran, Cottonseed, Palmolein)" is ONE oil
+  // component that happens to disclose its blend -- scoring three
+  // separate full-strength oils charges the product three times for one
+  // thing. Same for "Spices and Condiments (15 spices...)". The children
+  // still each get their own row, status and explanation; the group only
+  // says "these share one slot's worth of the product".
+  let groupCounter = 0;
+  const newGroupId = () => `g${++groupCounter}`;
+
+  const add = (item, groupId) => {
     if (seen.has(item.canonicalName)) return;
     seen.add(item.canonicalName);
-    out.push(item);
+    out.push({ ...item, groupId: groupId || null });
   };
 
   // Handles one top-level entry, recursing when it turns out to be a
@@ -374,7 +384,7 @@ export function parseIngredients(labelText) {
   // matter (sugar, flavour enhancers, HVP) -- so they get parsed as
   // their own entries instead of being hidden inside a generic wrapper
   // name that never gets researched with any awareness of what's in it.
-  const processEntry = (rawEntry) => {
+  const processEntry = (rawEntry, groupId = null) => {
     // A standalone footnote like "#(D-GLUCOSE, LEVULOSE)" explains an
     // ingredient listed above — it isn't an ingredient in its own right.
     if (/^\s*[#*†‡^]/.test(rawEntry)) return;
@@ -394,6 +404,10 @@ export function parseIngredients(labelText) {
       if (codes) {
         const label = cleaned.slice(0, bracket.start).trim();
         const categoryHint = label ? label.toLowerCase() : null;
+        // "Acidity Regulators (E296, E330)" is two distinct additives
+        // sharing one declared slot -- both stay listed, both keep their
+        // own status, but together they're one slot's worth of product.
+        const codeGroup = codes.length > 1 ? groupId || newGroupId() : groupId;
         for (const code of codes) {
           add({
             displayName: label ? `${titleCase(label)} (INS ${code})` : `INS ${code}`,
@@ -402,7 +416,7 @@ export function parseIngredients(labelText) {
             insCode: code,
             percentage: null,
             categoryHint,
-          });
+          }, codeGroup);
         }
         return;
       }
@@ -426,8 +440,13 @@ export function parseIngredients(labelText) {
     // the time its own turn comes around.
     const compound = findLastBracketGroup(cleaned);
     if (compound && compound.inner.includes(',')) {
+      // The outermost bracket defines the slot -- a nested group inside
+      // it ("(Dehydrated Vegetables (Onion, Carrot))") is still part of
+      // that same one declared component, so children inherit rather
+      // than starting a new group of their own.
+      const childGroup = groupId || newGroupId();
       for (const subEntry of splitTopLevel(compound.inner)) {
-        processEntry(subEntry);
+        processEntry(subEntry, childGroup);
       }
       return;
     }
@@ -477,7 +496,7 @@ export function parseIngredients(labelText) {
       insCode,
       percentage,
       categoryHint: null,
-    });
+    }, groupId);
   };
 
   for (const rawEntry of splitTopLevel(labelText)) {
