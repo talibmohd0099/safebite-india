@@ -17,28 +17,47 @@ name: Discover Open Food Facts Products
 #
 # Runs on GitHub Actions (free and effectively unlimited on a public
 # repo) since there's no Netlify site anymore.
+#
+# LOOPS INTERNALLY every 30 minutes instead of relying on the `schedule:`
+# trigger below to fire on time -- measured via the real run history on
+# this repo, GitHub's cron trigger was firing every ~4-4.5 HOURS, not
+# every 30 minutes (GitHub gives scheduled/cron triggers no SLA at all;
+# they're explicitly "best effort" and get deprioritized under platform
+# load, especially on free-tier public repos). Fixing that would
+# otherwise mean an external cron service on a timer hitting this
+# workflow's dispatch API -- a third-party account and a stored GitHub
+# token for something GitHub Actions can do by itself. Instead: once a
+# run DOES start (whenever GitHub gets around to it), it keeps working
+# every 30 minutes internally for up to ~5h40m (just under the 6-hour
+# hard cap GitHub puts on every job, no matter the repo or plan) before
+# exiting clean. Since new sessions were observed starting well inside
+# that 5h40m window, sessions chain into each other and real work ends up
+# happening close to every 30 minutes almost continuously, without any
+# new account or credential.
 
 on:
   schedule:
-    # Every 30 minutes. GitHub queues scheduled jobs on a best-effort
-    # basis, so runs can start a bit late -- harmless here, since each
-    # category's own page cursor means nothing is lost by an irregular
-    # schedule.
     - cron: '*/30 * * * *'
   # Adds a "Run workflow" button on the Actions tab for running it on demand.
   workflow_dispatch:
     inputs:
       category:
-        description: 'Only this category (leave blank for all)'
+        description: 'Only this category, run once (leave blank to loop through all every 30 min)'
         required: false
+
+concurrency:
+  # Queue rather than run two sessions at once -- two loops hitting the
+  # same seed_progress cursors in parallel could race each other.
+  group: discover-off-products
+  cancel-in-progress: false
 
 jobs:
   discover:
     runs-on: ubuntu-latest
-    # No Gemini pacing here, so this is bounded only by how many Open
-    # Food Facts requests fit in the timeout -- generous, but this
-    # script also stops itself early once it hits its own per-run cap.
-    timeout-minutes: 20
+    # GitHub's hard per-job cap is 360 minutes regardless of what's set
+    # here -- this just leaves a few minutes of headroom for setup/exit
+    # rather than getting killed mid-step.
+    timeout-minutes: 355
 
     steps:
       - uses: actions/checkout@v4
@@ -53,13 +72,29 @@ jobs:
 
       - run: npm ci
 
-      - name: Discover
+      - name: Discover, every 30 minutes until the job's own time runs out
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
           if [ -n "${{ github.event.inputs.category }}" ]; then
+            # A specific category via "Run workflow" is a one-off manual
+            # test -- run it once and exit, don't loop for hours.
             node scripts/discover-off-products.js --category "${{ github.event.inputs.category }}"
-          else
-            node scripts/discover-off-products.js
+            exit 0
           fi
+
+          BUDGET_SECONDS=$((340 * 60))  # 5h40m -- inside the 355m job timeout
+          PASS=1
+          while [ "$SECONDS" -lt "$BUDGET_SECONDS" ]; do
+            echo "=== Pass $PASS (${SECONDS}s into this session) ==="
+            node scripts/discover-off-products.js
+            PASS=$((PASS + 1))
+
+            REMAINING=$((BUDGET_SECONDS - SECONDS))
+            if [ "$REMAINING" -le 0 ]; then break; fi
+            SLEEP=$((REMAINING < 1800 ? REMAINING : 1800))
+            echo "Sleeping ${SLEEP}s before the next pass..."
+            sleep "$SLEEP"
+          done
+          echo "Session budget used up -- exiting clean. The next scheduled trigger picks this back up."

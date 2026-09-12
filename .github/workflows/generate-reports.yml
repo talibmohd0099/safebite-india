@@ -9,22 +9,43 @@ name: Generate Product Reports
 # discovery -- Gemini's free-tier rate limit is the only real bottleneck
 # in this whole pipeline, and it should only ever slow this job down,
 # never block new products from being discovered and saved.
+#
+# LOOPS INTERNALLY every 30 minutes instead of relying on the `schedule:`
+# trigger below to fire on time -- measured via the real run history on
+# this repo, GitHub's cron trigger was firing every ~4-4.5 HOURS, not
+# every 30 minutes (GitHub gives scheduled/cron triggers no SLA at all;
+# they're explicitly "best effort" and get deprioritized under platform
+# load, especially on free-tier public repos). Fixing that would
+# otherwise mean an external cron service on a timer hitting this
+# workflow's dispatch API -- a third-party account and a stored GitHub
+# token for something GitHub Actions can do by itself. Instead: once a
+# run DOES start (whenever GitHub gets around to it), it keeps working
+# every 30 minutes internally for up to ~5h40m (just under the 6-hour
+# hard cap GitHub puts on every job, no matter the repo or plan) before
+# exiting clean. Since new sessions were observed starting well inside
+# that 5h40m window, sessions chain into each other and real work ends up
+# happening close to every 30 minutes almost continuously, without any
+# new account or credential. Same pacing/backoff as before still applies
+# inside each pass -- this only changes how often a pass happens.
 
 on:
   schedule:
-    # Every 30 minutes -- shares the same Gemini key as real users of the
-    # live app, who must always come first, so this stays modest rather
-    # than racing to clear the backlog as fast as possible.
     - cron: '*/30 * * * *'
   workflow_dispatch:
+
+concurrency:
+  # Queue rather than run two sessions at once -- two loops pulling from
+  # the same pending-products queue in parallel could double up work.
+  group: generate-reports
+  cancel-in-progress: false
 
 jobs:
   generate:
     runs-on: ubuntu-latest
-    # A run can spend up to (RATE_LIMIT_RETRIES x RATE_LIMIT_WAIT_MS) per
-    # product while waiting out a rate limit, times MAX_REPORTS_PER_RUN --
-    # generous headroom so a run is never cut off mid-way.
-    timeout-minutes: 45
+    # GitHub's hard per-job cap is 360 minutes regardless of what's set
+    # here -- this just leaves a few minutes of headroom for setup/exit
+    # rather than getting killed mid-step.
+    timeout-minutes: 355
 
     steps:
       - uses: actions/checkout@v4
@@ -39,9 +60,23 @@ jobs:
 
       - run: npm ci
 
-      - name: Generate reports
+      - name: Generate reports, every 30 minutes until the job's own time runs out
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
-        run: node scripts/generate-reports.js
+        run: |
+          BUDGET_SECONDS=$((340 * 60))  # 5h40m -- inside the 355m job timeout
+          PASS=1
+          while [ "$SECONDS" -lt "$BUDGET_SECONDS" ]; do
+            echo "=== Pass $PASS (${SECONDS}s into this session) ==="
+            node scripts/generate-reports.js
+            PASS=$((PASS + 1))
+
+            REMAINING=$((BUDGET_SECONDS - SECONDS))
+            if [ "$REMAINING" -le 0 ]; then break; fi
+            SLEEP=$((REMAINING < 1800 ? REMAINING : 1800))
+            echo "Sleeping ${SLEEP}s before the next pass..."
+            sleep "$SLEEP"
+          done
+          echo "Session budget used up -- exiting clean. The next scheduled trigger picks this back up."
