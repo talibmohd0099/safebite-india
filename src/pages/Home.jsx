@@ -7,7 +7,6 @@ import { lookupBarcode, searchProductsByName } from '../services/openFoodFacts';
 import { getCachedReport, saveReport, barcodeKey, textKey, searchCachedProducts, getPopularSearchTerms } from '../services/productCache';
 import { saveToHistory } from '../utils/storage';
 import LoadingScreen from '../components/LoadingScreen';
-import CategoryIcon from '../components/CategoryIcon';
 import { CATEGORIES } from '../data/categories';
 
 function BarcodeIcon() {
@@ -511,21 +510,15 @@ export default function Home() {
                   See all
                 </button>
               </div>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 gap-2.5">
                 {CATEGORIES.map((cat, i) => (
                   <button
                     key={cat.id}
                     onClick={() => navigate(`/category/${cat.id}`)}
                     style={{ animationDelay: `${i * 40}ms` }}
-                    className={`item-in tap-scale flex flex-col items-center gap-2 py-3.5 px-1 rounded-2xl transition-transform hover:-translate-y-0.5 text-center ${cat.bg}`}
+                    className="item-in tap-scale rounded-2xl overflow-hidden transition-transform hover:-translate-y-0.5 shadow-sm"
                   >
-                    <span
-                      className={`rounded-full flex items-center justify-center flex-shrink-0 ${cat.iconBg} ${cat.iconColor}`}
-                      style={{ width: 50, height: 50 }}
-                    >
-                      <CategoryIcon id={cat.id} className="w-7 h-7" />
-                    </span>
-                    <span className="text-[15px] font-semibold text-slate-700 leading-tight">{cat.label}</span>
+                    <img src={cat.image} alt={cat.label} className="w-full h-full object-cover aspect-[4/5]" />
                   </button>
                 ))}
               </div>

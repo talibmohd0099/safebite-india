@@ -6,18 +6,26 @@
 // no new data pipeline, no AI cost, just a free browse over products
 // that have already been scored.
 //
-// `bg` is the tile's pale card background; `iconBg` is the more
-// saturated circle behind the icon; `iconColor` tints the icon itself
-// (see components/CategoryIcon.jsx) -- same color family, different
-// shades, so every tile reads as one consistent set rather than mixed
-// emoji of varying visual weight.
+// `image` is a real illustrated photo per category (cropped from a
+// reference grid the user supplied, see src/assets/categories/) --
+// replaced an earlier line-icon set that wasn't distinctive enough for
+// categories like Beverages/Dairy.
+import biscuits from '../assets/categories/biscuits.png';
+import noodles from '../assets/categories/noodles.png';
+import beverages from '../assets/categories/beverages.png';
+import snacks from '../assets/categories/snacks.png';
+import chocolates from '../assets/categories/chocolates.png';
+import spices from '../assets/categories/spices.png';
+import dairy from '../assets/categories/dairy.png';
+import essentials from '../assets/categories/essentials.png';
+
 export const CATEGORIES = [
-  { id: 'biscuits', label: 'Biscuits & Cookies', bg: 'bg-amber-50', iconBg: 'bg-amber-200', iconColor: 'text-amber-700', keywords: ['biscuit', 'cookie', 'cracker', 'rusk'] },
-  { id: 'noodles', label: 'Instant Noodles', bg: 'bg-orange-50', iconBg: 'bg-orange-200', iconColor: 'text-orange-700', keywords: ['noodle', 'maggi', 'pasta', 'vermicelli', 'soup', 'instant'] },
-  { id: 'beverages', label: 'Beverages', bg: 'bg-sky-50', iconBg: 'bg-sky-200', iconColor: 'text-sky-700', keywords: ['juice', 'drink', 'squash', 'tea', 'coffee'] },
-  { id: 'snacks', label: 'Snacks & Namkeen', bg: 'bg-pink-50', iconBg: 'bg-pink-200', iconColor: 'text-pink-700', keywords: ['chips', 'namkeen', 'bhujia', 'sev', 'mixture', 'popcorn', 'wafer'] },
-  { id: 'chocolates', label: 'Chocolates & Sweets', bg: 'bg-rose-50', iconBg: 'bg-rose-200', iconColor: 'text-rose-700', keywords: ['chocolate', 'candy', 'toffee', 'eclair', 'chikki'] },
-  { id: 'spices', label: 'Spices & Masala', bg: 'bg-red-50', iconBg: 'bg-red-200', iconColor: 'text-red-700', keywords: ['masala', 'spice', 'haldi', 'mirchi', 'garam'] },
-  { id: 'dairy', label: 'Dairy & Frozen', bg: 'bg-blue-50', iconBg: 'bg-blue-200', iconColor: 'text-blue-700', keywords: ['milk', 'cheese', 'paneer', 'curd', 'dahi', 'ice cream', 'kulfi', 'ghee', 'butter'] },
-  { id: 'essentials', label: 'Cooking Essentials', bg: 'bg-emerald-50', iconBg: 'bg-emerald-200', iconColor: 'text-emerald-700', keywords: ['oil', 'atta', 'flour', 'rice', 'sauce', 'ketchup'] },
+  { id: 'biscuits', label: 'Biscuits & Cookies', image: biscuits, keywords: ['biscuit', 'cookie', 'cracker', 'rusk'] },
+  { id: 'noodles', label: 'Instant Noodles', image: noodles, keywords: ['noodle', 'maggi', 'pasta', 'vermicelli', 'soup', 'instant'] },
+  { id: 'beverages', label: 'Beverages', image: beverages, keywords: ['juice', 'drink', 'squash', 'tea', 'coffee'] },
+  { id: 'snacks', label: 'Snacks & Namkeen', image: snacks, keywords: ['chips', 'namkeen', 'bhujia', 'sev', 'mixture', 'popcorn', 'wafer'] },
+  { id: 'chocolates', label: 'Chocolates & Sweets', image: chocolates, keywords: ['chocolate', 'candy', 'toffee', 'eclair', 'chikki'] },
+  { id: 'spices', label: 'Spices & Masala', image: spices, keywords: ['masala', 'spice', 'haldi', 'mirchi', 'garam'] },
+  { id: 'dairy', label: 'Dairy & Frozen', image: dairy, keywords: ['milk', 'cheese', 'paneer', 'curd', 'dahi', 'ice cream', 'kulfi', 'ghee', 'butter'] },
+  { id: 'essentials', label: 'Cooking Essentials', image: essentials, keywords: ['oil', 'atta', 'flour', 'rice', 'sauce', 'ketchup'] },
 ];

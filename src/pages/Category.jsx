@@ -8,7 +8,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { browseCategoryProducts, getCachedReport } from '../services/productCache';
 import { saveToHistory } from '../utils/storage';
 import { CATEGORIES } from '../data/categories';
-import CategoryIcon from '../components/CategoryIcon';
+import ProductImage from '../components/ProductImage';
 
 export default function Category() {
   const { id } = useParams();
@@ -60,9 +60,7 @@ export default function Category() {
       </button>
 
       <div className="flex items-center gap-3 mb-5">
-        <span className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 ${category.iconBg} ${category.iconColor}`}>
-          <CategoryIcon id={category.id} className="w-6 h-6" />
-        </span>
+        <img src={category.image} alt="" className="w-14 h-14 rounded-2xl object-cover flex-shrink-0" />
         <h1 className="text-xl font-bold text-slate-800">{category.label}</h1>
       </div>
 
@@ -79,19 +77,20 @@ export default function Category() {
       )}
 
       {!loading && results.length > 0 && (
-        <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 bg-white">
+        <div className="space-y-3">
           {results.map((item, i) => (
             <button
               key={item.lookupKey}
               onClick={() => openResult(item)}
               style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}
-              className="item-in tap-scale w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center justify-between gap-3"
+              className="item-in tap-scale w-full text-left bg-white rounded-2xl border border-slate-100 shadow-sm p-3 flex items-center gap-3 hover:shadow-md transition-all"
             >
-              <span className="min-w-0">
+              <ProductImage src={item.imageUrl} size={60} />
+              <span className="flex-1 min-w-0">
                 {item.brand && (
                   <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.brand}</span>
                 )}
-                <span className="block text-sm text-slate-700 truncate">{item.productName}</span>
+                <span className="block text-sm font-semibold text-slate-700 truncate">{item.productName}</span>
               </span>
               {typeof item.score === 'number' && (
                 <span className="flex-shrink-0 text-xs font-bold text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">

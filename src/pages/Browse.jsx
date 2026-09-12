@@ -2,7 +2,6 @@
 // "See all" destination for the home screen's category teaser grid.
 import { useNavigate } from 'react-router-dom';
 import { CATEGORIES } from '../data/categories';
-import CategoryIcon from '../components/CategoryIcon';
 
 export default function Browse() {
   const navigate = useNavigate();
@@ -23,12 +22,9 @@ export default function Browse() {
             key={cat.id}
             onClick={() => navigate(`/category/${cat.id}`)}
             style={{ animationDelay: `${i * 40}ms` }}
-            className={`item-in tap-scale flex items-center gap-3 p-4 rounded-2xl transition-transform hover:-translate-y-0.5 text-left ${cat.bg}`}
+            className="item-in tap-scale rounded-2xl overflow-hidden transition-transform hover:-translate-y-0.5 shadow-sm"
           >
-            <span className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 ${cat.iconBg} ${cat.iconColor}`}>
-              <CategoryIcon id={cat.id} className="w-6 h-6" />
-            </span>
-            <span className="text-sm font-semibold text-slate-700 leading-tight">{cat.label}</span>
+            <img src={cat.image} alt={cat.label} className="w-full h-full object-cover aspect-[4/5]" />
           </button>
         ))}
       </div>
