@@ -310,46 +310,66 @@ function extractJson(text, finishReason, shape = 'object') {
   }
 }
 
-const SUMMARY_PROMPT = `You are writing the one-line "executive summary" on a food product's health report for Indian consumers.
+const INSIGHTS_PROMPT = `You are writing the short human-facing text on a food product's health report for Indian consumers.
 
-Write ONE or TWO short, natural sentences (35 words max) that:
+Return ONLY valid JSON, no markdown, no preamble:
+{
+  "summary": "...",
+  "recommendation": "...",
+  "isCondimentOrSeasoning": false
+}
+
+"summary" -- ONE or TWO short, natural sentences (35 words max) that:
 - React specifically to THIS product's real profile -- not a generic template. Positive, neutral, or concerned, whichever is actually true.
 - If there are concerning or harmful ingredients, name the actual ones given below (not a vague category).
 - Sound like a knowledgeable friend, not a warning label. Vary your opening every time -- never reuse the same stock phrase across different products.
-- Do NOT give diet advice or tell the reader what to do -- a separate field already covers that. Just describe what's going on with this product.
+- Describe what is going on with this product. Do NOT give advice here -- "recommendation" covers that.
 - Do NOT invent ingredients or facts not given below.
 
-Return ONLY the sentence(s) as plain text. No quotes, no markdown, no preamble.`;
+"recommendation" -- ONE short sentence (25 words max) of practical advice for THIS specific product:
+- Say what someone should actually do: how often, in what quantity, what to watch for, or what to look for instead.
+- Tie it to what is actually in THIS product. "Fine occasionally" could describe thousands of products -- be specific about why.
+- Never alarmist, never preachy, never medical advice.
+
+"isCondimentOrSeasoning" -- true ONLY if this product is normally used in small amounts as part of another dish rather than eaten on its own: spice blends and masalas, seasonings, stock cubes, food colours and essences, baking powder, pickles and chutneys eaten as a side relish, ketchup and sauces used as condiments.
+false for anything eaten as a food in its own right -- biscuits, noodles, chips, namkeen, drinks, dairy, bread, chocolates. Also false for cooking oils, flours, rice and sugar: those are bulk ingredients eaten in real quantity, not small-quantity seasonings.`;
 
 /**
- * Write a fresh, specific 1-2 sentence summary for one product. Called
- * once per genuinely new product (the result gets cached in
+ * Write the report's human-facing text for one product in a single call:
+ * the summary, a product-specific recommendation, and whether this is a
+ * seasoning used in small amounts (which changes how its score should be
+ * read -- a masala scoring 95 is not an invitation to eat it by the
+ * spoonful).
+ *
+ * Called once per genuinely new product (the result gets cached in
  * product_reports forever after), never per repeat scan. Returns null on
- * any failure so the caller can fall back to the rule-based summary
- * instead of breaking the whole report over this.
+ * any failure so the caller can fall back to the rule-based text instead
+ * of breaking the whole report over this.
  */
-export async function generateSummary({ productName, brand, score, verdict, harmfulNames, concerningNames, ingredientCount }) {
+export async function generateProductInsights({ productName, brand, score, verdict, harmfulNames, concerningNames, ingredientCount, ingredientNames = [] }) {
   if (!GEMINI_API_KEY) return null;
 
   const details = `Product: ${productName}${brand ? ` (brand: ${brand})` : ''}
 Score: ${score}/100 (${verdict})
 Total ingredients: ${ingredientCount}
+Ingredients: ${ingredientNames.length ? ingredientNames.join(', ') : 'not listed'}
 Harmful ingredients: ${harmfulNames.length ? harmfulNames.join(', ') : 'none'}
 Concerning ingredients: ${concerningNames.length ? concerningNames.join(', ') : 'none'}`;
 
   const requestBody = {
-    contents: [{ parts: [{ text: `${SUMMARY_PROMPT}\n\n${details}` }] }],
+    contents: [{ parts: [{ text: `${INSIGHTS_PROMPT}\n\n${details}` }] }],
     generationConfig: {
-      // Higher than the analysis calls on purpose -- this is creative
-      // writing where varied phrasing is the point, not deterministic
-      // scoring where we want the same answer every time.
-      temperature: 0.9,
+      // Higher than the analysis calls on purpose -- the summary and
+      // recommendation are creative writing where varied phrasing is the
+      // point, not deterministic scoring where we want the same answer
+      // every time. Not so high that the boolean gets unreliable.
+      temperature: 0.8,
       topK: 40,
       topP: 0.95,
       // Gemini's "thinking" tokens count against this budget too, and
-      // can eat 100+ tokens on their own before it writes the actual
-      // sentence -- too tight a limit here silently truncates the reply.
-      maxOutputTokens: 700,
+      // can eat 100+ tokens on their own before it writes anything --
+      // too tight a limit here silently truncates the reply.
+      maxOutputTokens: 1000,
       thinkingConfig: { thinkingLevel: 'low' },
     },
   };
@@ -365,12 +385,21 @@ Concerning ingredients: ${concerningNames.length ? concerningNames.join(', ') : 
     const data = await response.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
     const finishReason = data.candidates?.[0]?.finishReason;
-    // A cut-off sentence is worse than no AI summary at all -- fall back
-    // to the rule-based one rather than show a broken half-sentence.
+    // Cut-off text is worse than no AI text at all -- fall back to the
+    // rule-based version rather than show a broken half-sentence.
     if (!text || finishReason !== 'STOP') return null;
 
-    return text.trim().replace(/^["'\s]+|["'\s]+$/g, '');
+    const parsed = extractJson(text, finishReason);
+    const clean = (s) => (typeof s === 'string' ? s.trim().replace(/^["'\s]+|["'\s]+$/g, '') : null);
+
+    return {
+      summary: clean(parsed?.summary),
+      recommendation: clean(parsed?.recommendation),
+      isCondimentOrSeasoning: parsed?.isCondimentOrSeasoning === true,
+    };
   } catch {
+    // extractJson throws on unparseable output -- same fallback as any
+    // other failure here, never surface it as a broken report.
     return null;
   }
 }

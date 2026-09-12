@@ -231,6 +231,18 @@ export default function Result() {
         </div>
       </div>
 
+      {/* A masala or seasoning scoring 95 isn't an invitation to eat it
+          by the spoonful -- the score describes the product itself, and
+          for these that's a pinch at a time inside a larger dish. */}
+      {result.isCondimentOrSeasoning && (
+        <div className="mx-4 mt-3 rounded-[14px] px-4 py-3 flex gap-3 items-start" style={{ background: 'var(--tint-bg)' }}>
+          <span className="text-[16px] leading-none mt-0.5 flex-shrink-0">🥄</span>
+          <p className="text-[13px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
+            Used in small amounts — this score reflects the seasoning itself, not the dish you add it to.
+          </p>
+        </div>
+      )}
+
       {result.hasEstimatedQuantities && (
         <div className="mx-4 mt-3 rounded-[14px] px-4 py-3" style={{ background: 'var(--bg-card)' }}>
           <p className="text-[13px] leading-relaxed" style={{ color: 'var(--label-2)' }}>

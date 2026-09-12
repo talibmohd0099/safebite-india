@@ -31,6 +31,15 @@ function categoryIcon(category) {
   return CATEGORY_ICONS[(category || '').toLowerCase()] || '🔹';
 }
 
+// Open Food Facts' percent estimates arrive unrounded -- a real one seen
+// in production was "0.0000461935997009277% of product", which is noise
+// dressed up as precision. Anything under 0.1% is a trace either way, so
+// say that instead of printing a number nobody can read.
+function formatPercentage(value) {
+  if (value < 0.1) return 'Trace amount';
+  return `${Number(value.toFixed(1))}% of product`;
+}
+
 function Badge({ label, value }) {
   if (!value) return null;
   return (
@@ -136,7 +145,7 @@ export default function IngredientCard({ ingredient, style }) {
                 className="text-xs px-2 py-0.5 rounded-full"
                 style={{ background: 'var(--fill)', color: 'var(--label-2)' }}
               >
-                {ingredient.percentage}% of product
+                {formatPercentage(ingredient.percentage)}
               </span>
             )}
           </div>

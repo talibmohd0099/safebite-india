@@ -8,7 +8,7 @@
 import { parseLabel, isBracketBalanced } from './ingredientParser.js';
 import { resolveIngredients } from './ingredientLibrary.js';
 import { buildReport } from './scoringEngine.js';
-import { generateSummary, repairLabelPunctuation } from './geminiService.js';
+import { generateProductInsights, repairLabelPunctuation } from './geminiService.js';
 import { applyOffPercentEstimates } from './openFoodFacts.js';
 
 /**
@@ -65,10 +65,10 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
   const report = buildReport(ingredients, { productName, brand, imageUrl });
   report.allergens = allergens;
 
-  // Single-ingredient lookups don't need a "product" summary at all --
-  // only worth the extra call for a real multi-ingredient product.
+  // Single-ingredient lookups don't need "product" text at all -- only
+  // worth the extra call for a real multi-ingredient product.
   if (parsed.length > 1) {
-    const aiSummary = await generateSummary({
+    const insights = await generateProductInsights({
       productName: report.productName,
       brand,
       score: report.overallScore,
@@ -76,10 +76,14 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
       harmfulNames: ingredients.filter((i) => i.status === 'harmful').map((i) => i.name),
       concerningNames: ingredients.filter((i) => i.status === 'concerning').map((i) => i.name),
       ingredientCount: ingredients.length,
+      ingredientNames: ingredients.map((i) => i.name),
     });
-    // Falls back to the rule-based summary already on `report` if this
-    // AI call fails for any reason -- never let it break the report.
-    if (aiSummary) report.summary = aiSummary;
+    // Each field falls back independently to the rule-based version
+    // already on `report` -- a failed call (or a partial response) must
+    // never break the report or blank out a section.
+    if (insights?.summary) report.summary = insights.summary;
+    if (insights?.recommendation) report.recommendation = insights.recommendation;
+    if (insights?.isCondimentOrSeasoning) report.isCondimentOrSeasoning = true;
   }
 
   return {

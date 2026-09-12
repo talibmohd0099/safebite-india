@@ -7,17 +7,18 @@
 // products/product_reports split was built to enable: run this any time
 // the scoring formula changes, instead of re-seeding from scratch.
 //
-// Deliberately leaves `summary` untouched -- it's AI-written prose that
-// already names specific ingredients; a changed score number alone
-// doesn't make that text wrong, and overwriting it with buildReport's
-// generic rule-based fallback would throw away a real AI summary for
-// no reason.
+// Deliberately leaves `summary` untouched, and leaves `recommendation`
+// untouched too whenever it's AI-written rather than the generic
+// score-band fallback -- both are prose that already names this
+// product's specific ingredients, and a changed score number alone
+// doesn't make that text wrong. Overwriting either with buildReport's
+// generic version would throw away real AI text for no reason.
 //
 // Usage:
 //   node scripts/recompute-scores.js --dry-run
 //   node scripts/recompute-scores.js
 
-import { buildReport } from '../src/services/scoringEngine.js';
+import { buildReport, isRuleBasedRecommendation } from '../src/services/scoringEngine.js';
 import { supabase, isSupabaseConfigured } from '../src/services/supabaseClient.js';
 
 const PAGE_SIZE = 500;
@@ -70,7 +71,13 @@ async function main() {
           ...row.report,
           overallScore: fresh.overallScore,
           verdict: fresh.verdict,
-          recommendation: fresh.recommendation,
+          // Only refresh the recommendation when it's still the generic
+          // score-band line -- an AI-written one is specific to this
+          // product and would be thrown away by overwriting it here,
+          // same reasoning as `summary` above.
+          recommendation: isRuleBasedRecommendation(row.report.recommendation)
+            ? fresh.recommendation
+            : row.report.recommendation,
           flags: fresh.flags,
           positives: fresh.positives,
           hasEstimatedQuantities: fresh.hasEstimatedQuantities,

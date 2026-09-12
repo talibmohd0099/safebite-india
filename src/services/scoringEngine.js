@@ -88,12 +88,28 @@ function computeScore(ingredients) {
   return score;
 }
 
+// The fallback recommendations, used when the AI-written per-product one
+// (see generateProductInsights) isn't available. Exported as a set so a
+// bulk re-score can tell "this row still has the generic line, safe to
+// refresh" apart from "this row has real AI text, leave it alone".
+const RULE_BASED_RECOMMENDATIONS = [
+  'This is a healthy choice — enjoy without concern.',
+  'A reasonably good choice, with only minor concerns to be aware of.',
+  'Fine occasionally, but not something to eat every day.',
+  'Better treated as an occasional indulgence than a regular choice.',
+  'Best avoided or eaten very rarely given its ingredient profile.',
+];
+
+export function isRuleBasedRecommendation(text) {
+  return RULE_BASED_RECOMMENDATIONS.includes((text || '').trim());
+}
+
 function recommendationFor(score) {
-  if (score >= 85) return 'This is a healthy choice — enjoy without concern.';
-  if (score >= 65) return 'A reasonably good choice, with only minor concerns to be aware of.';
-  if (score >= 45) return "Fine occasionally, but not something to eat every day.";
-  if (score >= 25) return 'Better treated as an occasional indulgence than a regular choice.';
-  return 'Best avoided or eaten very rarely given its ingredient profile.';
+  if (score >= 85) return RULE_BASED_RECOMMENDATIONS[0];
+  if (score >= 65) return RULE_BASED_RECOMMENDATIONS[1];
+  if (score >= 45) return RULE_BASED_RECOMMENDATIONS[2];
+  if (score >= 25) return RULE_BASED_RECOMMENDATIONS[3];
+  return RULE_BASED_RECOMMENDATIONS[4];
 }
 
 /**
