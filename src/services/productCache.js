@@ -217,6 +217,32 @@ export async function getDailySpotlight() {
 }
 
 /**
+ * Total products in the catalog, and how many were added today -- a
+ * simple progress counter for the home screen so growth is visible
+ * without digging into Supabase directly. `head: true` on a count
+ * query returns just the number, not the matching rows.
+ */
+export async function getCatalogStats() {
+  if (!isSupabaseConfigured) return { total: 0, addedToday: 0 };
+
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const [totalRes, todayRes] = await Promise.all([
+    supabase.from('product_reports').select('*', { count: 'exact', head: true }),
+    supabase
+      .from('product_reports')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', startOfToday.toISOString()),
+  ]);
+
+  return {
+    total: totalRes.count ?? 0,
+    addedToday: todayRes.count ?? 0,
+  };
+}
+
+/**
  * Look up a cached report by its key. Returns null on a cache miss,
  * on error, or if Supabase isn't configured yet — callers should treat
  * null the same as "no cache, go ahead and call the AI".

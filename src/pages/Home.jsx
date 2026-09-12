@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { extractIngredientsFromImage } from '../services/geminiService';
 import { analyzeText } from '../services/analyzeText';
 import { lookupBarcode, searchProductsByName } from '../services/openFoodFacts';
-import { getCachedReport, saveReport, barcodeKey, textKey, searchCachedProducts, getPopularSearchTerms, getRecentlyAddedProducts, getDailySpotlight, dayOfYearSeed } from '../services/productCache';
+import { getCachedReport, saveReport, barcodeKey, textKey, searchCachedProducts, getPopularSearchTerms, getRecentlyAddedProducts, getDailySpotlight, getCatalogStats, dayOfYearSeed } from '../services/productCache';
 import { saveToHistory, getScoreColor, getHistory } from '../utils/storage';
 import LoadingScreen from '../components/LoadingScreen';
 import ProductStripCard from '../components/ProductStripCard';
@@ -43,6 +43,7 @@ export default function Home() {
   const [popularTerms, setPopularTerms] = useState([]);
   const [recentlyAdded, setRecentlyAdded] = useState([]);
   const [spotlight, setSpotlight] = useState({ best: null, worst: null });
+  const [stats, setStats] = useState(null);
   const [recentScans] = useState(() => getHistory().slice(0, 5));
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Analyzing ingredients...');
@@ -59,6 +60,7 @@ export default function Home() {
     getPopularSearchTerms(8).then(setPopularTerms);
     getRecentlyAddedProducts(10).then(setRecentlyAdded);
     getDailySpotlight().then(setSpotlight);
+    getCatalogStats().then(setStats);
   }, []);
 
   // Review step: set after an image is read or a barcode is looked up,
@@ -430,6 +432,19 @@ export default function Home() {
             <h1 className="text-white text-[17px] font-bold text-center opacity-95">
               Is your food actually safe?
             </h1>
+            {stats && (
+              <div className="flex items-center justify-center gap-6 mt-3">
+                <div className="text-center">
+                  <p className="text-white text-lg font-extrabold leading-none">{stats.total.toLocaleString()}</p>
+                  <p className="text-white/75 text-[11px] mt-0.5">Products scored</p>
+                </div>
+                <div className="w-px h-8 bg-white/25" />
+                <div className="text-center">
+                  <p className="text-white text-lg font-extrabold leading-none">+{stats.addedToday.toLocaleString()}</p>
+                  <p className="text-white/75 text-[11px] mt-0.5">Added today</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Search bar */}
