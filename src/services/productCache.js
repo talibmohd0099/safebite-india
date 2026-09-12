@@ -2,6 +2,7 @@
 // Shared cache so repeat scans of the same product reuse a saved AI
 // report instead of paying for a fresh AI call every time.
 import { supabase, isSupabaseConfigured } from './supabaseClient.js';
+import { CATEGORIES } from '../data/categories.js';
 
 function normalizeText(text) {
   return text.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -214,6 +215,61 @@ export async function getDailySpotlight() {
     best: toItem(sorted[seed % poolSize]),
     worst: toItem(sorted[sorted.length - 1 - (seed % poolSize)]),
   };
+}
+
+/**
+ * Same category-keyword matching Category.jsx browses by, applied to a
+ * single product name -- lets us place a product into one of the fixed
+ * categories without asking the user or calling the AI again.
+ */
+function findCategoryForProduct(productName) {
+  const name = (productName || '').toLowerCase();
+  return CATEGORIES.find((c) => c.keywords.some((k) => name.includes(k))) || null;
+}
+
+// "Safe" here means the same bar the Result page already displays as
+// the "Good" tier and above (see SCORE_TIERS in utils/storage.js) --
+// there's no separate threshold invented just for this feature.
+const SAFE_SCORE_THRESHOLD = 65;
+
+/**
+ * Better-scoring products in the same category as a low-scoring one --
+ * the Result page's "Safer alternatives" section. Deliberately not an
+ * AI call: every candidate already has a real, verified score sitting
+ * in the catalog, so picking by category + score is both free and more
+ * trustworthy than asking a model to name a product that may not even
+ * be in our database.
+ */
+export async function getSaferAlternatives({ productName, lookupKey, limit = 3 }) {
+  if (!isSupabaseConfigured) return [];
+
+  const category = findCategoryForProduct(productName);
+  if (!category) return [];
+
+  const orFilter = category.keywords.map((k) => `product_name.ilike.%${k}%`).join(',');
+
+  const { data, error } = await supabase
+    .from('product_reports')
+    .select('lookup_key, product_name, report')
+    .or(orFilter)
+    .neq('lookup_key', lookupKey || '')
+    .limit(60); // score lives inside the report JSON, so filter/sort/slice client-side below
+
+  if (error || !data) return [];
+
+  return data
+    .filter((row) => row.product_name)
+    .map((row) => ({
+      lookupKey: row.lookup_key,
+      productName: row.product_name,
+      brand: row.report?.brand || null,
+      imageUrl: row.report?.imageUrl || null,
+      score: typeof row.report?.overallScore === 'number' ? row.report.overallScore : null,
+      verdict: row.report?.verdict || null,
+    }))
+    .filter((p) => typeof p.score === 'number' && p.score >= SAFE_SCORE_THRESHOLD)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
 }
 
 /**

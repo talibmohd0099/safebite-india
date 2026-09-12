@@ -1,11 +1,12 @@
 // src/pages/Result.jsx
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { getHistoryById, updateHistoryProductName, getScoreColor, getIngredientSeverity } from '../utils/storage';
-import { updateProductName } from '../services/productCache';
+import { getHistoryById, updateHistoryProductName, saveToHistory, getScoreColor, getIngredientSeverity } from '../utils/storage';
+import { updateProductName, getCachedReport, getSaferAlternatives } from '../services/productCache';
 import ScoreCircle from '../components/ScoreCircle';
 import IngredientCard from '../components/IngredientCard';
 import ProductImage from '../components/ProductImage';
+import ProductStripCard from '../components/ProductStripCard';
 
 function SectionHeader({ children, action }) {
   return (
@@ -85,6 +86,7 @@ export default function Result() {
   const [view, setView] = useState('overview');
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  const [alternatives, setAlternatives] = useState([]);
 
   useEffect(() => {
     const data = getHistoryById(id);
@@ -94,6 +96,28 @@ export default function Result() {
     }
     setResult(data);
   }, [id, navigate]);
+
+  // Only worth asking for when the score is actually low -- a "Good"
+  // or better product doesn't need an alternative suggested to it.
+  useEffect(() => {
+    if (!result || (result.overallScore || 0) >= 65) {
+      setAlternatives([]);
+      return;
+    }
+    let cancelled = false;
+    getSaferAlternatives({ productName: result.productName, lookupKey: result.lookupKey }).then((alts) => {
+      if (!cancelled) setAlternatives(alts);
+    });
+    return () => { cancelled = true; };
+  }, [result?.lookupKey, result?.productName, result?.overallScore]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const openAlternative = async (item) => {
+    const cached = await getCachedReport(item.lookupKey);
+    if (!cached) return;
+    cached.lookupKey = item.lookupKey;
+    const historyId = saveToHistory(cached, 'search');
+    navigate(`/result/${historyId}`);
+  };
 
   const startEditingName = () => {
     setNameInput(result.productName === 'Unknown Product' ? '' : result.productName || '');
@@ -249,6 +273,23 @@ export default function Result() {
             This label doesn't state an exact percentage for every ingredient, so part of this score is a reasonable estimate rather than the product's exact measured composition.
           </p>
         </div>
+      )}
+
+      {/* Safer alternatives -- only for a genuinely low score, and only
+          when the catalog actually has a better-scoring product in the
+          same category to suggest. No AI call: same category-keyword
+          match Category.jsx browses by, filtered to a "Good"-or-better
+          score, so every suggestion here is a real, already-verified
+          product rather than something a model guessed at. */}
+      {alternatives.length > 0 && (
+        <>
+          <SectionHeader>Safer alternatives in this category</SectionHeader>
+          <div className="flex gap-3 overflow-x-auto px-4 pb-1" style={{ scrollbarWidth: 'none' }}>
+            {alternatives.map((item) => (
+              <ProductStripCard key={item.lookupKey} item={item} onClick={() => openAlternative(item)} />
+            ))}
+          </div>
+        </>
       )}
 
       <SegmentedControl
