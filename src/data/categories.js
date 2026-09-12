@@ -21,7 +21,11 @@ import essentials from '../assets/categories/essentials.png';
 
 export const CATEGORIES = [
   { id: 'biscuits', label: 'Biscuits & Cookies', image: biscuits, keywords: ['biscuit', 'cookie', 'cracker', 'rusk'] },
-  { id: 'noodles', label: 'Instant Noodles', image: noodles, keywords: ['noodle', 'maggi', 'pasta', 'vermicelli', 'soup', 'instant'] },
+  // 'instant' on its own used to be a keyword here too, but it's generic
+  // enough to also match things like "Bru Instant Coffee" -- which then
+  // surfaced as a "safer alternative" to a pasta product. Every keyword
+  // left here is specific to an actual noodle/pasta product.
+  { id: 'noodles', label: 'Instant Noodles', image: noodles, keywords: ['noodle', 'maggi', 'pasta', 'vermicelli', 'macaroni', 'soup'] },
   { id: 'beverages', label: 'Beverages', image: beverages, keywords: ['juice', 'drink', 'squash', 'tea', 'coffee'] },
   { id: 'snacks', label: 'Snacks & Namkeen', image: snacks, keywords: ['chips', 'namkeen', 'bhujia', 'sev', 'mixture', 'popcorn', 'wafer'] },
   { id: 'chocolates', label: 'Chocolates & Sweets', image: chocolates, keywords: ['chocolate', 'candy', 'toffee', 'eclair', 'chikki'] },
