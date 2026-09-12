@@ -51,6 +51,13 @@ export async function lookupBarcode(barcode) {
     throw new Error('Could not reach the product database. Check your connection and try again.');
   }
 
+  // Open Food Facts' v2 API returns a plain 404 for a barcode it simply
+  // doesn't have -- that's the expected, common "not found" case (see
+  // the docstring above), not a failure. Anything else non-ok is a real
+  // problem worth surfacing.
+  if (response.status === 404) {
+    return { found: false };
+  }
   if (!response.ok) {
     throw new Error('Product lookup failed. Please try again.');
   }

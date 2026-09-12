@@ -11,6 +11,7 @@ import ProductStripCard from '../components/ProductStripCard';
 import ProductImage from '../components/ProductImage';
 import { CATEGORIES } from '../data/categories';
 import { getTodaysTip } from '../data/didYouKnowTips';
+import BarcodeScanner, { isBarcodeScanSupported } from '../components/BarcodeScanner';
 
 function BarcodeIcon() {
   return (
@@ -34,6 +35,7 @@ export default function Home() {
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [barcodeInput, setBarcodeInput] = useState('');
+  const [showScanner, setShowScanner] = useState(false);
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [suggestions, setSuggestions] = useState({ cached: [], off: [] });
   const [searching, setSearching] = useState(false);
@@ -189,8 +191,13 @@ export default function Home() {
     setReviewText(ingredientsText || '');
   };
 
-  const handleAnalyze = async () => {
+  const handleAnalyze = async (scannedCode) => {
     setError('');
+
+    // A camera scan calls this straight after setBarcodeInput(), whose
+    // state update hasn't landed yet on this render -- passing the
+    // scanned value through directly avoids reading stale state.
+    const barcodeValue = (scannedCode ?? barcodeInput).trim();
 
     if (mode === 'text' && !text.trim()) {
       setError('Please paste or type the ingredients list.');
@@ -200,7 +207,7 @@ export default function Home() {
       setError('Please upload a photo of the food label.');
       return;
     }
-    if (mode === 'barcode' && !barcodeInput.trim()) {
+    if (mode === 'barcode' && !barcodeValue) {
       setError('Please enter the barcode number (usually below the barcode lines).');
       return;
     }
@@ -252,7 +259,7 @@ export default function Home() {
       }
 
       if (mode === 'barcode') {
-        const key = barcodeKey(barcodeInput.trim());
+        const key = barcodeKey(barcodeValue);
         setLoadingMessage('Checking cache...');
         const cached = await getCachedReport(key);
         if (cached) {
@@ -263,7 +270,7 @@ export default function Home() {
         }
 
         setLoadingMessage('Looking up product...');
-        const found = await lookupBarcode(barcodeInput.trim());
+        const found = await lookupBarcode(barcodeValue);
         if (!found.found) {
           setError("This product isn't in the product database yet. Try pasting the ingredients or uploading a photo instead.");
           setLoading(false);
@@ -277,6 +284,12 @@ export default function Home() {
       setError(err.message || 'Something went wrong. Please try again.');
       setLoading(false);
     }
+  };
+
+  const handleBarcodeDetected = (code) => {
+    setShowScanner(false);
+    setBarcodeInput(code);
+    handleAnalyze(code);
   };
 
   const handleConfirmReview = async () => {
@@ -780,8 +793,16 @@ export default function Home() {
       {/* Barcode Mode */}
       {mode === 'barcode' && (
         <div className="mb-4">
+          {isBarcodeScanSupported() && (
+            <button
+              onClick={() => setShowScanner(true)}
+              className="tap-scale w-full mb-3 py-3.5 rounded-xl border-2 border-dashed border-green-300 bg-green-50 text-green-700 font-semibold text-sm flex items-center justify-center gap-2"
+            >
+              📷 Scan with camera
+            </button>
+          )}
           <label className="block text-sm font-semibold text-slate-700 mb-2">
-            Enter the barcode number:
+            Or enter the barcode number:
           </label>
           <input
             type="text"
@@ -808,12 +829,16 @@ export default function Home() {
       {/* Analyze Button — search mode acts on picking a result instead */}
       {mode !== 'search' && (
         <button
-          onClick={handleAnalyze}
+          onClick={() => handleAnalyze()}
           disabled={loading}
           className="tap-scale w-full py-4 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-base rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-green-200"
         >
           {mode === 'barcode' ? '🔍 Look Up Product' : '🔍 Analyze Ingredients'}
         </button>
+      )}
+
+      {showScanner && (
+        <BarcodeScanner onDetected={handleBarcodeDetected} onClose={() => setShowScanner(false)} />
       )}
 
     </div>
