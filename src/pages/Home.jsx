@@ -517,12 +517,15 @@ export default function Home() {
                     key={cat.id}
                     onClick={() => navigate(`/category/${cat.id}`)}
                     style={{ animationDelay: `${i * 40}ms` }}
-                    className={`item-in tap-scale flex flex-col items-center gap-1.5 py-3 px-1 rounded-2xl transition-transform hover:-translate-y-0.5 text-center ${cat.bg}`}
+                    className={`item-in tap-scale flex flex-col items-center gap-2 py-3.5 px-1 rounded-2xl transition-transform hover:-translate-y-0.5 text-center ${cat.bg}`}
                   >
-                    <span className={`w-9 h-9 rounded-full flex items-center justify-center ${cat.iconBg} ${cat.iconColor}`}>
-                      <CategoryIcon id={cat.id} className="w-5 h-5" />
+                    <span
+                      className={`rounded-full flex items-center justify-center flex-shrink-0 ${cat.iconBg} ${cat.iconColor}`}
+                      style={{ width: 50, height: 50 }}
+                    >
+                      <CategoryIcon id={cat.id} className="w-7 h-7" />
                     </span>
-                    <span className="text-[10.5px] font-semibold text-slate-700 leading-tight">{cat.label}</span>
+                    <span className="text-[15px] font-semibold text-slate-700 leading-tight">{cat.label}</span>
                   </button>
                 ))}
               </div>

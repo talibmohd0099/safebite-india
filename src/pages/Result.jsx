@@ -152,8 +152,13 @@ export default function Result() {
       </button>
 
       {/* Title */}
-      <div className="px-5 pt-1 pb-5 flex gap-3.5 items-start">
-        <div className="flex-1 min-w-0">
+      <div className="px-5 pt-1 pb-5">
+        {result.imageUrl && (
+          <div className="flex justify-center mb-4">
+            <ProductImage src={result.imageUrl} size={152} />
+          </div>
+        )}
+        <div className="min-w-0">
           {result.brand && !editingName && (
             <p className="text-[13px] font-semibold mb-0.5" style={{ color: 'var(--label-2)' }}>
               {result.brand.toUpperCase()}
@@ -204,8 +209,6 @@ export default function Result() {
             </span>
           )}
         </div>
-
-        <ProductImage src={result.imageUrl} />
       </div>
 
       {/* Score hero */}
