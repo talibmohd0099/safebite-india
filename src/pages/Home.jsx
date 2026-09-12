@@ -4,10 +4,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { extractIngredientsFromImage } from '../services/geminiService';
 import { analyzeText } from '../services/analyzeText';
 import { lookupBarcode, searchProductsByName } from '../services/openFoodFacts';
-import { getCachedReport, saveReport, barcodeKey, textKey, searchCachedProducts, getPopularSearchTerms } from '../services/productCache';
-import { saveToHistory, getScoreColor } from '../utils/storage';
+import { getCachedReport, saveReport, barcodeKey, textKey, searchCachedProducts, getPopularSearchTerms, getRecentlyAddedProducts, getDailySpotlight, dayOfYearSeed } from '../services/productCache';
+import { saveToHistory, getScoreColor, getHistory } from '../utils/storage';
 import LoadingScreen from '../components/LoadingScreen';
+import ProductStripCard from '../components/ProductStripCard';
+import ProductImage from '../components/ProductImage';
 import { CATEGORIES } from '../data/categories';
+import { getTodaysTip } from '../data/didYouKnowTips';
 
 function BarcodeIcon() {
   return (
@@ -36,17 +39,24 @@ export default function Home() {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [popularTerms, setPopularTerms] = useState([]);
+  const [recentlyAdded, setRecentlyAdded] = useState([]);
+  const [spotlight, setSpotlight] = useState({ best: null, worst: null });
+  const [recentScans] = useState(() => getHistory().slice(0, 5));
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Analyzing ingredients...');
   const [error, setError] = useState('');
   const fileInputRef = useRef(null);
   const searchInputRef = useRef(null);
   const navigate = useNavigate();
+  const todaysTip = getTodaysTip(dayOfYearSeed());
 
-  // Real usage data for the "Popular searches" pills -- loaded once, not
-  // worth the type-ahead effect's debounce/cancellation machinery.
+  // Real usage/catalog data for the home screen's discovery sections --
+  // each loaded once, not worth the type-ahead effect's debounce/
+  // cancellation machinery.
   useEffect(() => {
     getPopularSearchTerms(8).then(setPopularTerms);
+    getRecentlyAddedProducts(10).then(setRecentlyAdded);
+    getDailySpotlight().then(setSpotlight);
   }, []);
 
   // Review step: set after an image is read or a barcode is looked up,
@@ -468,6 +478,60 @@ export default function Home() {
             </div>
           )}
 
+          {/* Continue where you left off -- your own past scans, so
+              re-checking something you already looked at doesn't need a
+              trip to the History tab. Only for returning users. */}
+          {searchQuery.trim().length === 0 && recentScans.length > 0 && (
+            <div className="mb-6">
+              <p className="text-sm font-bold text-slate-800 mb-2 px-0.5">Continue where you left off</p>
+              <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+                {recentScans.map((entry, i) => (
+                  <ProductStripCard
+                    key={entry.id}
+                    item={{ productName: entry.productName, imageUrl: entry.imageUrl, score: entry.overallScore }}
+                    onClick={() => navigate(`/result/${entry.id}`)}
+                    style={{ animationDelay: `${i * 30}ms` }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Today's spotlight -- one high scorer, one low scorer, both
+              real and rotating daily. Teaches by example instead of just
+              telling people what to avoid in the abstract. */}
+          {searchQuery.trim().length === 0 && (spotlight.best || spotlight.worst) && (
+            <div className="mb-6">
+              <p className="text-sm font-bold text-slate-800 mb-2 px-0.5">Today's spotlight</p>
+              <div className="grid grid-cols-2 gap-2.5">
+                {spotlight.best && (
+                  <button
+                    onClick={() => openCachedSuggestion(spotlight.best)}
+                    className="tap-scale flex items-center gap-2.5 p-3 rounded-2xl bg-green-50 border border-green-100 text-left"
+                  >
+                    <ProductImage src={spotlight.best.imageUrl} size={44} expandable={false} />
+                    <span className="min-w-0">
+                      <span className="block text-[10px] font-bold text-green-700 uppercase tracking-wide">Healthiest pick</span>
+                      <span className="block text-xs font-semibold text-slate-700 leading-tight line-clamp-2">{spotlight.best.productName}</span>
+                    </span>
+                  </button>
+                )}
+                {spotlight.worst && (
+                  <button
+                    onClick={() => openCachedSuggestion(spotlight.worst)}
+                    className="tap-scale flex items-center gap-2.5 p-3 rounded-2xl bg-red-50 border border-red-100 text-left"
+                  >
+                    <ProductImage src={spotlight.worst.imageUrl} size={44} expandable={false} />
+                    <span className="min-w-0">
+                      <span className="block text-[10px] font-bold text-red-700 uppercase tracking-wide">Worth a closer look</span>
+                      <span className="block text-xs font-semibold text-slate-700 leading-tight line-clamp-2">{spotlight.worst.productName}</span>
+                    </span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Popular searches -- real scan-count data, not a guess. */}
           {searchQuery.trim().length === 0 && popularTerms.length > 0 && (
             <div className="mb-6">
@@ -487,6 +551,31 @@ export default function Home() {
                 </div>
                 {/* Fade hints there's more to scroll to -- the row has no
                     other visual cue that it doesn't just end there. */}
+                <div
+                  className="pointer-events-none absolute top-0 right-0 bottom-1 w-10"
+                  style={{ background: 'linear-gradient(to right, transparent, var(--bg-grouped))' }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Recently added -- the newest products in the catalog, so the
+              app has something fresh to show even to someone who never
+              types a search. */}
+          {searchQuery.trim().length === 0 && recentlyAdded.length > 0 && (
+            <div className="mb-6">
+              <p className="text-sm font-bold text-slate-800 mb-2 px-0.5">Recently added</p>
+              <div className="relative">
+                <div className="flex gap-3 overflow-x-auto pb-1 pr-8" style={{ scrollbarWidth: 'none' }}>
+                  {recentlyAdded.map((item, i) => (
+                    <ProductStripCard
+                      key={item.lookupKey}
+                      item={item}
+                      onClick={() => openCachedSuggestion(item)}
+                      style={{ animationDelay: `${i * 30}ms` }}
+                    />
+                  ))}
+                </div>
                 <div
                   className="pointer-events-none absolute top-0 right-0 bottom-1 w-10"
                   style={{ background: 'linear-gradient(to right, transparent, var(--bg-grouped))' }}
@@ -523,6 +612,19 @@ export default function Home() {
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Did you know -- a small, static, curated fact. Not AI text --
+              a wrong "fun fact" would undercut the app's whole pitch of
+              being accurate about Indian food regulations. */}
+          {searchQuery.trim().length === 0 && (
+            <div className="mb-6 flex gap-3 items-start p-3.5 rounded-2xl bg-white border border-slate-100">
+              <span className="text-lg flex-shrink-0">💡</span>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                <span className="font-bold text-slate-800">Did you know? </span>
+                {todaysTip}
+              </p>
             </div>
           )}
 

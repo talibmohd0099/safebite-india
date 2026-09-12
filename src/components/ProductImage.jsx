@@ -7,29 +7,38 @@
 // Tapping a real photo opens it full-screen -- the thumbnail size here
 // is a recognition/context size, not big enough to actually inspect
 // against the physical pack, so a bigger look needs to be one tap away.
+//
+// `expandable` turns that off: some callers (a whole card that should
+// just navigate to the report on any tap -- ProductStripCard, the home
+// screen's spotlight cards) want a plain, inert thumbnail. Without this,
+// the image's own onClick swallows the tap via stopPropagation before it
+// ever reaches the card's handler, so tapping the photo silently did
+// nothing (well, technically opened an empty lightbox) instead of
+// navigating -- found by a click that resolved but never changed the URL.
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 
-export default function ProductImage({ src, size = 76 }) {
+export default function ProductImage({ src, size = 76, expandable = true }) {
   const [failed, setFailed] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const showFallback = !src || failed;
+  const canExpand = expandable && !showFallback;
 
   return (
     <>
       <div
-        className={`flex-shrink-0 rounded-2xl overflow-hidden flex items-center justify-center ${!showFallback ? 'tap-scale cursor-zoom-in' : ''}`}
+        className={`flex-shrink-0 rounded-2xl overflow-hidden flex items-center justify-center ${canExpand ? 'tap-scale cursor-zoom-in' : ''}`}
         style={{ width: size, height: size, background: 'var(--fill)' }}
         onClick={(e) => {
-          if (showFallback) return;
+          if (!canExpand) return;
           // A thumbnail often sits inside something else clickable (a
           // history row that navigates on tap) -- this should only ever
           // open the viewer, never also trigger whatever's around it.
           e.stopPropagation();
           setExpanded(true);
         }}
-        role={!showFallback ? 'button' : undefined}
-        aria-label={!showFallback ? 'View larger image' : undefined}
+        role={canExpand ? 'button' : undefined}
+        aria-label={canExpand ? 'View larger image' : undefined}
       >
         {showFallback ? (
           <span style={{ fontSize: size * 0.4 }}>📦</span>

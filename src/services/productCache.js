@@ -136,6 +136,87 @@ export async function getPopularSearchTerms(limit = 8) {
 }
 
 /**
+ * The most recently added products -- home screen's "Recently added"
+ * feed, so the app has something fresh to show even to a visitor who
+ * never types a search. Ordered by when we saved the report, not by
+ * when the product itself was manufactured.
+ */
+export async function getRecentlyAddedProducts(limit = 10) {
+  if (!isSupabaseConfigured) return [];
+
+  const { data, error } = await supabase
+    .from('product_reports')
+    .select('lookup_key, product_name, report, created_at')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error || !data) return [];
+
+  return data
+    .filter((row) => row.product_name)
+    .map((row) => ({
+      lookupKey: row.lookup_key,
+      productName: row.product_name,
+      brand: row.report?.brand || null,
+      imageUrl: row.report?.imageUrl || null,
+      score: typeof row.report?.overallScore === 'number' ? row.report.overallScore : null,
+      verdict: row.report?.verdict || null,
+    }));
+}
+
+// A stable number for "today" -- the same all day, different tomorrow --
+// used to rotate the daily spotlight and tip without a real backend
+// scheduler. Deliberately NOT random: a random pick on every page load
+// would mean two visits in the same day show different things, which
+// reads as broken rather than "daily".
+export function dayOfYearSeed(date = new Date()) {
+  const start = new Date(date.getFullYear(), 0, 0);
+  return Math.floor((date - start) / 86400000);
+}
+
+/**
+ * One high-scoring and one low-scoring product, rotating daily from a
+ * pool of the catalog's best/worst so it isn't the literal same two
+ * products forever. Selects only the score/verdict/brand/image fields
+ * via a JSON-path select (not the whole `report`, which would also drag
+ * along every product's full ingredient list just to pick two of them).
+ */
+export async function getDailySpotlight() {
+  if (!isSupabaseConfigured) return { best: null, worst: null };
+
+  const { data, error } = await supabase
+    .from('product_reports')
+    .select('lookup_key, product_name, score:report->>overallScore, verdict:report->>verdict, brand:report->>brand, imageUrl:report->>imageUrl')
+    .limit(1000);
+
+  if (error || !data?.length) return { best: null, worst: null };
+
+  const withScore = data
+    .filter((row) => row.product_name && row.score !== null)
+    .map((row) => ({ ...row, score: Number(row.score) }))
+    .filter((row) => Number.isFinite(row.score));
+  if (!withScore.length) return { best: null, worst: null };
+
+  const sorted = [...withScore].sort((a, b) => b.score - a.score);
+  const poolSize = Math.min(20, sorted.length);
+  const seed = dayOfYearSeed();
+
+  const toItem = (row) => ({
+    lookupKey: row.lookup_key,
+    productName: row.product_name,
+    brand: row.brand || null,
+    imageUrl: row.imageUrl || null,
+    score: row.score,
+    verdict: row.verdict || null,
+  });
+
+  return {
+    best: toItem(sorted[seed % poolSize]),
+    worst: toItem(sorted[sorted.length - 1 - (seed % poolSize)]),
+  };
+}
+
+/**
  * Look up a cached report by its key. Returns null on a cache miss,
  * on error, or if Supabase isn't configured yet — callers should treat
  * null the same as "no cache, go ahead and call the AI".
