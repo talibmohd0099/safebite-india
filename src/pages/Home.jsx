@@ -26,6 +26,27 @@ function BarcodeIcon() {
   );
 }
 
+// A small animated "scan" badge for the hero -- a barcode with a glowing
+// line sweeping across it on a loop, echoing the app's actual scanning
+// feature instead of being decoration for its own sake.
+function ScanBadge() {
+  return (
+    <div className="relative w-14 h-14 flex-shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center overflow-hidden">
+      <svg viewBox="0 0 24 24" className="w-7 h-7 text-white/90">
+        <rect x="1.5" y="4" width="1.6" height="16" fill="currentColor" />
+        <rect x="4.5" y="4" width="0.9" height="16" fill="currentColor" />
+        <rect x="6.7" y="4" width="2.2" height="16" fill="currentColor" />
+        <rect x="10.5" y="4" width="0.9" height="16" fill="currentColor" />
+        <rect x="13" y="4" width="1.6" height="16" fill="currentColor" />
+        <rect x="16" y="4" width="0.9" height="16" fill="currentColor" />
+        <rect x="18.2" y="4" width="2.2" height="16" fill="currentColor" />
+        <rect x="21.9" y="4" width="0.9" height="16" fill="currentColor" />
+      </svg>
+      <div className="scan-sweep absolute left-1.5 right-1.5 h-[2px] rounded-full" style={{ background: '#bef264', boxShadow: '0 0 6px 1px rgba(190,242,100,0.85)' }} />
+    </div>
+  );
+}
+
 export default function Home() {
   const [searchParams] = useSearchParams();
   const [mode, setMode] = useState('search'); // 'search' | 'text' | 'image' | 'barcode'
@@ -428,20 +449,37 @@ export default function Home() {
       {mode === 'search' && (
         <>
           {/* Hero band */}
-          <div className="hero-animated -mx-4 px-4 pt-6 pb-8 rounded-b-[28px]">
-            <h1 className="text-white text-[17px] font-bold text-center opacity-95">
-              Is your food actually safe?
-            </h1>
+          <div className="hero-animated relative -mx-4 px-5 pt-7 pb-9 rounded-b-[32px] overflow-hidden">
+            {/* Soft floating accents -- small, quiet motion, not the
+                main event; hidden entirely under reduced-motion. */}
+            <span className="hero-float absolute top-3 right-24 w-1.5 h-6 rounded-full bg-lime-300/40 rotate-12" aria-hidden="true" />
+            <span className="hero-float-delay absolute top-16 right-12 w-1.5 h-1.5 rounded-full bg-white/50" aria-hidden="true" />
+
+            <div className="relative flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h1 className="text-white text-[22px] leading-[1.18] font-extrabold tracking-tight">
+                  Is your food<br />actually <span className="text-lime-300">safe?</span>
+                </h1>
+                <p className="text-white/80 text-[13px] font-medium mt-1.5">Scan. Know. Eat Smarter.</p>
+              </div>
+              <ScanBadge />
+            </div>
+
             {stats && (
-              <div className="flex items-center justify-center gap-6 mt-3">
-                <div className="text-center">
-                  <p className="text-white text-lg font-extrabold leading-none">{stats.total.toLocaleString()}</p>
-                  <p className="text-white/75 text-[11px] mt-0.5">Products scored</p>
+              <div className="relative flex items-center gap-2.5 mt-5">
+                <div className="flex-1 flex items-center gap-2.5 bg-white/15 backdrop-blur-sm rounded-2xl px-3.5 py-2.5 min-w-0">
+                  <span className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-sm flex-shrink-0">📊</span>
+                  <div className="min-w-0">
+                    <p className="text-white text-base font-extrabold leading-none">{stats.total.toLocaleString()}</p>
+                    <p className="text-white/75 text-[10.5px] mt-1 truncate">Products scored</p>
+                  </div>
                 </div>
-                <div className="w-px h-8 bg-white/25" />
-                <div className="text-center">
-                  <p className="text-white text-lg font-extrabold leading-none">+{stats.addedToday.toLocaleString()}</p>
-                  <p className="text-white/75 text-[11px] mt-0.5">Added today</p>
+                <div className="flex-1 flex items-center gap-2.5 bg-white/15 backdrop-blur-sm rounded-2xl px-3.5 py-2.5 min-w-0">
+                  <span className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-sm flex-shrink-0">✨</span>
+                  <div className="min-w-0">
+                    <p className="text-white text-base font-extrabold leading-none">+{stats.addedToday.toLocaleString()}</p>
+                    <p className="text-white/75 text-[10.5px] mt-1 truncate">Added today</p>
+                  </div>
                 </div>
               </div>
             )}

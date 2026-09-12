@@ -2,15 +2,14 @@
 // Just branding now -- Scan/History/About moved to BottomTabBar, since
 // 3 top-level destinations belong within thumb reach, not the top edge.
 import { Link } from 'react-router-dom';
+import headerIcon from '../assets/header-icon.png';
 
 export default function Header() {
   return (
     <header className="bg-white border-b border-slate-100 sticky top-0 z-40">
       <div className="max-w-2xl mx-auto px-4 py-2.5">
         <Link to="/" className="flex items-center gap-2 group w-fit">
-          <div className="w-7 h-7 bg-green-600 rounded-lg flex items-center justify-center text-white text-sm flex-shrink-0 group-hover:bg-green-700 transition-colors">
-            🛡️
-          </div>
+          <img src={headerIcon} alt="" className="w-7 h-7 flex-shrink-0 rounded-lg" />
           {/* One line, not stacked -- "India" reads as an accent on the
               wordmark, not a second row competing for its own line. */}
           <span className="flex items-baseline gap-1.5">
