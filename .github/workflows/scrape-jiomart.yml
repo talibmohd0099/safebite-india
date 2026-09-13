@@ -1,0 +1,90 @@
+name: Scrape JioMart
+
+# Second, independent product-image/ingredients source alongside
+# scrape-blinkit.yml -- Blinkit started returning 403 Forbidden on every
+# request as of 2026-09-10 (an active anti-scraping block from sustained
+# request volume, not a code problem), so this targets a different
+# retailer entirely rather than retrying the same block.
+#
+# UNVERIFIED against real JioMart HTML -- see the header comment in
+# src/services/jiomart.js for why, and treat every run until proven
+# otherwise as reconnaissance, not production seeding.
+#
+# No schedule on purpose, unlike Blinkit's (which only got disabled
+# AFTER getting blocked). This starts manual-only and stays that way
+# until a --list run and a small real run have both been checked by
+# hand -- only then does a conservative schedule get added here.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'What to run'
+        required: true
+        default: 'list'
+        type: choice
+        options:
+          - list
+          - sitemap
+          - category
+          - all
+      sitemap_url:
+        description: 'Exact sitemap URL from a --list run (only used when mode = sitemap)'
+        required: false
+        default: ''
+      category:
+        description: 'Category substring to match (only used when mode = category)'
+        required: false
+        default: ''
+      limit:
+        description: 'Products to fetch for sitemap/category mode'
+        required: false
+        default: '5'
+      per_category:
+        description: 'Products to fetch per category for --all mode'
+        required: false
+        default: '5'
+      dry_run:
+        description: 'Dry run (nothing written to the database)'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Scrape
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+        run: |
+          DRY_FLAG=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then DRY_FLAG="--dry-run"; fi
+
+          case "${{ github.event.inputs.mode }}" in
+            list)
+              node scripts/scrape-jiomart.js --list
+              ;;
+            sitemap)
+              node scripts/scrape-jiomart.js --sitemap "${{ github.event.inputs.sitemap_url }}" --limit "${{ github.event.inputs.limit }}" $DRY_FLAG
+              ;;
+            category)
+              node scripts/scrape-jiomart.js --category "${{ github.event.inputs.category }}" --limit "${{ github.event.inputs.limit }}" $DRY_FLAG
+              ;;
+            all)
+              node scripts/scrape-jiomart.js --all --per-category "${{ github.event.inputs.per_category }}" $DRY_FLAG
+              ;;
+          esac
