@@ -1,0 +1,37 @@
+name: Fetch News
+
+# Populates news_items for the app's News page: real nutrition/food-
+# safety research from PubMed (always), and India food-news headlines
+# from a news API (only once the NEWSDATA_API_KEY secret is set).
+#
+# Unlike discover-off-products/generate-reports, this doesn't need to
+# run every 30 minutes -- news and research don't go stale that fast --
+# so a plain daily cron is fine even with GitHub's well-known best-effort
+# scheduling delays on free-tier repos.
+
+on:
+  schedule:
+    - cron: '0 3 * * *' # once a day
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Fetch research + news
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          NEWSDATA_API_KEY: ${{ secrets.NEWSDATA_API_KEY }}
+        run: node scripts/fetch-news.js

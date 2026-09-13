@@ -22,6 +22,7 @@ import About from './pages/About';
 import Browse from './pages/Browse';
 import Category from './pages/Category';
 import PopularSearches from './pages/PopularSearches';
+import News from './pages/News';
 
 // The Android app's hardware/gesture back button doesn't do anything by
 // default in a Capacitor WebView -- without this, it would just sit
@@ -64,6 +65,7 @@ export default function App() {
             <Route path="/browse" element={<Browse />} />
             <Route path="/category/:id" element={<Category />} />
             <Route path="/popular" element={<PopularSearches />} />
+            <Route path="/news" element={<News />} />
           </Routes>
         </main>
         <BottomTabBar />

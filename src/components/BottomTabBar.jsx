@@ -7,6 +7,7 @@ import { Link, useLocation } from 'react-router-dom';
 const TABS = [
   { path: '/', label: 'Scan', icon: '🔍' },
   { path: '/history', label: 'History', icon: '📋' },
+  { path: '/news', label: 'News', icon: '📰' },
   { path: '/about', label: 'About', icon: '🛡️' },
 ];
 
@@ -18,7 +19,7 @@ export default function BottomTabBar() {
       className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <div className="max-w-2xl mx-auto grid grid-cols-3">
+      <div className="max-w-2xl mx-auto grid grid-cols-4">
         {TABS.map((tab) => {
           const active = location.pathname === tab.path;
           return (
