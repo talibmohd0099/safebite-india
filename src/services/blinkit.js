@@ -194,6 +194,7 @@ export async function scrapeProduct(url, category, { useAI = false } = {}) {
       image_url: jsonField(html, 'image_url'),
       nutrition,
       fssai_license: attributes['FSSAI License'] || null,
+      source: 'blinkit',
       scraped_at: new Date().toISOString(),
     },
   };

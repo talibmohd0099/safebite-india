@@ -240,7 +240,9 @@ export async function extractIngredientsWithAI(productName, text) {
 }
 
 /**
- * Scrape one product page into a jiomart_products row.
+ * Scrape one product page into a blinkit_products row (source: 'jiomart') --
+ * this and blinkit.js's scrapeProduct share that one table; see
+ * supabase/blinkit_products_add_source_migration.sql for why.
  * Returns { error } when there's nothing usable to save.
  */
 export async function scrapeProduct(url, category, { useAI = false } = {}) {
@@ -278,7 +280,7 @@ export async function scrapeProduct(url, category, { useAI = false } = {}) {
       ingredients_text: ingredients,
       category,
       image_url: image || null,
-      source_url: url,
+      source: 'jiomart',
       scraped_at: new Date().toISOString(),
     },
   };

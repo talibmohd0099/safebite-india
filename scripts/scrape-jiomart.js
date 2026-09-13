@@ -1,11 +1,23 @@
 // scripts/scrape-jiomart.js
 //
 // Walks JioMart's sitemap and saves brand / product name / ingredients /
-// image into jiomart_products. Second, independent source alongside
-// blinkit.js -- Blinkit started returning 403 Forbidden on 2026-09-10
-// (see .github/workflows/scrape-blinkit.yml), an active anti-scraping
-// block, not a code bug. Rather than hammer the same blocked site again,
-// this is a different retailer entirely.
+// image into the SAME blinkit_products table scrape-blinkit.js uses
+// (tagged source: 'jiomart' -- see
+// supabase/blinkit_products_add_source_migration.sql) rather than a
+// separate table: same shape, same purpose, no reason to duplicate the
+// schema. Second, independent scraping source alongside blinkit.js --
+// Blinkit started returning 403 Forbidden on 2026-09-10 (see
+// .github/workflows/scrape-blinkit.yml), an active anti-scraping block,
+// not a code bug. Rather than hammer the same blocked site again, this
+// is a different retailer entirely.
+//
+// Progress cursors also share blinkit_seed_progress with the Blinkit
+// scraper, one row per category -- since JioMart's real category names
+// are unknown until a --list run, and could coincidentally collide with
+// a Blinkit category name (both might have a "snacks", say), this
+// script's cursor rows are keyed "jiomart:<category>" so the two
+// scrapers' progress can never overwrite each other regardless of what
+// JioMart's real taxonomy turns out to be.
 //
 // UNVERIFIED against real JioMart HTML -- see the header comment in
 // src/services/jiomart.js for why (this was built in a sandbox that
@@ -57,11 +69,18 @@ function client() {
   return createClient(url, key);
 }
 
-/** Where each category got to last time -- shares jiomart_seed_progress with the scheduled job. */
+// Prefixes this scraper's progress-cursor rows so they can never collide
+// with a Blinkit category of the same name in the shared table.
+const progressKey = (category) => `jiomart:${category}`;
+
+/** Where each category got to last time -- shares blinkit_seed_progress with scrape-blinkit.js. */
 async function loadProgress(supabase) {
-  const { data, error } = await supabase.from('jiomart_seed_progress').select('*');
+  const { data, error } = await supabase
+    .from('blinkit_seed_progress')
+    .select('*')
+    .like('category', 'jiomart:%');
   if (error) {
-    console.warn('Could not read progress (has jiomart_seed_progress_schema.sql been run?):', error.message);
+    console.warn('Could not read progress (has blinkit_seed_progress_schema.sql been run?):', error.message);
     return {};
   }
   return Object.fromEntries((data || []).map((row) => [row.category, row]));
@@ -70,7 +89,7 @@ async function loadProgress(supabase) {
 async function saveProgress(supabase, rows) {
   if (rows.length === 0) return;
   const { error } = await supabase
-    .from('jiomart_seed_progress')
+    .from('blinkit_seed_progress')
     .upsert(rows.map((r) => ({ ...r, updated_at: new Date().toISOString() })), { onConflict: 'category' });
   if (error) console.warn('Could not save progress:', error.message);
 }
@@ -82,12 +101,13 @@ async function save(products) {
     return false;
   }
   const { error } = await supabase
-    .from('jiomart_products')
+    .from('blinkit_products')
     .upsert(products, { onConflict: 'brand,product_name' });
 
   if (error) {
     console.error(`Save failed: ${error.message}`);
-    console.error('(Have jiomart_products_schema.sql and jiomart_seed_progress_schema.sql been run?)');
+    console.error('(Have blinkit_products_schema.sql, blinkit_products_migration.sql and');
+    console.error(' blinkit_products_add_source_migration.sql all been run?)');
     return false;
   }
   return true;
@@ -161,7 +181,7 @@ async function main() {
   const progressUpdates = [];
 
   for (const sitemap of targets) {
-    const cursor = progress[sitemap.category];
+    const cursor = progress[progressKey(sitemap.category)];
     if (SCRAPE_ALL && cursor?.exhausted) continue;
 
     const startIndex = SCRAPE_ALL ? cursor?.next_index || 0 : 0;
@@ -174,7 +194,7 @@ async function main() {
     if (urls.length === 0) {
       if (SCRAPE_ALL && startIndex >= all.length) {
         progressUpdates.push({
-          category: sitemap.category, sitemap_url: sitemap.url,
+          category: progressKey(sitemap.category), sitemap_url: sitemap.url,
           next_index: startIndex, exhausted: true,
           products_saved: cursor?.products_saved || 0,
         });
@@ -205,7 +225,7 @@ async function main() {
 
     if (SCRAPE_ALL) {
       progressUpdates.push({
-        category: sitemap.category, sitemap_url: sitemap.url,
+        category: progressKey(sitemap.category), sitemap_url: sitemap.url,
         next_index: startIndex + urls.length,
         exhausted: false,
         products_saved: (cursor?.products_saved || 0) + savedHere,
@@ -227,7 +247,7 @@ async function main() {
       process.exitCode = 1;
       return;
     }
-    console.log(`Saved ${deduped.length} products to jiomart_products.`);
+    console.log(`Saved ${deduped.length} products to blinkit_products (source: jiomart).`);
   }
 
   if (supabase && progressUpdates.length > 0) {
