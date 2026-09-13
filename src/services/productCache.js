@@ -2,7 +2,10 @@
 // Shared cache so repeat scans of the same product reuse a saved AI
 // report instead of paying for a fresh AI call every time.
 import { supabase, isSupabaseConfigured } from './supabaseClient.js';
-import { CATEGORIES } from '../data/categories.js';
+// The keyword-only data, not categories.js -- that file also imports
+// each category's .png, which plain-Node scripts importing this module
+// (generate-reports.js, discover-off-products.js) can't load outside Vite.
+import { CATEGORY_KEYWORDS } from '../data/categoryKeywords.js';
 
 function normalizeText(text) {
   return text.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -224,7 +227,7 @@ export async function getDailySpotlight() {
  */
 function findCategoryForProduct(productName) {
   const name = (productName || '').toLowerCase();
-  return CATEGORIES.find((c) => c.keywords.some((k) => name.includes(k))) || null;
+  return CATEGORY_KEYWORDS.find((c) => c.keywords.some((k) => name.includes(k))) || null;
 }
 
 // "Safe" here means the same bar the Result page already displays as

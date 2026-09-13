@@ -9,7 +9,10 @@
 // `image` is a real illustrated photo per category (cropped from a
 // reference grid the user supplied, see src/assets/categories/) --
 // replaced an earlier line-icon set that wasn't distinctive enough for
-// categories like Beverages/Dairy.
+// categories like Beverages/Dairy. The id/label/keywords themselves
+// live in categoryKeywords.js, kept free of these image imports so
+// plain-Node scripts can use the keyword data without Vite in the loop.
+import { CATEGORY_KEYWORDS } from './categoryKeywords.js';
 import biscuits from '../assets/categories/biscuits.png';
 import noodles from '../assets/categories/noodles.png';
 import beverages from '../assets/categories/beverages.png';
@@ -19,17 +22,6 @@ import spices from '../assets/categories/spices.png';
 import dairy from '../assets/categories/dairy.png';
 import essentials from '../assets/categories/essentials.png';
 
-export const CATEGORIES = [
-  { id: 'biscuits', label: 'Biscuits & Cookies', image: biscuits, keywords: ['biscuit', 'cookie', 'cracker', 'rusk'] },
-  // 'instant' on its own used to be a keyword here too, but it's generic
-  // enough to also match things like "Bru Instant Coffee" -- which then
-  // surfaced as a "safer alternative" to a pasta product. Every keyword
-  // left here is specific to an actual noodle/pasta product.
-  { id: 'noodles', label: 'Instant Noodles', image: noodles, keywords: ['noodle', 'maggi', 'pasta', 'vermicelli', 'macaroni', 'soup'] },
-  { id: 'beverages', label: 'Beverages', image: beverages, keywords: ['juice', 'drink', 'squash', 'tea', 'coffee'] },
-  { id: 'snacks', label: 'Snacks & Namkeen', image: snacks, keywords: ['chips', 'namkeen', 'bhujia', 'sev', 'mixture', 'popcorn', 'wafer'] },
-  { id: 'chocolates', label: 'Chocolates & Sweets', image: chocolates, keywords: ['chocolate', 'candy', 'toffee', 'eclair', 'chikki'] },
-  { id: 'spices', label: 'Spices & Masala', image: spices, keywords: ['masala', 'spice', 'haldi', 'mirchi', 'garam'] },
-  { id: 'dairy', label: 'Dairy & Frozen', image: dairy, keywords: ['milk', 'cheese', 'paneer', 'curd', 'dahi', 'ice cream', 'kulfi', 'ghee', 'butter'] },
-  { id: 'essentials', label: 'Cooking Essentials', image: essentials, keywords: ['oil', 'atta', 'flour', 'rice', 'sauce', 'ketchup'] },
-];
+const IMAGES = { biscuits, noodles, beverages, snacks, chocolates, spices, dairy, essentials };
+
+export const CATEGORIES = CATEGORY_KEYWORDS.map((c) => ({ ...c, image: IMAGES[c.id] }));
