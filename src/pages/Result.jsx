@@ -305,6 +305,26 @@ export default function Result() {
         </div>
       </div>
 
+      {/* A plain ingredient score can't say WHY a product exists -- an
+          oral rehydration/glucose product scoring "Moderate" as an
+          everyday food can still be exactly right for its actual,
+          specific purpose. Distinct green "good news" tone (not the
+          same tint-blue as the seasoning note below) since this is a
+          positive reframe of the score above, not a caveat on it. */}
+      {result.usefulContext && (
+        <div className="mx-4 mt-3 rounded-[14px] px-4 py-3.5 flex gap-3 items-start" style={{ background: 'var(--v-good-bg)' }}>
+          <span className="text-[18px] leading-none mt-0.5 flex-shrink-0">🎯</span>
+          <div className="min-w-0">
+            <p className="text-[13px] font-bold mb-0.5" style={{ color: 'var(--v-good)' }}>
+              When this is actually useful
+            </p>
+            <p className="text-[13px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
+              {result.usefulContext}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* A masala or seasoning scoring 95 isn't an invitation to eat it
           by the spoonful -- the score describes the product itself, and
           for these that's a pinch at a time inside a larger dish. */}

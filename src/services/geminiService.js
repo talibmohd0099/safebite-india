@@ -316,7 +316,8 @@ Return ONLY valid JSON, no markdown, no preamble:
 {
   "summary": "...",
   "recommendation": "...",
-  "isCondimentOrSeasoning": false
+  "isCondimentOrSeasoning": false,
+  "usefulContext": null
 }
 
 "summary" -- ONE or TWO short, natural sentences (35 words max) that:
@@ -332,14 +333,20 @@ Return ONLY valid JSON, no markdown, no preamble:
 - Never alarmist, never preachy, never medical advice.
 
 "isCondimentOrSeasoning" -- true ONLY if this product is normally used in small amounts as part of another dish rather than eaten on its own: spice blends and masalas, seasonings, stock cubes, food colours and essences, baking powder, pickles and chutneys eaten as a side relish, ketchup and sauces used as condiments.
-false for anything eaten as a food in its own right -- biscuits, noodles, chips, namkeen, drinks, dairy, bread, chocolates. Also false for cooking oils, flours, rice and sugar: those are bulk ingredients eaten in real quantity, not small-quantity seasonings.`;
+false for anything eaten as a food in its own right -- biscuits, noodles, chips, namkeen, drinks, dairy, bread, chocolates. Also false for cooking oils, flours, rice and sugar: those are bulk ingredients eaten in real quantity, not small-quantity seasonings.
+
+"usefulContext" -- null for ordinary everyday foods. A product's ingredient score alone can't say WHY it exists, and some products genuinely have a real, specific purpose that a low or middling score would otherwise hide -- oral rehydration salts and electrolyte drinks, glucose/dextrose energy powders, protein or meal-replacement supplements. For exactly these, ONE short sentence (25 words max) naming the actual real-world situation this product is genuinely useful for (e.g. "During dehydration, heat exhaustion, or after intense exercise, for fast glucose and electrolyte replacement."). Never invent or guess at a use case that isn't well-established for this exact kind of product -- when in doubt, return null.`;
 
 /**
  * Write the report's human-facing text for one product in a single call:
- * the summary, a product-specific recommendation, and whether this is a
+ * the summary, a product-specific recommendation, whether this is a
  * seasoning used in small amounts (which changes how its score should be
  * read -- a masala scoring 95 is not an invitation to eat it by the
- * spoonful).
+ * spoonful), and whether it's a functional/medicinal-use product whose
+ * real value a plain ingredient score can't express (glucose powders,
+ * ORS, protein supplements -- a middling score for "eaten as an everyday
+ * food" doesn't mean it isn't exactly what it should be for its actual
+ * purpose).
  *
  * Called once per genuinely new product (the result gets cached in
  * product_reports forever after), never per repeat scan. Returns null on
@@ -396,6 +403,7 @@ Concerning ingredients: ${concerningNames.length ? concerningNames.join(', ') : 
       summary: clean(parsed?.summary),
       recommendation: clean(parsed?.recommendation),
       isCondimentOrSeasoning: parsed?.isCondimentOrSeasoning === true,
+      usefulContext: clean(parsed?.usefulContext),
     };
   } catch {
     // extractJson throws on unparseable output -- same fallback as any
