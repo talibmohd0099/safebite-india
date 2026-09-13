@@ -9,12 +9,13 @@
 // as the server is concerned. The tradeoff is a visible # in the URL.
 // It also happens to suit the Android app build just as well, since
 // Capacitor serves local files the same server-less way.
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import Header from './components/Header';
 import BottomTabBar from './components/BottomTabBar';
+import SplashScreen from './components/SplashScreen';
 import Home from './pages/Home';
 import Result from './pages/Result';
 import History from './pages/History';
@@ -51,6 +52,10 @@ function AndroidBackButton() {
 }
 
 export default function App() {
+  // Shown once per fresh load, like a native app's launch screen -- not
+  // a one-time "first ever visit" flag, so it doesn't need localStorage.
+  const [showSplash, setShowSplash] = useState(true);
+
   return (
     <HashRouter>
       <AndroidBackButton />
@@ -70,6 +75,7 @@ export default function App() {
         </main>
         <BottomTabBar />
       </div>
+      {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
     </HashRouter>
   );
 }
