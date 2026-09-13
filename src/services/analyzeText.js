@@ -68,6 +68,23 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
     throw new Error(`"${ingredients[0].name}" doesn't look like a real food ingredient. Please check the spelling and try again.`);
   }
 
+  // A real product's ingredient list is virtually never MOSTLY things
+  // Gemini can't recognize as food at all -- a real but obscure regional
+  // ingredient still comes back recognized (see the prompt in
+  // geminiService.js), so a majority unrecognized means the source text
+  // almost certainly wasn't a real ingredients list to begin with. Found
+  // via a real seeded product (Taj Mahal tea) whose "ingredients" were
+  // things like "Rusbea Verified Environment" and "Org 00 8 901030
+  // 658778" -- a certification blurb and a barcode, scraped from the
+  // wrong field -- which each individually resolved as harmless (nothing
+  // to penalize), so the product scored a false 100/100. Scoring text
+  // like that as if it were a clean product would be actively misleading.
+  const unrecognized = ingredients.filter((i) => i.recognized === false);
+  if (parsed.length > 1 && unrecognized.length / ingredients.length > 0.5) {
+    const examples = unrecognized.slice(0, 3).map((i) => `"${i.name}"`).join(', ');
+    throw new Error(`This doesn't look like a real ingredients list — most of what was found (${examples}) isn't a recognized food ingredient. Please check the text and try again.`);
+  }
+
   const report = buildReport(ingredients, { productName, brand, imageUrl });
   report.allergens = allergens;
 
