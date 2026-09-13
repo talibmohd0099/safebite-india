@@ -47,14 +47,27 @@ const SITEMAP_CANDIDATES = [
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 const GEMINI_MODEL = 'gemini-3.1-flash-lite';
 
-// JioMart's real category taxonomy is unknown until a --list run against
-// the live sitemap shows it -- unlike blinkit.js's FOOD_GROUPS, this
-// starts empty on purpose. Fill in the real category/group names you see
-// in a --list run's output; until then, --all matches nothing and only
-// --category (substring match) or --sitemap (an exact URL from --list)
-// can select anything, which is exactly the "look before seeding" this
-// file's header comment asks for.
-export const FOOD_GROUPS = [];
+// Filled in from a real --list run plus manually checking what's actually
+// inside each candidate sitemap (fetched live, not guessed) -- unlike
+// Blinkit, JioMart's sitemap.xml doesn't split cleanly into a dedicated
+// "groceries" file. What --list actually found:
+//   electronics-1 / electronics-2  -- confirmed pure electronics, no food
+//   sitemap-collections / sitemap-sections -- /collection/ and /sections/
+//     browse pages, not individual product pages at all -- nothing here
+//     is scrapable for ingredients regardless of category
+//   custom       -- 904 product URLs, sampled across the file: heavily
+//     grocery (atta, dal, dates, Amul milk/ghee/dahi/cheese, produce),
+//     with a minority of non-food items mixed in (mosquito repellents,
+//     small appliances) that the existing "extract, never invent"
+//     ingredient logic already skips harmlessly (no Ingredients section
+//     to find, so nothing gets saved for those)
+//   home-and-kitchen -- 3,660 URLs, lower food density (umbrellas,
+//     cookware, alongside some food/pooja items) -- much bigger, noisier
+//     haul for the same reason; left out of the default list below on
+//     purpose so a first real run stays small and high-signal. Worth
+//     adding once `custom` alone has been checked against a handful of
+//     real saved rows.
+export const FOOD_GROUPS = ['custom.sitemap'];
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -161,12 +174,53 @@ function productJsonLd(html) {
 }
 
 /**
+ * JioMart's real ingredient data lives in a structured attribute object
+ * embedded in the page's script-tag JSON state -- e.g.
+ * {"code":"C5936E","display_string":"Ingredients","value":"Whole Spices",...}
+ * -- confirmed against real product pages (a spice product and a
+ * packaged snack), NOT in naturally-flowing visible text. This is the
+ * same shape blinkit.js's structured-attribute lookup already uses; the
+ * generic text-label search below was the only method tried at first,
+ * which is why an early real run found 0 usable products out of 20 real
+ * ones, including well-known packaged snacks that clearly do have a
+ * declared ingredients list on the actual page.
+ *
+ * Runs against the RAW html, not visibleText()'s output -- that strips
+ * every <script> tag out first, which is exactly where this lives.
+ * The attribute is itself JSON-escaped one level deep (it's a stringified
+ * array inside the page's larger embedded JSON), so the matched chunk is
+ * unescaped before being parsed as a normal object.
+ *
+ * Some products genuinely have no transcribed text -- their "value" is a
+ * placeholder like "Available on the image" pointing at a pack photo
+ * instead. That's real information (nothing usable to extract as text),
+ * not a parse failure, so it's filtered out here rather than returned.
+ */
+function ingredientsFromAttributes(html) {
+  const match = html.match(/\{\\"code\\"[^{}]*?\\"display_string\\"\s*:\s*\\"Ingredients\\"[^{}]*?\}/i);
+  if (!match) return null;
+
+  try {
+    const obj = JSON.parse(match[0].replace(/\\"/g, '"'));
+    const value = (obj.value || '').trim();
+    if (!value || /^available on/i.test(value)) return null;
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Best-effort "Ingredients" section out of a page's visible text. There
  * is no standard schema.org field for a grocery ingredients list, so
  * this looks for the word itself acting as a label (":" or line break
  * after it) and captures up to the next all-caps/label-like line or a
  * sane length cap, same shape as blinkit.js's structured-attribute
- * lookup but working off raw text instead of a known JSON field.
+ * lookup but working off raw text instead of a known JSON field. Only
+ * ever a fallback for a page that doesn't have the structured attribute
+ * above -- untested against a real case where this one actually fires,
+ * since every real product checked so far had (or lacked) the
+ * structured field instead.
  */
 function ingredientsFromText(text) {
   const match = text.match(/ingredients?\s*[:-]\s*([^\n]{12,1000})/i);
@@ -255,7 +309,7 @@ export async function scrapeProduct(url, category, { useAI = false } = {}) {
   const productName = product?.name || null;
   if (!productName) return { error: 'no product name (no Product JSON-LD found on this page)' };
 
-  let ingredients = ingredientsFromText(text);
+  let ingredients = ingredientsFromAttributes(html) || ingredientsFromText(text);
   let viaAI = false;
 
   if (!ingredients && useAI) {

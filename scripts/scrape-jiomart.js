@@ -153,8 +153,14 @@ async function main() {
       return;
     }
   } else if (SCRAPE_ALL) {
+    // Matches against `category` too, not just `group` -- on JioMart
+    // every leaf sitemap lives under the same /sitemap/ path, so `group`
+    // is identically "sitemap" for all of them (confirmed via a real
+    // --list run) and could never selectively match anything on its own.
+    // `category` (the sitemap's own filename, e.g. "custom.sitemap") is
+    // what FOOD_GROUPS actually needs to match here.
     targets = FOOD_GROUPS.length > 0
-      ? sitemaps.filter((s) => FOOD_GROUPS.includes(s.group))
+      ? sitemaps.filter((s) => FOOD_GROUPS.includes(s.group) || FOOD_GROUPS.includes(s.category))
       : sitemaps;
     if (FOOD_GROUPS.length === 0) {
       console.log('FOOD_GROUPS is empty -- walking every sitemap found, including non-food ones.');
