@@ -105,13 +105,25 @@ const CATEGORIES = [
 // mistakenly saved in the ingredients field instead of real ingredients.
 // Same check src/services/openFoodFacts.js uses for barcode scans.
 const NUTRITION_ONLY_WORDS = new Set([
-  'energy', 'protein', 'carbohydrate', 'carbohydrates', 'fat', 'fats',
+  'energy', 'protein', 'protrin', 'carbohydrate', 'carbohydrates', 'fat', 'fats',
   'fibre', 'fiber', 'sodium', 'calories', 'kcal', 'sugar', 'sugars', 'cholesterol',
 ]);
+
+// Phrases that only ever appear on a nutrition-facts panel, never in an
+// actual ingredients list -- checked regardless of commas. Found via a
+// real case ("Poha Mota") where the comma inside "nutrition facts per
+// 100gm at 1, kcal calories" let it slip past the no-comma-only check
+// below undetected, and got seeded with a false near-perfect score.
+const NUTRITION_PANEL_PHRASES = [
+  'nutrition facts', 'nutritional information', 'nutrition information', 'per 100g', 'per 100 g', 'per serving',
+];
 
 function looksLikeValidIngredients(text) {
   const cleaned = (text || '').trim();
   if (cleaned.length < 40) return false;
+
+  const lower = cleaned.toLowerCase();
+  if (NUTRITION_PANEL_PHRASES.some((phrase) => lower.includes(phrase))) return false;
 
   const words = cleaned.replace(/[.,]/g, ' ').split(/\s+/).filter(Boolean);
   if (words.length < 4) return false;
