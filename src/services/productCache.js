@@ -363,6 +363,23 @@ export async function updateProductName(lookupKey, productName) {
 }
 
 /**
+ * Remove a cached report so the next lookup for it is a genuine cache
+ * miss — used by "Refresh analysis" to throw away a report that was
+ * built before a parser/scoring fix, rather than leaving stale columns
+ * around for the follow-up saveReport() to only partially overwrite.
+ * Safe to call even if Supabase isn't configured — it just no-ops.
+ */
+export async function deleteReport(lookupKey) {
+  if (!isSupabaseConfigured || !lookupKey) return;
+
+  try {
+    await supabase.from('product_reports').delete().eq('lookup_key', lookupKey);
+  } catch {
+    // Best-effort — the fresh report below still gets saved either way.
+  }
+}
+
+/**
  * Save a freshly-generated AI report to the shared cache so the next
  * person (or the same person, next time) skips the AI call entirely.
  * Safe to call even if Supabase isn't configured — it just no-ops.

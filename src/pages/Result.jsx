@@ -1,8 +1,9 @@
 // src/pages/Result.jsx
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { getHistoryById, updateHistoryProductName, saveToHistory, getScoreColor, getIngredientSeverity } from '../utils/storage';
-import { updateProductName, getCachedReport, getSaferAlternatives } from '../services/productCache';
+import { getHistoryById, updateHistoryProductName, refreshHistoryEntry, saveToHistory, getScoreColor, getIngredientSeverity } from '../utils/storage';
+import { updateProductName, getCachedReport, getSaferAlternatives, deleteReport, saveReport } from '../services/productCache';
+import { analyzeText } from '../services/analyzeText';
 import ScoreCircle from '../components/ScoreCircle';
 import IngredientCard from '../components/IngredientCard';
 import ProductImage from '../components/ProductImage';
@@ -87,6 +88,8 @@ export default function Result() {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [alternatives, setAlternatives] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState('');
 
   useEffect(() => {
     const data = getHistoryById(id);
@@ -134,6 +137,40 @@ export default function Result() {
     updateHistoryProductName(result.id, trimmed);
     if (result.lookupKey) updateProductName(result.lookupKey, trimmed);
     setEditingName(false);
+  };
+
+  // Wipes this product's cached report and re-runs the full analysis
+  // pipeline from scratch, so a scoring/parser fix (or a mistaken result)
+  // shows up immediately instead of waiting on the stale cached report.
+  const handleRefresh = async () => {
+    if (!result.ingredientsText || refreshing) return;
+
+    setRefreshing(true);
+    setRefreshError('');
+    try {
+      const analysis = await analyzeText(result.ingredientsText, result.productName, result.brand, null, result.imageUrl);
+      const fresh = analysis.report;
+      fresh.ingredientsText = result.ingredientsText;
+      fresh.lookupKey = result.lookupKey;
+
+      if (result.lookupKey && !analysis.isIngredientOnly) {
+        await deleteReport(result.lookupKey);
+        await saveReport({
+          lookupKey: result.lookupKey,
+          source: result.inputType || 'text',
+          productName: result.productName,
+          ingredientsText: result.ingredientsText,
+          report: fresh,
+        });
+      }
+
+      refreshHistoryEntry(result.id, fresh);
+      setResult((prev) => ({ ...prev, ...fresh }));
+    } catch (err) {
+      setRefreshError(err.message || 'Could not refresh this report. Please try again.');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   if (!result) return null;
@@ -252,6 +289,19 @@ export default function Result() {
           <Link to="/about#how-score-works" className="inline-block text-[15px] mt-2" style={{ color: 'var(--tint)' }}>
             How is this calculated?
           </Link>
+          {result.ingredientsText && (
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="tap-scale block text-[15px] mt-1.5"
+              style={{ color: 'var(--tint)', opacity: refreshing ? 0.6 : 1 }}
+            >
+              {refreshing ? 'Refreshing…' : 'Refresh analysis'}
+            </button>
+          )}
+          {refreshError && (
+            <p className="text-[13px] mt-1" style={{ color: 'var(--v-poor)' }}>{refreshError}</p>
+          )}
         </div>
       </div>
 
