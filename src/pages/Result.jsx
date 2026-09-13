@@ -4,10 +4,12 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getHistoryById, updateHistoryProductName, refreshHistoryEntry, saveToHistory, getScoreColor, getIngredientSeverity } from '../utils/storage';
 import { updateProductName, getCachedReport, getSaferAlternatives, deleteReport, saveReport } from '../services/productCache';
 import { analyzeText } from '../services/analyzeText';
+import { getRelatedNews } from '../services/newsRepo';
 import ScoreCircle from '../components/ScoreCircle';
 import IngredientCard from '../components/IngredientCard';
 import ProductImage from '../components/ProductImage';
 import ProductStripCard from '../components/ProductStripCard';
+import NewsCard from '../components/NewsCard';
 
 function SectionHeader({ children, action }) {
   return (
@@ -88,6 +90,7 @@ export default function Result() {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [alternatives, setAlternatives] = useState([]);
+  const [relatedNews, setRelatedNews] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState('');
 
@@ -113,6 +116,26 @@ export default function Result() {
     });
     return () => { cancelled = true; };
   }, [result?.lookupKey, result?.productName, result?.overallScore]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keyed off the product's brand and its flagged ingredients specifically
+  // (not the full list) -- an article title is far more likely to be
+  // about a specific concerning substance than an everyday bulk one.
+  const flaggedIngredientKey = (result?.ingredients || [])
+    .filter((i) => i.status === 'harmful' || i.status === 'concerning')
+    .map((i) => i.name)
+    .join(',');
+
+  useEffect(() => {
+    if (!result) {
+      setRelatedNews([]);
+      return;
+    }
+    let cancelled = false;
+    getRelatedNews({ brand: result.brand, flaggedIngredientNames: flaggedIngredientKey ? flaggedIngredientKey.split(',') : [] }).then((items) => {
+      if (!cancelled) setRelatedNews(items);
+    });
+    return () => { cancelled = true; };
+  }, [result?.brand, flaggedIngredientKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openAlternative = async (item) => {
     const cached = await getCachedReport(item.lookupKey);
@@ -462,6 +485,21 @@ export default function Result() {
             {result.positives?.length > 0 && (
               <ListCard title="Good things" dotColor="var(--v-good)" items={result.positives} />
             )}
+          </div>
+        </>
+      )}
+
+      {/* Related reading -- news/research whose title mentions this
+          product's brand or one of its flagged ingredients specifically,
+          so it only shows up when there's something genuinely on-topic
+          to read, not for every product. */}
+      {view === 'overview' && relatedNews.length > 0 && (
+        <>
+          <SectionHeader>Related reading</SectionHeader>
+          <div className="mx-4">
+            {relatedNews.map((item) => (
+              <NewsCard key={item.id} item={item} />
+            ))}
           </div>
         </>
       )}
