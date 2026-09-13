@@ -66,6 +66,26 @@ export function updateHistoryProductName(id, productName) {
 }
 
 /**
+ * Overwrite a saved scan's report fields with a freshly re-analyzed one
+ * (e.g. after "Refresh analysis"), while keeping the entry's original
+ * id/savedAt/inputType so its place in history and its scan date don't change.
+ */
+export function refreshHistoryEntry(id, freshReport) {
+  const history = getHistory();
+  const updated = history.map(entry =>
+    entry.id === id
+      ? { ...entry, ...freshReport, id: entry.id, savedAt: entry.savedAt, inputType: entry.inputType }
+      : entry
+  );
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Delete a single history entry
  */
 export function deleteFromHistory(id) {
