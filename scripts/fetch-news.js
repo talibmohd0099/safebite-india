@@ -17,55 +17,62 @@
 // request pacing.
 import { supabase, isSupabaseConfigured } from '../src/services/supabaseClient.js';
 
-// Deliberately more specific than a bare "food safety india" -- that
-// broad a query pulls in unrelated materials-science/sensor papers that
-// just happen to use the phrase "food safety" in an abstract. These
-// read closer to what a general reader means by "new research" on
-// this topic. Worth continuing to tune once real results are visible.
-const PUBMED_QUERIES = [
-  'food adulteration india health',
-  'ultra-processed food health india',
-  'food additive health effects',
-];
+// A bare "food safety india" as a free-text query matched on ANY field
+// (including abstracts), which pulled in a lot of unrelated analytical-
+// chemistry/sensor-development papers that just happen to mention "food
+// safety" while describing a new detection method for something else
+// entirely -- verified live: results included things like a fluorescent
+// probe for bilirubin detection and wearable sweat sensors, alongside
+// genuinely relevant items.
+//
+// Fixed with three changes, each verified live against the real API
+// before landing here:
+//  - [Title] restricts the core topic terms to the paper's own title,
+//    not any mention anywhere in the abstract -- far higher precision.
+//  - india[Title/Abstract] required, matching what this section is
+//    actually for -- India-relevant food safety and nutrition, not
+//    global food science generally.
+//  - NOT (...) excludes titles built around an analytical/detection
+//    method -- sensor, spectroscopy, chromatography, nanomaterials --
+//    which is where nearly all the irrelevant results were coming from.
+// One combined query rather than several narrower ones, since PubMed's
+// own OR/NOT operators already express this precisely in one call.
+const PUBMED_QUERY =
+  '(food safety[Title] OR food adulteration[Title] OR ultra-processed food[Title] OR food additive[Title] OR nutrition policy[Title] OR food labeling[Title]) ' +
+  'AND india[Title/Abstract] ' +
+  'NOT (sensor[Title] OR biosensor[Title] OR electrochemical[Title] OR spectroscopy[Title] OR chromatography[Title] OR nanoparticle[Title] OR fluorescent[Title] OR aptamer[Title] OR nanocluster[Title] OR nanocomposite[Title])';
 
 async function fetchPubMedResearch() {
-  const items = [];
-
-  for (const query of PUBMED_QUERIES) {
-    const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(query)}&sort=pub+date&retmax=8&retmode=json`;
-    const searchRes = await fetch(searchUrl);
-    if (!searchRes.ok) {
-      console.warn(`  PubMed search failed for "${query}": ${searchRes.status}`);
-      continue;
-    }
-    const searchData = await searchRes.json();
-    const ids = searchData.esearchresult?.idlist || [];
-    if (ids.length === 0) continue;
-
-    const summaryUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=${ids.join(',')}&retmode=json`;
-    const summaryRes = await fetch(summaryUrl);
-    if (!summaryRes.ok) {
-      console.warn(`  PubMed summary failed for "${query}": ${summaryRes.status}`);
-      continue;
-    }
-    const summaryData = await summaryRes.json();
-
-    for (const id of ids) {
-      const doc = summaryData.result?.[id];
-      if (!doc?.title) continue;
-      items.push({
-        type: 'research',
-        title: doc.title.replace(/\.$/, ''),
-        link: `https://pubmed.ncbi.nlm.nih.gov/${id}/`,
-        source: doc.fulljournalname || doc.source || 'PubMed',
-        published_at: doc.sortpubdate ? new Date(doc.sortpubdate).toISOString() : null,
-      });
-    }
-
-    // NCBI asks for no more than ~3 requests/sec without a registered API key.
-    await new Promise((r) => setTimeout(r, 400));
+  const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(PUBMED_QUERY)}&sort=pub+date&retmax=24&retmode=json`;
+  const searchRes = await fetch(searchUrl);
+  if (!searchRes.ok) {
+    console.warn(`  PubMed search failed: ${searchRes.status}`);
+    return [];
   }
+  const searchData = await searchRes.json();
+  const ids = searchData.esearchresult?.idlist || [];
+  if (ids.length === 0) return [];
 
+  const summaryUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=${ids.join(',')}&retmode=json`;
+  const summaryRes = await fetch(summaryUrl);
+  if (!summaryRes.ok) {
+    console.warn(`  PubMed summary failed: ${summaryRes.status}`);
+    return [];
+  }
+  const summaryData = await summaryRes.json();
+
+  const items = [];
+  for (const id of ids) {
+    const doc = summaryData.result?.[id];
+    if (!doc?.title) continue;
+    items.push({
+      type: 'research',
+      title: doc.title.replace(/\.$/, ''),
+      link: `https://pubmed.ncbi.nlm.nih.gov/${id}/`,
+      source: doc.fulljournalname || doc.source || 'PubMed',
+      published_at: doc.sortpubdate ? new Date(doc.sortpubdate).toISOString() : null,
+    });
+  }
   return items;
 }
 
