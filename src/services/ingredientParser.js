@@ -230,6 +230,57 @@ function findLastBracketGroup(raw) {
 }
 
 /**
+ * Like findLastBracketGroup, but returns every top-level bracket group in
+ * a string, in order -- needed because the sub-ingredient list isn't
+ * always the LAST bracket. "Supergrain blend (whole wheat (atta), jowar)
+ * (63%)" has the real ingredient list in the middle bracket, followed by
+ * a trailing percentage-only one; picking only the last bracket (as
+ * findLastBracketGroup does) finds "(63%)", which has no comma, so the
+ * compound-list check below would never recurse into the actual
+ * ingredients and would silently drop the whole entry instead.
+ */
+function findAllTopLevelBrackets(raw) {
+  const groups = [];
+  let depth = 0;
+  let start = -1;
+
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (OPENERS.includes(ch)) {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (CLOSERS.includes(ch)) {
+      depth = Math.max(0, depth - 1);
+      if (depth === 0 && start !== -1) {
+        groups.push({ start, end: i, inner: raw.slice(start + 1, i) });
+        start = -1;
+      }
+    }
+  }
+  return groups;
+}
+
+/** True for a bracket that states nothing but a share of the product, e.g. "63%". */
+function isPurePercentageBracket(inner) {
+  return /^\s*\d+(?:\.\d+)?\s*%\s*$/.test(inner);
+}
+
+/**
+ * How far apart two non-overlapping top-level brackets are in the raw
+ * string (0 if adjacent). Used to find the percentage bracket that
+ * actually belongs to a given compound bracket -- "Noodles (88.5%): ...
+ * blend (whole wheat (atta), jowar) (63%)" has TWO pure-percentage
+ * brackets; picking the first one found in the string would grab the
+ * unrelated outer "(88.5%)" instead of the "(63%)" sitting right next to
+ * the ingredient list it actually describes.
+ */
+function bracketGap(a, b) {
+  if (b.start >= a.end) return b.start - a.end;
+  if (a.start >= b.end) return a.start - b.end;
+  return 0;
+}
+
+/**
  * If the bracket contents are nothing but additive codes and separators,
  * return the list of codes. Otherwise null (it's descriptive text like
  * "(SUGAR, CITRIC ACID)", which must not be treated as codes).
@@ -384,7 +435,7 @@ export function parseIngredients(labelText) {
   // matter (sugar, flavour enhancers, HVP) -- so they get parsed as
   // their own entries instead of being hidden inside a generic wrapper
   // name that never gets researched with any awareness of what's in it.
-  const processEntry = (rawEntry, groupId = null) => {
+  const processEntry = (rawEntry, groupId = null, inheritedPercentage = null) => {
     // A standalone footnote like "#(D-GLUCOSE, LEVULOSE)" explains an
     // ingredient listed above — it isn't an ingredient in its own right.
     if (/^\s*[#*†‡^]/.test(rawEntry)) return;
@@ -438,15 +489,44 @@ export function parseIngredients(labelText) {
     // strip it, even when it actually belongs to one specific sub-item
     // several levels down, leaving that sub-item with no percentage by
     // the time its own turn comes around.
-    const compound = findLastBracketGroup(cleaned);
-    if (compound && compound.inner.includes(',')) {
+    //
+    // The sub-ingredient list isn't always the LAST top-level bracket --
+    // "Supergrain blend (whole wheat (atta), jowar) (63%)" has it in the
+    // middle, followed by a trailing percentage-only bracket. Scanning
+    // every top-level bracket for the one that actually contains a comma
+    // (rather than assuming it's the last one) is what lets this recurse
+    // into "whole wheat (atta)" and "jowar" instead of falling through to
+    // single-entry parsing, mangling the whole clause into one unnamed
+    // blob, and silently dropping it as "not a real ingredient name".
+    const topBrackets = findAllTopLevelBrackets(cleaned);
+    const compound = topBrackets.find((b) => b.inner.includes(','));
+    if (compound) {
+      // A sibling bracket that states nothing but a percentage -- e.g.
+      // that trailing "(63%)" -- is this whole group's share of the
+      // product, not any one child's. Split it evenly across the
+      // children instead of discarding it, but let a child that states
+      // its own percentage keep that instead. When more than one
+      // percentage-only bracket exists in the entry (an outer wrapper's
+      // plus this group's own), take the one closest to this compound
+      // bracket rather than whichever appears first in the string.
+      const pctCandidates = topBrackets.filter((b) => b !== compound && isPurePercentageBracket(b.inner));
+      const pctBracket = pctCandidates.length > 0
+        ? pctCandidates.reduce((closest, b) =>
+            bracketGap(compound, b) < bracketGap(compound, closest) ? b : closest)
+        : null;
+      const subEntries = splitTopLevel(compound.inner);
+      const perMemberPercentage =
+        pctBracket && subEntries.length > 0
+          ? parseFloat(pctBracket.inner) / subEntries.length
+          : null;
+
       // The outermost bracket defines the slot -- a nested group inside
       // it ("(Dehydrated Vegetables (Onion, Carrot))") is still part of
       // that same one declared component, so children inherit rather
       // than starting a new group of their own.
       const childGroup = groupId || newGroupId();
-      for (const subEntry of splitTopLevel(compound.inner)) {
-        processEntry(subEntry, childGroup);
+      for (const subEntry of subEntries) {
+        processEntry(subEntry, childGroup, perMemberPercentage);
       }
       return;
     }
@@ -494,7 +574,7 @@ export function parseIngredients(labelText) {
       canonicalName,
       lookupKeys: buildLookupKeys(name, insCode),
       insCode,
-      percentage,
+      percentage: percentage != null ? percentage : inheritedPercentage,
       categoryHint: null,
     }, groupId);
   };
