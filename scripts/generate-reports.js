@@ -6,6 +6,12 @@
 // own analysis pipeline (src/services/analyzeText.js) -- Gemini only for
 // genuinely unknown ingredients and the one-line AI summary.
 //
+// Also processes the Blinkit/JioMart scrape backlog (blinkit_products,
+// via scripts/scrape-blinkit.js / scrape-jiomart.js) through the exact
+// same pipeline -- otherwise scraped rows would just sit in that staging
+// table forever, never becoming a real, searchable product_reports row.
+// Both backlogs share one combined per-run budget below.
+//
 // Kept as its own job, separate from discovery, because Gemini's
 // free-tier rate limit is the only real bottleneck here. Previously,
 // one overloaded/rate-limited product aborted the ENTIRE run -- every
@@ -23,6 +29,7 @@
 import { analyzeText } from '../src/services/analyzeText.js';
 import { saveReport } from '../src/services/productCache.js';
 import { getPendingProducts, markReportGenerated } from '../src/services/productsRepo.js';
+import { getPendingBlinkitProducts, markBlinkitReportGenerated, blinkitLookupKey } from '../src/services/blinkitProductsRepo.js';
 import { isSupabaseConfigured } from '../src/services/supabaseClient.js';
 
 const GEMINI_PACING_MS = 1500; // proactive spacing, not just reacting to 429s
@@ -87,6 +94,28 @@ async function generateWithRetry(product) {
   return { report: null, transient: true };
 }
 
+// blinkit_products has no lookup_key/off_ingredients columns of its own
+// (Blinkit/JioMart expose their own product ids, not barcodes) -- shape
+// each row the same as a productsRepo.js row plus a bound "mark done"
+// callback, so the loop below can treat both backlogs identically
+// without caring which table a given item actually came from.
+function normalizeOffProduct(row) {
+  return { ...row, markGenerated: () => markReportGenerated(row.lookup_key) };
+}
+
+function normalizeBlinkitProduct(row) {
+  return {
+    lookup_key: blinkitLookupKey(row.source, row.brand, row.product_name),
+    source: row.source,
+    product_name: row.product_name,
+    brand: row.brand,
+    ingredients_text: row.ingredients_text,
+    off_ingredients: null,
+    image_url: row.image_url,
+    markGenerated: () => markBlinkitReportGenerated(row.id),
+  };
+}
+
 async function main() {
   const dryRun = process.argv.includes('--dry-run');
 
@@ -96,8 +125,15 @@ async function main() {
     return;
   }
 
-  const pending = await getPendingProducts(MAX_REPORTS_PER_RUN);
-  console.log(`Found ${pending.length} product(s) waiting for a report${dryRun ? ' (dry run)' : ''}.\n`);
+  // Split the shared per-run budget across both backlogs so one source
+  // with a long queue can't starve the other of a turn.
+  const half = Math.ceil(MAX_REPORTS_PER_RUN / 2);
+  const [offPending, blinkitPending] = await Promise.all([
+    getPendingProducts(half),
+    getPendingBlinkitProducts(MAX_REPORTS_PER_RUN - half),
+  ]);
+  const pending = [...offPending.map(normalizeOffProduct), ...blinkitPending.map(normalizeBlinkitProduct)];
+  console.log(`Found ${offPending.length} OFF product(s) and ${blinkitPending.length} Blinkit/JioMart product(s) waiting for a report${dryRun ? ' (dry run)' : ''}.\n`);
 
   let generated = 0;
   let consecutiveTransientFailures = 0;
@@ -118,7 +154,7 @@ async function main() {
         ingredientsText: product.ingredients_text,
         report,
       });
-      await markReportGenerated(product.lookup_key);
+      await product.markGenerated();
       generated++;
       consecutiveTransientFailures = 0;
     } else if (transient) {
@@ -130,7 +166,7 @@ async function main() {
     } else {
       // Permanent failure (e.g. unparseable ingredients text) -- mark it
       // done so it doesn't sit in the backlog getting retried forever.
-      await markReportGenerated(product.lookup_key);
+      await product.markGenerated();
       consecutiveTransientFailures = 0;
     }
 

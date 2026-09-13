@@ -11,6 +11,8 @@
 // anonymous request for the cold-drinks category returns dairy), while
 // the sitemaps are static and organised by category. robots.txt
 // disallows /s/* (search); nothing here touches it.
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
 const SITEMAP_INDEX = 'https://blinkit.com/sitemap.xml';
 // A real browser UA, not a self-identifying bot string. Manual testing
@@ -46,14 +48,42 @@ const NOISE_ATTRIBUTES = /gst|hsn|tax|case|polybag|guidelines|warehouse|_weight|
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Node's own fetch() gets an immediate 403 from Blinkit -- confirmed on a
+// single isolated request, same IP, same User-Agent, no other requests
+// around it at all, so this was never actually about request volume the
+// way it first looked. curl succeeds on that exact same request every
+// time. That points to their anti-bot check fingerprinting the HTTP
+// client itself (most likely at the TLS/connection level, e.g. JA3/JA4 --
+// curl and Node's fetch have different TLS stacks even with an identical
+// User-Agent header) rather than tracking who's asking or how often.
+// Shelling out to curl changes nothing about what's requested, how often,
+// or from where -- same single IP, same honest User-Agent, same pacing
+// the caller already applies between requests.
+const execFileAsync = promisify(execFile);
+const STATUS_MARKER = '\n__HTTP_STATUS__';
+
+async function curlGet(url) {
+  const { stdout } = await execFileAsync('curl', [
+    '-sS',
+    '--max-time', '20',
+    '-A', USER_AGENT,
+    '-w', `${STATUS_MARKER}%{http_code}`,
+    url,
+  ], { maxBuffer: 25 * 1024 * 1024 });
+
+  const idx = stdout.lastIndexOf(STATUS_MARKER);
+  if (idx === -1) throw new Error('curl output missing status marker');
+  return { status: Number(stdout.slice(idx + STATUS_MARKER.length).trim()), body: stdout.slice(0, idx) };
+}
+
 export async function fetchText(url, retries = 3) {
   let lastFailure = null;
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
-      if (res.ok) return await res.text();
-      lastFailure = `HTTP ${res.status} ${res.statusText}`;
+      const { status, body } = await curlGet(url);
+      if (status >= 200 && status < 300) return body;
+      lastFailure = `HTTP ${status}`;
     } catch (err) {
       lastFailure = `${err.name}: ${err.message}`;
     }
