@@ -10,11 +10,11 @@ export default function Browse() {
     <div className="page-in max-w-2xl mx-auto px-4 py-6 pb-24">
       <button
         onClick={() => navigate(-1)}
-        className="tap-scale inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-4 transition-colors"
+        className="tap-scale inline-flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 mb-4 transition-colors"
       >
         ← Back
       </button>
-      <h1 className="text-xl font-bold text-slate-800 mb-5">Explore food</h1>
+      <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-5">Explore food</h1>
 
       <div className="grid grid-cols-2 gap-3">
         {CATEGORIES.map((cat, i) => (

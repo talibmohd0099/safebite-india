@@ -43,18 +43,18 @@ export default function LoadingScreen({ message = 'Analyzing ingredients...' }) 
         <ScanBadge size={80} tone="soft" />
       </div>
 
-      <h2 className="text-xl font-bold text-slate-800 mb-1 text-center">{message}</h2>
-      <p className="text-slate-500 text-sm text-center mb-6">
+      <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-1 text-center">{message}</h2>
+      <p className="text-slate-500 dark:text-slate-400 text-sm text-center mb-6">
         Generating your health report — usually 5–10 seconds
       </p>
 
       {/* Progress bar */}
       <div className="w-full max-w-sm mb-6">
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-xs font-semibold text-green-700">Analyzing</span>
-          <span className="text-xs font-semibold text-slate-500 tabular-nums">{progress}%</span>
+          <span className="text-xs font-semibold text-green-700 dark:text-green-400">Analyzing</span>
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 tabular-nums">{progress}%</span>
         </div>
-        <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden">
+        <div className="h-2.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
           <div
             className="h-full bg-gradient-to-r from-green-500 to-green-600 rounded-full transition-all duration-200 ease-out"
             style={{ width: `${progress}%` }}
@@ -63,7 +63,7 @@ export default function LoadingScreen({ message = 'Analyzing ingredients...' }) 
       </div>
 
       {/* Step checklist */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 max-w-sm w-full space-y-2.5">
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 max-w-sm w-full space-y-2.5">
         {STEPS.map((step, i) => {
           const done = i < stepIndex;
           const active = i === stepIndex;
@@ -76,14 +76,14 @@ export default function LoadingScreen({ message = 'Analyzing ingredients...' }) 
             >
               <span className="flex-shrink-0 w-5 text-center">
                 {done ? (
-                  <span className="text-green-600">✓</span>
+                  <span className="text-green-600 dark:text-green-400">✓</span>
                 ) : active ? (
                   <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                 ) : (
                   <span>{step.icon}</span>
                 )}
               </span>
-              <span className={done ? 'text-slate-400 line-through' : active ? 'text-slate-800 font-medium' : 'text-slate-500'}>
+              <span className={done ? 'text-slate-400 dark:text-slate-500 line-through' : active ? 'text-slate-800 dark:text-slate-100 font-medium' : 'text-slate-500 dark:text-slate-400'}>
                 {step.label}
               </span>
             </div>

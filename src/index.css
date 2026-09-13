@@ -37,8 +37,21 @@
   --v-very-poor-bg: rgba(255, 59, 48, 0.12);
 }
 
+/*
+ * Three states, not two: no explicit choice follows the OS live (the
+ * media query below); an explicit choice pins it either way regardless
+ * of what the OS says. `.light`/`.dark` are applied by useTheme.js
+ * (and mirrored synchronously in index.html before React mounts, so
+ * there's no flash of the wrong theme).
+ *
+ * :not(.light) on the media query is what lets an explicit "light" pick
+ * win even while the OS prefers dark -- otherwise the media query and
+ * the .light class would both apply and fight over the same properties.
+ * The .dark block is repeated (not just relying on the media query)
+ * so an explicit "dark" pick works even when the OS itself prefers light.
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light) {
     --bg-grouped: #000000;
     --bg-card: #1c1c1e;
     --label-1: #ffffff;
@@ -63,6 +76,30 @@
     --v-poor-bg: rgba(255, 159, 10, 0.18);
     --v-very-poor-bg: rgba(255, 69, 58, 0.18);
   }
+}
+
+:root.dark {
+  --bg-grouped: #000000;
+  --bg-card: #1c1c1e;
+  --label-1: #ffffff;
+  --label-2: rgba(235, 235, 245, 0.60);
+  --label-3: rgba(235, 235, 245, 0.30);
+  --separator: rgba(84, 84, 88, 0.65);
+  --fill: rgba(120, 120, 128, 0.24);
+  --tint: #0a84ff;
+  --tint-bg: rgba(10, 132, 255, 0.18);
+
+  --v-very-healthy: #28c94f;
+  --v-good: #5be07d;
+  --v-moderate: #ffd60a;
+  --v-poor: #ff9f0a;
+  --v-very-poor: #ff453a;
+
+  --v-very-healthy-bg: rgba(40, 201, 79, 0.18);
+  --v-good-bg: rgba(91, 224, 125, 0.16);
+  --v-moderate-bg: rgba(255, 214, 10, 0.18);
+  --v-poor-bg: rgba(255, 159, 10, 0.18);
+  --v-very-poor-bg: rgba(255, 69, 58, 0.18);
 }
 
 * {
@@ -199,3 +236,37 @@ body {
   .scan-sweep { animation: none; top: 50%; margin-top: -1px; opacity: 0.85; }
   .hero-float, .hero-float-delay { animation: none; }
 }
+
+/* SplashScreen -- the launch moment. Icon overshoots slightly on the
+   way in (a plain fade-in reads as sluggish for something this brief),
+   the glow behind it breathes gently, food icons drift upward and fade
+   like steam/freshness, and the wordmark settles in just after the icon
+   so the eye has one thing to follow at a time instead of everything
+   arriving at once. All of this is skipped under reduced-motion --
+   SplashScreen.jsx renders without these classes in that case, this CSS
+   never needs its own reduced-motion override. */
+@keyframes splash-icon-in {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.splash-icon-in { animation: splash-icon-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+@keyframes splash-glow {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.25); opacity: 0.15; }
+}
+.splash-glow { animation: splash-glow 2.2s ease-in-out infinite; animation-delay: 0.3s; }
+
+@keyframes splash-text-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.splash-text-in { animation: splash-text-in 0.5s ease-out 0.45s both; }
+
+@keyframes splash-particle {
+  0% { transform: translateY(0) scale(0.8); opacity: 0; }
+  20% { opacity: 0.9; }
+  100% { transform: translateY(-140px) scale(1); opacity: 0; }
+}
+.splash-particle { animation: splash-particle 2.2s ease-out both; }

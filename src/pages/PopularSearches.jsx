@@ -22,16 +22,16 @@ export default function PopularSearches() {
     <div className="page-in max-w-2xl mx-auto px-4 py-6 pb-24">
       <button
         onClick={() => navigate(-1)}
-        className="tap-scale inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-4 transition-colors"
+        className="tap-scale inline-flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 mb-4 transition-colors"
       >
         ← Back
       </button>
-      <h1 className="text-xl font-bold text-slate-800 mb-5">Popular searches</h1>
+      <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-5">Popular searches</h1>
 
-      {loading && <p className="text-sm text-slate-400 px-1">Loading…</p>}
+      {loading && <p className="text-sm text-slate-400 dark:text-slate-500 px-1">Loading…</p>}
 
       {!loading && terms.length === 0 && (
-        <p className="text-sm text-slate-400 px-1">Nothing scanned enough yet to show here.</p>
+        <p className="text-sm text-slate-400 dark:text-slate-500 px-1">Nothing scanned enough yet to show here.</p>
       )}
 
       {!loading && terms.length > 0 && (
@@ -41,7 +41,7 @@ export default function PopularSearches() {
               key={term}
               onClick={() => navigate(`/?q=${encodeURIComponent(term)}`)}
               style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}
-              className="item-in tap-scale px-4 py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition-colors"
+              className="item-in tap-scale px-4 py-2 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-sm font-medium text-slate-700 dark:text-slate-200 transition-colors"
             >
               {term}
             </button>

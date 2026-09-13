@@ -48,8 +48,8 @@ export default function History() {
     return (
       <div className="page-in max-w-2xl mx-auto px-4 py-16 pb-24 text-center">
         <div className="text-6xl mb-4">📋</div>
-        <h2 className="text-xl font-bold text-slate-700 mb-2">No scans yet</h2>
-        <p className="text-slate-400 text-sm mb-6">
+        <h2 className="text-xl font-bold text-slate-700 dark:text-slate-200 mb-2">No scans yet</h2>
+        <p className="text-slate-400 dark:text-slate-500 text-sm mb-6">
           Your scan history will appear here after you analyze your first product.
         </p>
         <button
@@ -68,8 +68,8 @@ export default function History() {
     <div className="page-in max-w-2xl mx-auto px-4 py-6 pb-24">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Your food history</h1>
-          <p className="text-sm text-slate-400 mt-0.5">See what you've checked so far.</p>
+          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Your food history</h1>
+          <p className="text-sm text-slate-400 dark:text-slate-500 mt-0.5">See what you've checked so far.</p>
         </div>
         <button
           onClick={handleClearAll}
@@ -85,7 +85,7 @@ export default function History() {
             key={f}
             onClick={() => setFilter(f)}
             className={`tap-scale flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${
-              filter === f ? 'bg-green-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              filter === f ? 'bg-green-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
             }`}
           >
             {f}
@@ -94,7 +94,7 @@ export default function History() {
       </div>
 
       {filtered.length === 0 ? (
-        <p className="text-sm text-slate-400 text-center py-10">Nothing in this category yet.</p>
+        <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-10">Nothing in this category yet.</p>
       ) : (
         <div className="space-y-3">
           {filtered.map((entry, i) => (
@@ -102,15 +102,15 @@ export default function History() {
               key={entry.id}
               onClick={() => navigate(`/result/${entry.id}`)}
               style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }}
-              className="item-in tap-scale bg-white rounded-2xl border border-slate-100 shadow-sm p-3 flex items-center gap-3 cursor-pointer hover:shadow-md transition-all"
+              className="item-in tap-scale bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-3 flex items-center gap-3 cursor-pointer hover:shadow-md transition-all"
             >
               <ProductImage src={entry.imageUrl} size={128} />
 
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-slate-800 text-[15px] leading-snug truncate">
+                <p className="font-bold text-slate-800 dark:text-slate-100 text-[15px] leading-snug truncate">
                   {entry.productName || 'Unknown Product'}
                 </p>
-                <p className="text-xs text-slate-400 mt-0.5">{formatHistoryDate(entry.savedAt)}</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{formatHistoryDate(entry.savedAt)}</p>
               </div>
 
               <ScoreCircle score={entry.overallScore || 0} size="small" showLabel />

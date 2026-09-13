@@ -10,8 +10,8 @@ export default function ScanBadge({ size = 56, tone = 'light' }) {
   const barcodeSize = size * 0.5;
   const amplitude = size * 0.28;
 
-  const boxClass = isLight ? 'bg-white/15 backdrop-blur-sm' : 'bg-green-100';
-  const barsClass = isLight ? 'text-white/90' : 'text-green-700';
+  const boxClass = isLight ? 'bg-white/15 backdrop-blur-sm' : 'bg-green-100 dark:bg-green-950';
+  const barsClass = isLight ? 'text-white/90' : 'text-green-700 dark:text-green-400';
   const lineColor = isLight ? '#bef264' : '#65a30d';
   const lineGlow = isLight ? 'rgba(190,242,100,0.85)' : 'rgba(101,163,13,0.6)';
 

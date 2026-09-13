@@ -14,7 +14,7 @@ export default function ProductStripCard({ item, onClick, style }) {
       className="item-in tap-scale flex-shrink-0 w-28 text-left"
     >
       <ProductImage src={item.imageUrl} size={112} expandable={false} />
-      <p className="text-xs font-semibold text-slate-700 mt-1.5 leading-tight line-clamp-2">
+      <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 mt-1.5 leading-tight line-clamp-2">
         {item.productName}
       </p>
       {colors && (

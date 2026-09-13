@@ -367,26 +367,26 @@ export default function Home() {
       <div className="page-in max-w-2xl mx-auto px-4 py-8 pb-24">
         <button
           onClick={cancelReview}
-          className="tap-scale inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-4 transition-colors"
+          className="tap-scale inline-flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 mb-4 transition-colors"
         >
           ← Start over
         </button>
 
-        <h1 className="text-xl font-bold text-slate-800 mb-1">Check before we analyze</h1>
-        <p className="text-sm text-slate-500 mb-4">
+        <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-1">Check before we analyze</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
           {mode === 'image'
             ? "Small print is easy to misread — please check this matches the pack before we generate your report."
             : 'This came from an open product database — please check it looks right.'}
         </p>
 
         {(!review.readable || review.notes) && (
-          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 flex items-start gap-2">
+          <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-xl text-sm text-amber-800 dark:text-amber-300 flex items-start gap-2">
             <span>⚠️</span>
             <span>{review.notes || 'The photo may not have captured the full ingredients list clearly — please double-check and complete it below.'}</span>
           </div>
         )}
 
-        <label className="block text-sm font-semibold text-slate-700 mb-2">
+        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
           Product name (optional)
         </label>
         <input
@@ -394,20 +394,20 @@ export default function Home() {
           value={reviewProductName}
           onChange={(e) => setReviewProductName(e.target.value)}
           placeholder="e.g. Maggi 2-Minute Noodles"
-          className="w-full mb-4 p-3 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder:text-slate-400"
+          className="w-full mb-4 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder:text-slate-400 dark:placeholder:text-slate-500"
         />
 
-        <label className="block text-sm font-semibold text-slate-700 mb-2">
+        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
           Ingredients list — edit or complete anything that's missing:
         </label>
         <textarea
           value={reviewText}
           onChange={(e) => setReviewText(e.target.value)}
-          className="w-full h-44 p-4 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          className="w-full h-44 p-4 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
         />
 
         {error && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600 flex items-start gap-2">
+          <div className="mt-4 p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-600 dark:text-red-400 flex items-start gap-2">
             <span>⚠️</span>
             <span>{error}</span>
           </div>
@@ -461,8 +461,8 @@ export default function Home() {
 
           {/* Search bar */}
           <div className="-mt-5 mb-4 relative z-10">
-            <div className="flex items-center gap-3 bg-white rounded-2xl shadow-lg shadow-slate-200 border border-slate-100 px-4 py-3">
-              <span className="text-slate-400 text-lg flex-shrink-0">🔍</span>
+            <div className="flex items-center gap-3 bg-white dark:bg-slate-800 rounded-2xl shadow-lg shadow-slate-200 border border-slate-100 dark:border-slate-800 px-4 py-3">
+              <span className="text-slate-400 dark:text-slate-500 text-lg flex-shrink-0">🔍</span>
               <div className="flex-1 min-w-0">
                 <input
                   ref={searchInputRef}
@@ -471,10 +471,10 @@ export default function Home() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search a product"
                   autoComplete="off"
-                  className="w-full text-[15px] font-semibold text-slate-800 placeholder:text-slate-800 bg-transparent focus:outline-none"
+                  className="w-full text-[15px] font-semibold text-slate-800 dark:text-slate-100 placeholder:text-slate-800 dark:placeholder:text-slate-300 bg-transparent focus:outline-none"
                 />
                 {searchQuery.length === 0 && (
-                  <p className="text-xs text-slate-400 -mt-0.5">Maggi, Parle-G, Oreo...</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 -mt-0.5">Maggi, Parle-G, Oreo...</p>
                 )}
               </div>
               <button
@@ -503,14 +503,14 @@ export default function Home() {
               </button>
               <button
                 onClick={() => { setMode('barcode'); setError(''); }}
-                className="tap-scale flex items-center justify-center gap-1.5 px-4 py-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors"
+                className="tap-scale flex items-center justify-center gap-1.5 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
               >
                 <BarcodeIcon />
                 <span className="text-xs font-semibold">Barcode</span>
               </button>
               <button
                 onClick={() => { setMode('text'); setError(''); }}
-                className="tap-scale flex items-center justify-center gap-1.5 px-4 py-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors"
+                className="tap-scale flex items-center justify-center gap-1.5 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
               >
                 <span className="text-sm">📄</span>
                 <span className="text-xs font-semibold">Paste</span>
@@ -523,7 +523,7 @@ export default function Home() {
               trip to the History tab. Only for returning users. */}
           {searchQuery.trim().length === 0 && recentScans.length > 0 && (
             <div className="mb-6">
-              <p className="text-sm font-bold text-slate-800 mb-2 px-0.5">Continue where you left off</p>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">Continue where you left off</p>
               <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
                 {recentScans.map((entry, i) => (
                   <ProductStripCard
@@ -542,29 +542,29 @@ export default function Home() {
               telling people what to avoid in the abstract. */}
           {searchQuery.trim().length === 0 && (spotlight.best || spotlight.worst) && (
             <div className="mb-6">
-              <p className="text-sm font-bold text-slate-800 mb-2 px-0.5">Today's spotlight</p>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">Today's spotlight</p>
               <div className="grid grid-cols-2 gap-2.5">
                 {spotlight.best && (
                   <button
                     onClick={() => openCachedSuggestion(spotlight.best)}
-                    className="tap-scale flex items-center gap-2.5 p-3 rounded-2xl bg-green-50 border border-green-100 text-left"
+                    className="tap-scale flex items-center gap-2.5 p-3 rounded-2xl bg-green-50 dark:bg-green-950 border border-green-100 dark:border-green-900 text-left"
                   >
                     <ProductImage src={spotlight.best.imageUrl} size={44} expandable={false} />
                     <span className="min-w-0">
-                      <span className="block text-[10px] font-bold text-green-700 uppercase tracking-wide">Healthiest pick</span>
-                      <span className="block text-xs font-semibold text-slate-700 leading-tight line-clamp-2">{spotlight.best.productName}</span>
+                      <span className="block text-[10px] font-bold text-green-700 dark:text-green-400 uppercase tracking-wide">Healthiest pick</span>
+                      <span className="block text-xs font-semibold text-slate-700 dark:text-slate-200 leading-tight line-clamp-2">{spotlight.best.productName}</span>
                     </span>
                   </button>
                 )}
                 {spotlight.worst && (
                   <button
                     onClick={() => openCachedSuggestion(spotlight.worst)}
-                    className="tap-scale flex items-center gap-2.5 p-3 rounded-2xl bg-red-50 border border-red-100 text-left"
+                    className="tap-scale flex items-center gap-2.5 p-3 rounded-2xl bg-red-50 dark:bg-red-950 border border-red-100 text-left"
                   >
                     <ProductImage src={spotlight.worst.imageUrl} size={44} expandable={false} />
                     <span className="min-w-0">
                       <span className="block text-[10px] font-bold text-red-700 uppercase tracking-wide">Worth a closer look</span>
-                      <span className="block text-xs font-semibold text-slate-700 leading-tight line-clamp-2">{spotlight.worst.productName}</span>
+                      <span className="block text-xs font-semibold text-slate-700 dark:text-slate-200 leading-tight line-clamp-2">{spotlight.worst.productName}</span>
                     </span>
                   </button>
                 )}
@@ -575,7 +575,7 @@ export default function Home() {
           {/* Popular searches -- real scan-count data, not a guess. */}
           {searchQuery.trim().length === 0 && popularTerms.length > 0 && (
             <div className="mb-6">
-              <p className="text-sm font-bold text-slate-800 mb-2 px-0.5">Popular searches</p>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">Popular searches</p>
               <div className="relative">
                 <div className="flex gap-2 overflow-x-auto pb-1 pr-8" style={{ scrollbarWidth: 'none' }}>
                   {popularTerms.map((term, i) => (
@@ -583,7 +583,7 @@ export default function Home() {
                       key={term}
                       onClick={() => setSearchQuery(term)}
                       style={{ animationDelay: `${i * 30}ms` }}
-                      className="item-in tap-scale flex-shrink-0 px-4 py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition-colors"
+                      className="item-in tap-scale flex-shrink-0 px-4 py-2 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-sm font-medium text-slate-700 dark:text-slate-200 transition-colors"
                     >
                       {term}
                     </button>
@@ -604,7 +604,7 @@ export default function Home() {
               types a search. */}
           {searchQuery.trim().length === 0 && recentlyAdded.length > 0 && (
             <div className="mb-6">
-              <p className="text-sm font-bold text-slate-800 mb-2 px-0.5">Recently added</p>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">Recently added</p>
               <div className="relative">
                 <div className="flex gap-3 overflow-x-auto pb-1 pr-8" style={{ scrollbarWidth: 'none' }}>
                   {recentlyAdded.map((item, i) => (
@@ -629,8 +629,8 @@ export default function Home() {
           {searchQuery.trim().length === 0 && (
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2 px-0.5">
-                <p className="text-sm font-bold text-slate-800">Explore food</p>
-                <button onClick={() => navigate('/browse')} className="tap-scale text-xs font-semibold text-green-600">
+                <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Explore food</p>
+                <button onClick={() => navigate('/browse')} className="tap-scale text-xs font-semibold text-green-600 dark:text-green-400">
                   See all
                 </button>
               </div>
@@ -659,46 +659,46 @@ export default function Home() {
               a wrong "fun fact" would undercut the app's whole pitch of
               being accurate about Indian food regulations. */}
           {searchQuery.trim().length === 0 && (
-            <div className="mb-6 flex gap-3 items-start p-3.5 rounded-2xl bg-white border border-slate-100">
+            <div className="mb-6 flex gap-3 items-start p-3.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-800">
               <span className="text-lg flex-shrink-0">💡</span>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                <span className="font-bold text-slate-800">Did you know? </span>
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                <span className="font-bold text-slate-800 dark:text-slate-100">Did you know? </span>
                 {todaysTip}
               </p>
             </div>
           )}
 
           {searching && (
-            <p className="text-xs text-slate-400 mt-2 px-1">Searching…</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 px-1">Searching…</p>
           )}
 
           {!searching && searchError && suggestions.cached.length === 0 && suggestions.off.length === 0 && (
-            <p className="text-xs text-amber-600 mt-2 px-1">{searchError}</p>
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 px-1">{searchError}</p>
           )}
 
           {!searching && !searchError && searchQuery.trim().length >= 2 &&
             suggestions.cached.length === 0 && suggestions.off.length === 0 && (
-            <p className="text-xs text-slate-400 mt-2 px-1">
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 px-1">
               No products found with a readable ingredients list. Try a different spelling, or use Paste / Photo to enter the ingredients yourself.
             </p>
           )}
 
           {(suggestions.cached.length > 0 || suggestions.off.length > 0) && (
-            <div className="mt-2 border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 bg-white">
+            <div className="mt-2 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-800">
               {suggestions.cached.map((item, i) => (
                 <button
                   key={item.lookupKey}
                   onClick={() => openCachedSuggestion(item)}
                   style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }}
-                  className="item-in tap-scale w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center justify-between gap-3"
+                  className="item-in tap-scale w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center justify-between gap-3"
                 >
                   <span className="min-w-0">
                     {item.brand && (
-                      <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
                         {item.brand}
                       </span>
                     )}
-                    <span className="block text-sm text-slate-700 truncate">{item.productName}</span>
+                    <span className="block text-sm text-slate-700 dark:text-slate-200 truncate">{item.productName}</span>
                   </span>
                   {typeof item.score === 'number' && (
                     <span
@@ -716,20 +716,20 @@ export default function Home() {
                   key={item.code}
                   onClick={() => openSearchResult(item)}
                   style={{ animationDelay: `${Math.min((suggestions.cached.length + i) * 30, 300)}ms` }}
-                  className="item-in tap-scale w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
+                  className="item-in tap-scale w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
                 >
                   {item.brand && (
-                    <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
                       {item.brand}
                     </span>
                   )}
-                  <span className="block text-sm text-slate-700 truncate">{item.productName}</span>
+                  <span className="block text-sm text-slate-700 dark:text-slate-200 truncate">{item.productName}</span>
                 </button>
               ))}
             </div>
           )}
 
-          <p className="text-[11px] text-slate-400 mt-3 text-center">
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-3 text-center">
             Powered by a free open product database · already-scored items load instantly
           </p>
         </>
@@ -740,7 +740,7 @@ export default function Home() {
       {mode !== 'search' && (
         <button
           onClick={() => { setMode('search'); setError(''); }}
-          className="tap-scale inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 pt-5 pb-2 transition-colors"
+          className="tap-scale inline-flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 pt-5 pb-2 transition-colors"
         >
           ← Back to search
         </button>
@@ -749,7 +749,7 @@ export default function Home() {
       {/* Text Mode */}
       {mode === 'text' && (
         <div className="mb-4">
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
+          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
             Product name (optional, but helps identify it correctly)
           </label>
           <input
@@ -757,19 +757,19 @@ export default function Home() {
             value={textProductName}
             onChange={(e) => setTextProductName(e.target.value)}
             placeholder="e.g. Parle-G Biscuits"
-            className="w-full mb-4 p-3 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder:text-slate-400"
+            className="w-full mb-4 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder:text-slate-400 dark:placeholder:text-slate-500"
           />
 
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
+          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
             Paste the ingredients list from the back of the pack:
           </label>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={`Example:\nWheat flour, Sugar, Palm oil, Skimmed milk powder, Cocoa powder, Salt, Raising agents (INS 500ii, INS 503ii), Emulsifier (INS 322), Artificial flavour (Vanilla)`}
-            className="w-full h-44 p-4 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder:text-slate-400"
+            className="w-full h-44 p-4 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder:text-slate-400 dark:placeholder:text-slate-500"
           />
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
             Tip: The ingredient list is usually on the back of the packet in small text.
           </p>
         </div>
@@ -779,7 +779,7 @@ export default function Home() {
       {mode === 'image' && (
         <div className="mb-4">
           <div
-            className={`upload-area rounded-xl p-8 text-center cursor-pointer ${dragOver ? 'drag-over' : ''} ${imagePreview ? 'border-green-400 bg-green-50' : ''}`}
+            className={`upload-area rounded-xl p-8 text-center cursor-pointer ${dragOver ? 'drag-over' : ''} ${imagePreview ? 'border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-950' : ''}`}
             onClick={() => fileInputRef.current?.click()}
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
@@ -792,15 +792,15 @@ export default function Home() {
                   alt="Selected label"
                   className="max-h-48 mx-auto rounded-lg object-contain mb-3"
                 />
-                <p className="text-sm text-green-600 font-medium">✅ Photo selected — tap Analyze to continue</p>
-                <p className="text-xs text-slate-400 mt-1">Click to change photo</p>
+                <p className="text-sm text-green-600 dark:text-green-400 font-medium">✅ Photo selected — tap Analyze to continue</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Click to change photo</p>
               </div>
             ) : (
               <div>
                 <div className="text-5xl mb-3">📸</div>
-                <p className="font-semibold text-slate-700 mb-1">Drop your food label photo here</p>
-                <p className="text-sm text-slate-400">or click to choose from your device</p>
-                <p className="text-xs text-slate-400 mt-2">JPG, PNG, WEBP · Max 5MB</p>
+                <p className="font-semibold text-slate-700 dark:text-slate-200 mb-1">Drop your food label photo here</p>
+                <p className="text-sm text-slate-400 dark:text-slate-500">or click to choose from your device</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">JPG, PNG, WEBP · Max 5MB</p>
               </div>
             )}
           </div>
@@ -811,7 +811,7 @@ export default function Home() {
             className="hidden"
             onChange={(e) => handleImageSelect(e.target.files[0])}
           />
-          <p className="text-xs text-slate-400 mt-2">
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
             💡 Tip: get close, use good light, and if the list wraps around the pack, fit as much as you can in one shot — you'll get to check and complete it before we analyze.
           </p>
         </div>
@@ -823,12 +823,12 @@ export default function Home() {
           {isBarcodeScanSupported() && (
             <button
               onClick={() => setShowScanner(true)}
-              className="tap-scale w-full mb-3 py-3.5 rounded-xl border-2 border-dashed border-green-300 bg-green-50 text-green-700 font-semibold text-sm flex items-center justify-center gap-2"
+              className="tap-scale w-full mb-3 py-3.5 rounded-xl border-2 border-dashed border-green-300 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-400 font-semibold text-sm flex items-center justify-center gap-2"
             >
               📷 Scan with camera
             </button>
           )}
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
+          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
             Or enter the barcode number:
           </label>
           <input
@@ -837,9 +837,9 @@ export default function Home() {
             value={barcodeInput}
             onChange={(e) => setBarcodeInput(e.target.value.replace(/[^0-9]/g, ''))}
             placeholder="e.g. 8901058851468"
-            className="w-full p-4 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder:text-slate-400 tracking-widest"
+            className="w-full p-4 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder:text-slate-400 dark:placeholder:text-slate-500 tracking-widest"
           />
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
             The number printed below the barcode lines on the pack. We check it against a free open product database — if it's not listed, you can still paste ingredients or take a photo.
           </p>
         </div>
@@ -847,7 +847,7 @@ export default function Home() {
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600 flex items-start gap-2">
+        <div className="mb-4 p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-600 dark:text-red-400 flex items-start gap-2">
           <span>⚠️</span>
           <span>{error}</span>
         </div>

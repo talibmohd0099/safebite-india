@@ -16,7 +16,7 @@ export default function BottomTabBar() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200"
+      className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="max-w-2xl mx-auto grid grid-cols-4">
@@ -31,7 +31,7 @@ export default function BottomTabBar() {
               <span className={`text-xl leading-none transition-transform ${active ? 'scale-110' : 'opacity-50'}`}>
                 {tab.icon}
               </span>
-              <span className={`text-[11px] font-semibold ${active ? 'text-green-700' : 'text-slate-400'}`}>
+              <span className={`text-[11px] font-semibold ${active ? 'text-green-700 dark:text-green-400' : 'text-slate-400 dark:text-slate-500'}`}>
                 {tab.label}
               </span>
             </Link>

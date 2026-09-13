@@ -63,8 +63,8 @@ export default function Category() {
   if (!category) {
     return (
       <div className="page-in max-w-2xl mx-auto px-4 py-16 text-center">
-        <p className="text-slate-500">Unknown category.</p>
-        <button onClick={() => navigate('/browse')} className="tap-scale mt-4 text-green-600 font-semibold">
+        <p className="text-slate-500 dark:text-slate-400">Unknown category.</p>
+        <button onClick={() => navigate('/browse')} className="tap-scale mt-4 text-green-600 dark:text-green-400 font-semibold">
           ← Back to categories
         </button>
       </div>
@@ -75,7 +75,7 @@ export default function Category() {
     <div className="page-in max-w-2xl mx-auto px-4 py-6 pb-24">
       <button
         onClick={() => navigate(-1)}
-        className="tap-scale inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-4 transition-colors"
+        className="tap-scale inline-flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 mb-4 transition-colors"
       >
         ← Back
       </button>
@@ -97,7 +97,7 @@ export default function Category() {
               key={s.id}
               onClick={() => setSort(s.id)}
               className={`tap-scale px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-                sort === s.id ? 'bg-green-600 text-white' : 'bg-white border border-slate-200 text-slate-600'
+                sort === s.id ? 'bg-green-600 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
               }`}
             >
               {s.label}
@@ -106,16 +106,16 @@ export default function Category() {
         </div>
       )}
 
-      {loading && <p className="text-sm text-slate-400 px-1">Loading…</p>}
+      {loading && <p className="text-sm text-slate-400 dark:text-slate-500 px-1">Loading…</p>}
 
       {!loading && results.length === 0 && (
-        <p className="text-sm text-slate-400 px-1">
+        <p className="text-sm text-slate-400 dark:text-slate-500 px-1">
           Nothing scored in this category yet — check back as more products get added.
         </p>
       )}
 
       {error && (
-        <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{error}</div>
+        <div className="mb-3 p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-600 dark:text-red-400">{error}</div>
       )}
 
       {!loading && sortedResults.length > 0 && (
@@ -127,7 +127,7 @@ export default function Category() {
                 key={item.lookupKey}
                 onClick={() => openResult(item)}
                 style={{ animationDelay: `${Math.min(i * 20, 300)}ms` }}
-                className="item-in tap-scale bg-white rounded-2xl border border-slate-100 shadow-sm p-2 flex flex-col items-center gap-1.5 text-center hover:shadow-md transition-all"
+                className="item-in tap-scale bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-2 flex flex-col items-center gap-1.5 text-center hover:shadow-md transition-all"
               >
                 <div
                   onClick={(e) => {
@@ -140,7 +140,7 @@ export default function Category() {
                 >
                   <ProductImage src={item.imageUrl} size={90} expandable={false} />
                 </div>
-                <span className="text-[11px] font-semibold text-slate-700 leading-tight line-clamp-2 w-full">
+                <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200 leading-tight line-clamp-2 w-full">
                   {item.productName}
                 </span>
                 {scoreColors && (

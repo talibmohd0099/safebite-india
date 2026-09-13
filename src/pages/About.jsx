@@ -21,16 +21,16 @@ export default function About() {
         <div className="w-16 h-16 bg-green-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">
           🛡️
         </div>
-        <h1 className="text-2xl font-bold text-slate-800 mb-2">About SafeBite India</h1>
-        <p className="text-slate-500 text-sm">
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">About SafeBite India</h1>
+        <p className="text-slate-500 dark:text-slate-400 text-sm">
           Food label transparency for every Indian consumer
         </p>
       </div>
 
       {/* Mission */}
-      <div className="bg-green-50 border border-green-200 rounded-2xl p-5 mb-4">
-        <h2 className="font-bold text-green-800 mb-2">🎯 Our Mission</h2>
-        <p className="text-sm text-green-700 leading-relaxed">
+      <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-2xl p-5 mb-4">
+        <h2 className="font-bold text-green-800 dark:text-green-300 mb-2">🎯 Our Mission</h2>
+        <p className="text-sm text-green-700 dark:text-green-400 leading-relaxed">
           International apps like Yuka are built for Europe and America. They don't recognize Indian brands, 
           don't understand FSSAI regulations, and flag ingredients that are actually fine under Indian standards — 
           while missing ones that aren't. SafeBite fixes that.
@@ -38,8 +38,8 @@ export default function About() {
       </div>
 
       {/* How it works */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-4">
-        <h2 className="font-bold text-slate-800 mb-4">⚙️ How It Works</h2>
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 mb-4">
+        <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-4">⚙️ How It Works</h2>
         <div className="space-y-4">
           {[
             {
@@ -68,8 +68,8 @@ export default function About() {
                 {item.step}
               </div>
               <div>
-                <p className="font-semibold text-slate-800 text-sm">{item.title}</p>
-                <p className="text-slate-500 text-xs mt-0.5 leading-relaxed">{item.desc}</p>
+                <p className="font-semibold text-slate-800 dark:text-slate-100 text-sm">{item.title}</p>
+                <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 leading-relaxed">{item.desc}</p>
               </div>
             </div>
           ))}
@@ -77,40 +77,40 @@ export default function About() {
       </div>
 
       {/* How the score is actually calculated */}
-      <div id="how-score-works" className="bg-white border border-slate-200 rounded-2xl p-5 mb-4 scroll-mt-4">
-        <h2 className="font-bold text-slate-800 mb-2">🧮 How Your Score Is Calculated</h2>
-        <p className="text-sm text-slate-500 mb-4 leading-relaxed">
+      <div id="how-score-works" className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 mb-4 scroll-mt-4">
+        <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-2">🧮 How Your Score Is Calculated</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
           Every product starts at a perfect <strong>100</strong>. Each ingredient then subtracts points based on how much it's actually worth worrying about — and, critically, <strong>how much of the product it actually is</strong>.
         </p>
 
         <div className="space-y-3 mb-5">
           <div className="flex gap-3">
             <span className="text-lg flex-shrink-0">1️⃣</span>
-            <p className="text-sm text-slate-600 leading-relaxed">
+            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
               <strong>Every ingredient gets a 0–40 penalty</strong> reflecting nutritional quality — not just whether it's legal. Being permitted doesn't mean penalty-free: refined flour (maida) is completely legal, but it's stripped of fibre and spikes blood sugar, so it still costs real points.
             </p>
           </div>
           <div className="flex gap-3">
             <span className="text-lg flex-shrink-0">2️⃣</span>
-            <p className="text-sm text-slate-600 leading-relaxed">
+            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
               <strong>Quantity matters.</strong> When a label states a percentage, that ingredient's penalty is scaled by how dominant it is — from 0.5× for a trace amount up to a full 1× if it's basically the whole product. A stated 3% gets far less weight than a stated 68%.
             </p>
           </div>
           <div className="flex gap-3">
             <span className="text-lg flex-shrink-0">3️⃣</span>
-            <p className="text-sm text-slate-600 leading-relaxed">
+            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
               <strong>One bad ingredient can't hide in a crowd.</strong> If anything is FSSAI-banned or genuinely harmful, the score is capped at 24 no matter how many safe ingredients surround it. A pile of safe ingredients should never be able to launder something dangerous into looking "moderate."
             </p>
           </div>
         </div>
 
         {/* Worked example */}
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <p className="text-xs font-bold text-amber-800 uppercase tracking-wide mb-2">📎 Real example — Parle-G Gluco Biscuits</p>
+        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+          <p className="text-xs font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wide mb-2">📎 Real example — Parle-G Gluco Biscuits</p>
           <p className="text-sm text-amber-900 leading-relaxed mb-3">
             The label states <strong>Refined Wheat Flour (Maida) — 68%</strong>, its single largest ingredient. Maida carries a penalty of <strong>15</strong> (nutritionally poor, though legal). Here's its actual contribution to the score:
           </p>
-          <div className="bg-white rounded-lg p-3 font-mono text-xs text-slate-700 mb-3 overflow-x-auto">
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-3 font-mono text-xs text-slate-700 dark:text-slate-200 mb-3 overflow-x-auto">
             weight = 0.5 + (68 ÷ 100) × 0.5 = <strong>0.84</strong><br />
             contribution = 15 × 0.84 = <strong>12.6 points</strong>
           </div>
@@ -119,14 +119,14 @@ export default function About() {
           </p>
         </div>
 
-        <p className="text-xs text-slate-400 mt-4 leading-relaxed">
+        <p className="text-xs text-slate-400 dark:text-slate-500 mt-4 leading-relaxed">
           Honest note: this is SafeBite's own transparent formula, not a government or scientific standard — there isn't one universal agreed formula for this anywhere (Nutri-Score, NOVA, and Yuka all score differently from each other, too). We'd rather show you the exact math than hide behind a black box.
         </p>
       </div>
 
       {/* Score guide */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-4">
-        <h2 className="font-bold text-slate-800 mb-3">📊 Score Guide</h2>
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 mb-4">
+        <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-3">📊 Score Guide</h2>
         <div className="space-y-2">
           {[
             { range: '85–100', color: 'bg-green-500', label: 'Very Healthy', desc: 'Whole/minimally processed, nothing concerning' },
@@ -140,8 +140,8 @@ export default function About() {
                 {item.range.split('–')[0]}
               </div>
               <div>
-                <span className="text-sm font-semibold text-slate-700">{item.label}</span>
-                <span className="text-xs text-slate-400 ml-2">{item.desc}</span>
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{item.label}</span>
+                <span className="text-xs text-slate-400 dark:text-slate-500 ml-2">{item.desc}</span>
               </div>
             </div>
           ))}
@@ -149,9 +149,9 @@ export default function About() {
       </div>
 
       {/* Data sources */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-4">
-        <h2 className="font-bold text-slate-800 mb-3">📚 Data Sources</h2>
-        <ul className="text-sm text-slate-600 space-y-2">
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 mb-4">
+        <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-3">📚 Data Sources</h2>
+        <ul className="text-sm text-slate-600 dark:text-slate-300 space-y-2">
           <li className="flex items-start gap-2">
             <span>🇮🇳</span>
             <span><strong>FSSAI</strong> — legal/permitted status for food additives comes directly from the official Food Safety and Standards (Food Products Standards and Food Additives) Regulations, not from AI guessing</span>
@@ -168,7 +168,7 @@ export default function About() {
       </div>
 
       {/* Disclaimer */}
-      <div className="bg-slate-100 rounded-2xl p-4 mb-6 text-xs text-slate-500 leading-relaxed">
+      <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-4 mb-6 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
         <strong>⚠️ Disclaimer:</strong> SafeBite is an independent, AI-powered informational tool and is not affiliated with FSSAI or any government body. Scores are for general awareness only. Always consult a healthcare professional for personal dietary advice. AI analysis may occasionally make errors.
       </div>
 
