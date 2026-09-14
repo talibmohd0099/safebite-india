@@ -114,6 +114,8 @@ export default function Result() {
   const [relatedNews, setRelatedNews] = useState([]);
   const [showHabitModal, setShowHabitModal] = useState(false);
   const [showScoreModal, setShowScoreModal] = useState(false);
+  const [showAllBreakdownItems, setShowAllBreakdownItems] = useState(false);
+  const [expandedBreakdownRows, setExpandedBreakdownRows] = useState(() => new Set());
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState('');
@@ -873,6 +875,18 @@ export default function Result() {
           item that would make the numbers not add up. */}
       {showScoreModal && scoreBreakdown && (() => {
         const breakdown = scoreBreakdown;
+        const maxPoints = Math.max(1, ...breakdown.items.map((i) => i.points));
+        const visibleItems = showAllBreakdownItems ? breakdown.items : breakdown.items.slice(0, 5);
+        const totalLost = breakdown.items.reduce((sum, i) => sum + i.points, 0);
+        const toggleRow = (idx) => {
+          setExpandedBreakdownRows((prev) => {
+            const next = new Set(prev);
+            if (next.has(idx)) next.delete(idx);
+            else next.add(idx);
+            return next;
+          });
+        };
+
         return createPortal(
           <div
             className="fixed inset-0 z-[999] bg-black/50 flex items-end sm:items-center justify-center"
@@ -892,24 +906,86 @@ export default function Result() {
                 ×
               </button>
 
-              <p className="text-[17px] font-bold pr-8 mb-2" style={{ color: 'var(--label-1)' }}>
+              <p className="text-[17px] font-bold pr-8 mb-3" style={{ color: 'var(--label-1)' }}>
                 {t('scoreBreakdownTitle', { score })}
               </p>
+
+              {/* Mini score summary -- a quick visual "gist" before the
+                  detailed table, so the popup doesn't start cold with
+                  just a wall of text. */}
+              <div className="flex items-center gap-4 mb-3 pb-3" style={{ borderBottom: '1px solid var(--separator)' }}>
+                <ScoreCircle score={score} size="large" />
+                <div className="min-w-0">
+                  <p className="text-[15px] font-bold" style={{ color: scoreColors.color }}>
+                    {result.verdict || scoreColors.label}
+                  </p>
+                  <p className="text-[13px] mt-1" style={{ color: 'var(--label-2)' }}>
+                    {t('scoreBreakdownStartedAt')}: <span className="font-semibold" style={{ color: 'var(--label-1)' }}>100</span>
+                  </p>
+                  <p className="text-[13px]" style={{ color: 'var(--label-2)' }}>
+                    {t('scoreBreakdownImpact')}: <span className="font-semibold" style={{ color: 'var(--v-poor)' }}>−{totalLost}</span>
+                  </p>
+                </div>
+              </div>
+
               <p className="text-[13px] leading-relaxed mb-3" style={{ color: 'var(--label-2)' }}>
                 {t('scoreBreakdownIntro')}
               </p>
 
+              {/* Top 5 by default -- 14+ rows is a lot to scroll past in
+                  a modal. Each row is tappable when the ingredient has a
+                  stored "reason" (same text IngredientCard shows), for
+                  progressive disclosure at no extra cost -- no new AI
+                  call, just data already on hand. */}
+              <div className="space-y-2 mb-2">
+                {visibleItems.map((item, i) => {
+                  const expanded = expandedBreakdownRows.has(i);
+                  return (
+                    <div key={i} className="rounded-[10px] overflow-hidden" style={{ background: 'var(--fill)' }}>
+                      <button
+                        onClick={() => item.reason && toggleRow(i)}
+                        className="w-full px-3 py-2.5 text-left"
+                        disabled={!item.reason}
+                      >
+                        <div className="flex items-center justify-between mb-1 gap-2">
+                          <span className="text-[14px] flex items-center gap-1 min-w-0" style={{ color: 'var(--label-1)' }}>
+                            <span className="truncate">{item.name}</span>
+                            {item.reason && (
+                              <span className="flex-shrink-0" style={{ color: 'var(--label-3)' }}>{expanded ? '︿' : '›'}</span>
+                            )}
+                          </span>
+                          <span className="text-[14px] font-semibold tabular-nums flex-shrink-0" style={{ color: 'var(--v-poor)' }}>
+                            −{item.points}
+                          </span>
+                        </div>
+                        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-card)' }}>
+                          <div
+                            className="h-full rounded-full"
+                            style={{ width: `${(item.points / maxPoints) * 100}%`, background: 'var(--v-poor)' }}
+                          />
+                        </div>
+                      </button>
+                      {expanded && item.reason && (
+                        <p className="px-3 pb-2.5 text-[13px] leading-relaxed" style={{ color: 'var(--label-2)' }}>
+                          {item.reason}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {breakdown.items.length > 5 && (
+                <button
+                  onClick={() => setShowAllBreakdownItems((v) => !v)}
+                  className="tap-scale text-[13px] font-semibold mb-3"
+                  style={{ color: 'var(--tint)' }}
+                >
+                  {showAllBreakdownItems ? t('scoreBreakdownShowLess') : t('scoreBreakdownShowAll', { count: breakdown.items.length })}
+                </button>
+              )}
+
               <div className="rounded-[12px] overflow-hidden mb-3" style={{ background: 'var(--fill)' }}>
-                <div className="flex items-center justify-between px-3.5 py-2.5" style={{ borderBottom: '1px solid var(--separator)' }}>
-                  <span className="text-[14px] font-semibold" style={{ color: 'var(--label-1)' }}>{t('scoreBreakdownBase')}</span>
-                  <span className="text-[14px] font-bold tabular-nums" style={{ color: 'var(--label-1)' }}>100</span>
-                </div>
-                {breakdown.items.map((item, i) => (
-                  <div key={i} className="flex items-center justify-between px-3.5 py-2" style={{ borderBottom: '1px solid var(--separator)' }}>
-                    <span className="text-[14px]" style={{ color: 'var(--label-1)' }}>{item.name}</span>
-                    <span className="text-[14px] font-semibold tabular-nums" style={{ color: 'var(--v-poor)' }}>−{item.points}</span>
-                  </div>
-                ))}
                 <div className="flex items-center justify-between px-3.5 py-2.5">
                   <span className="text-[14px] font-bold" style={{ color: 'var(--label-1)' }}>
                     {breakdown.wasCapped ? t('scoreBreakdownRawScore') : t('scoreBreakdownFinal')}
@@ -934,6 +1010,15 @@ export default function Result() {
                   </div>
                 </div>
               )}
+
+              {/* Honest, not invented -- this formula has no additive
+                  mechanism at all (100 is a hard ceiling, everything
+                  only ever subtracts), so this says that plainly instead
+                  of fabricating a "+N positive points" line that isn't
+                  how the real scoring works. */}
+              <p className="text-[12px] leading-relaxed italic" style={{ color: 'var(--label-3)' }}>
+                {t('scoreBreakdownNoPositives')}
+              </p>
             </div>
           </div>,
           document.body

@@ -29,10 +29,14 @@ export const STRINGS = {
 
     whyScoreLink: 'Why {score}?',
     scoreBreakdownTitle: 'Why did this score {score}?',
-    scoreBreakdownIntro: "Every ingredient pulls the score down by a different amount, based on how concerning it is and how much of the product it makes up. Here's exactly where the points went.",
-    scoreBreakdownBase: 'Starting point',
+    scoreBreakdownIntro: "Each ingredient can affect the score based on how concerning it is and how much of the product it makes up — some pull it down, others don't affect it at all. Here's exactly where the points went.",
     scoreBreakdownRawScore: 'Score before adjustment',
     scoreBreakdownFinal: 'Final score',
+    scoreBreakdownStartedAt: 'Started at',
+    scoreBreakdownImpact: 'Ingredient impact',
+    scoreBreakdownShowAll: 'Show all {count} ingredients',
+    scoreBreakdownShowLess: 'Show less',
+    scoreBreakdownNoPositives: "No additional points are added for anything — this score only ever subtracts for concerning ingredients, never adds for good ones.",
     scoreBreakdownCappedHarmful: "Because this product contains a harmful ingredient, the raw score of {rawScore} was capped down to {finalScore} — one harmful ingredient shouldn't be diluted by everything else being fine.",
     scoreBreakdownCappedConcerning: "Because this product contains a concerning ingredient, the raw score of {rawScore} was capped down to {finalScore}, so this can't rate higher than \"Moderate\" overall.",
 
@@ -144,10 +148,14 @@ export const STRINGS = {
 
     whyScoreLink: '{score} ही क्यों?',
     scoreBreakdownTitle: 'यह स्कोर {score} ही क्यों है?',
-    scoreBreakdownIntro: 'हर सामग्री स्कोर को अलग-अलग मात्रा में घटाती है — यह इस पर निर्भर करता है कि वह कितनी चिंताजनक है और प्रोडक्ट में कितनी मात्रा में है। नीचे देखें पॉइंट्स कहां-कहां कटे।',
-    scoreBreakdownBase: 'शुरुआती स्कोर',
+    scoreBreakdownIntro: 'हर सामग्री कितनी चिंताजनक है और प्रोडक्ट में कितनी मात्रा में है, इसके आधार पर स्कोर को असर कर सकती है — कुछ इसे घटाती हैं, कुछ का कोई असर नहीं पड़ता। नीचे देखें पॉइंट्स कहां-कहां कटे।',
     scoreBreakdownRawScore: 'एडजस्टमेंट से पहले का स्कोर',
     scoreBreakdownFinal: 'फाइनल स्कोर',
+    scoreBreakdownStartedAt: 'शुरुआत',
+    scoreBreakdownImpact: 'सामग्री का असर',
+    scoreBreakdownShowAll: 'सभी {count} सामग्री दिखाएं',
+    scoreBreakdownShowLess: 'कम दिखाएं',
+    scoreBreakdownNoPositives: 'किसी भी चीज़ के लिए एक्स्ट्रा पॉइंट्स नहीं जोड़े जाते — यह स्कोर सिर्फ चिंताजनक सामग्री के लिए घटता है, अच्छी चीज़ों के लिए कभी नहीं बढ़ता।',
     scoreBreakdownCappedHarmful: 'इस प्रोडक्ट में एक हानिकारक सामग्री होने के कारण, {rawScore} का असली स्कोर घटाकर {finalScore} कर दिया गया है — एक हानिकारक सामग्री को बाकी सब ठीक होने से छुपाना सही नहीं है।',
     scoreBreakdownCappedConcerning: 'इस प्रोडक्ट में एक चिंताजनक सामग्री होने के कारण, {rawScore} का असली स्कोर घटाकर {finalScore} कर दिया गया है, जिससे यह "चिंताजनक" से ऊपर रेट नहीं हो सकता।',
 
