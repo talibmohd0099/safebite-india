@@ -85,7 +85,7 @@ function ListCard({ title, dotColor, items }) {
 export default function Result() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [result, setResult] = useState(null);
   const [filter, setFilter] = useState('all');
   const [view, setView] = useState('overview');
@@ -222,6 +222,26 @@ export default function Result() {
   });
   const reportId = `SB-${(result.id || '').toString().slice(-8).toUpperCase()}`;
 
+  // AI-generated content only, never the product name/brand or ingredient
+  // names -- those aren't translated (see translateService.js). Falls
+  // back to English per-field whenever a Hindi version isn't there yet
+  // (an older cached report that hasn't been refreshed since translation
+  // was added, or a translation call that failed), so nothing goes blank.
+  const hi = language === 'hi' ? result.hi : null;
+  const displaySummary = hi?.summary || result.summary;
+  const displayRecommendation = hi?.recommendation || result.recommendation;
+  const displayUsefulContext = hi?.usefulContext || result.usefulContext;
+  const displayFlags = hi?.flags?.length === result.flags?.length ? hi.flags : result.flags;
+  const displayPositives = hi?.positives?.length === result.positives?.length ? hi.positives : result.positives;
+  const displayStory = result.story && {
+    ...result.story,
+    ...(hi?.story || {}),
+    mythVsFact:
+      hi?.story?.mythVsFact?.length === result.story.mythVsFact?.length
+        ? hi.story.mythVsFact
+        : result.story.mythVsFact,
+  };
+
   return (
     <div className="page-in max-w-[560px] mx-auto pb-24" style={{ background: 'var(--bg-grouped)' }}>
 
@@ -336,7 +356,7 @@ export default function Result() {
           specific purpose. Distinct green "good news" tone (not the
           same tint-blue as the seasoning note below) since this is a
           positive reframe of the score above, not a caveat on it. */}
-      {result.usefulContext && (
+      {displayUsefulContext && (
         <div className="mx-4 mt-3 rounded-[14px] px-4 py-3.5 flex gap-3 items-start" style={{ background: 'var(--v-good-bg)' }}>
           <span className="text-[18px] leading-none mt-0.5 flex-shrink-0">🎯</span>
           <div className="min-w-0">
@@ -344,7 +364,7 @@ export default function Result() {
               {t('usefulContextTitle')}
             </p>
             <p className="text-[13px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
-              {result.usefulContext}
+              {displayUsefulContext}
             </p>
           </div>
         </div>
@@ -398,7 +418,7 @@ export default function Result() {
       />
 
       {/* Summary */}
-      {view === 'overview' && result.summary && (
+      {view === 'overview' && displaySummary && (
         <>
           <SectionHeader>{t('sectionSummary')}</SectionHeader>
           <Group>
@@ -410,7 +430,7 @@ export default function Result() {
                 📄
               </span>
               <p className="text-[15px] leading-relaxed pt-1" style={{ color: 'var(--label-1)' }}>
-                {result.summary}
+                {displaySummary}
               </p>
             </div>
           </Group>
@@ -457,7 +477,7 @@ export default function Result() {
       )}
 
       {/* Recommendation */}
-      {view === 'overview' && result.recommendation && (
+      {view === 'overview' && displayRecommendation && (
         <>
           <SectionHeader>{t('sectionRecommendation')}</SectionHeader>
           <Group>
@@ -469,7 +489,7 @@ export default function Result() {
                 💡
               </span>
               <p className="text-[15px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
-                {result.recommendation}
+                {displayRecommendation}
               </p>
             </div>
           </Group>
@@ -483,10 +503,10 @@ export default function Result() {
           <SectionHeader>{t('sectionAtAGlance')}</SectionHeader>
           <div className={`grid gap-2.5 mx-4 ${result.flags?.length > 0 && result.positives?.length > 0 ? 'grid-cols-2' : 'grid-cols-1'}`}>
             {result.flags?.length > 0 && (
-              <ListCard title={t('watchOutFor')} dotColor="var(--v-poor)" items={result.flags} />
+              <ListCard title={t('watchOutFor')} dotColor="var(--v-poor)" items={displayFlags} />
             )}
             {result.positives?.length > 0 && (
-              <ListCard title={t('goodThings')} dotColor="var(--v-good)" items={result.positives} />
+              <ListCard title={t('goodThings')} dotColor="var(--v-good)" items={displayPositives} />
             )}
           </div>
         </>
@@ -589,17 +609,17 @@ export default function Result() {
           things to say (see geminiService.js's "story" rules) -- never
           fabricated filler for an unfamiliar generic product, which is
           also why the tab itself only appears when this exists. */}
-      {view === 'story' && result.story && (
+      {view === 'story' && displayStory && (
         <>
-          {result.story.headline && (
+          {displayStory.headline && (
             <div className="mx-4 mt-4 rounded-[16px] px-5 py-4" style={{ background: 'var(--tint-bg)' }}>
               <p className="text-[17px] font-bold leading-snug" style={{ color: 'var(--label-1)' }}>
-                {result.story.headline}
+                {displayStory.headline}
               </p>
             </div>
           )}
 
-          {result.story.history && (
+          {displayStory.history && (
             <>
               <SectionHeader>{t('storyHistory')}</SectionHeader>
               <Group>
@@ -611,14 +631,14 @@ export default function Result() {
                     📜
                   </span>
                   <p className="text-[15px] leading-relaxed pt-1" style={{ color: 'var(--label-1)' }}>
-                    {result.story.history}
+                    {displayStory.history}
                   </p>
                 </div>
               </Group>
             </>
           )}
 
-          {result.story.whyItsUsed && (
+          {displayStory.whyItsUsed && (
             <>
               <SectionHeader>{t('storyWhyUsed')}</SectionHeader>
               <Group>
@@ -630,14 +650,14 @@ export default function Result() {
                     ⚙️
                   </span>
                   <p className="text-[15px] leading-relaxed pt-1" style={{ color: 'var(--label-1)' }}>
-                    {result.story.whyItsUsed}
+                    {displayStory.whyItsUsed}
                   </p>
                 </div>
               </Group>
             </>
           )}
 
-          {result.story.controversy && (
+          {displayStory.controversy && (
             <>
               <SectionHeader>{t('storyControversy')}</SectionHeader>
               <Group>
@@ -649,18 +669,18 @@ export default function Result() {
                     ⚠️
                   </span>
                   <p className="text-[15px] leading-relaxed pt-1" style={{ color: 'var(--label-1)' }}>
-                    {result.story.controversy}
+                    {displayStory.controversy}
                   </p>
                 </div>
               </Group>
             </>
           )}
 
-          {result.story.mythVsFact?.length > 0 && (
+          {displayStory.mythVsFact?.length > 0 && (
             <>
               <SectionHeader>{t('storyMythVsFact')}</SectionHeader>
               <div className="mx-4 space-y-2.5">
-                {result.story.mythVsFact.map((pair, i) => (
+                {displayStory.mythVsFact.map((pair, i) => (
                   <div key={i} className="rounded-[14px] p-3.5" style={{ background: 'var(--bg-card)' }}>
                     <div className="flex gap-2.5 items-start mb-2.5">
                       <span

@@ -9,6 +9,7 @@ import { parseLabel, isBracketBalanced } from './ingredientParser.js';
 import { resolveIngredients } from './ingredientLibrary.js';
 import { buildReport } from './scoringEngine.js';
 import { generateProductInsights, repairLabelPunctuation } from './geminiService.js';
+import { translateReportToHindi } from './translateService.js';
 import { applyOffPercentEstimates } from './openFoodFacts.js';
 import { estimateQuantities } from './quantityEstimator.js';
 
@@ -109,6 +110,12 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
     if (insights?.isCondimentOrSeasoning) report.isCondimentOrSeasoning = true;
     if (insights?.usefulContext) report.usefulContext = insights.usefulContext;
     if (insights?.story) report.story = insights.story;
+
+    // Hindi translation of everything above -- a completely separate
+    // service/quota from Gemini, so it's safe to always attempt (falls
+    // back to English on any failure, never blocks the report).
+    const hi = await translateReportToHindi(report);
+    if (hi) report.hi = hi;
   }
 
   return {
