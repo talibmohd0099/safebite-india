@@ -5,7 +5,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseIngredients } from './ingredientParser.js';
+import { parseIngredients, parseLabel } from './ingredientParser.js';
 
 function byName(ingredients, name) {
   return ingredients.find((i) => i.displayName === name);
@@ -109,4 +109,47 @@ test('does not regress a single aliased ingredient', () => {
   const result = parseIngredients(label);
   assert.equal(result.length, 1);
   assert.equal(result[0].displayName, 'Refined Wheat Flour Maida');
+});
+
+test('does not lose a bracketed group whose closing sentence period sits before the closing brace', () => {
+  // Regression test for a real seeded product (Maggi 2-minute noodles,
+  // scored a false 98/100): "Noodles {..., Humectant (451(i)).} Masala
+  // {...}." puts the full stop INSIDE the group, right before its own
+  // closing brace. splitTopLevel used to force a flush on every period
+  // regardless of bracket depth (a rescue for genuinely unbalanced OCR'd
+  // text) -- here it split the group in half at that period, leaving
+  // every real ingredient trapped in one over-long blob that later fails
+  // the "looks like one ingredient name" check and gets silently
+  // dropped, so only the allergen sentence after it got parsed as
+  // "ingredients" at all.
+  const label =
+    'Noodles {Refined wheat flour (Maida), Palm oil, Wheat gluten, ' +
+    'Humectant (451(i)).} Masala {Sugar, Flavour enhancer (635), ' +
+    'Colour (150d) and Wheat gluten.} Contains Wheat and nut.';
+
+  const result = parseIngredients(label);
+
+  for (const name of ['Palm Oil', 'Flavour Enhancer (INS 635)', 'Colour (INS 150d)']) {
+    assert.ok(byName(result, name), `${name} should be extracted, not swallowed by the period-before-brace`);
+  }
+});
+
+test('extracts a "Contains" allergen declaration separately even with markdown emphasis underscores', () => {
+  // Same real product: its allergen line came through as "Contains
+  // _Wheat_ and _nut_. May contains _Milk_, _Mustard_, _Oats_ and
+  // _Soy_." -- the underscores (leaked from some earlier AI step) meant
+  // "_wheat_" never matched the plain word "wheat" in ALLERGEN_WORDS, so
+  // the whole clause fell through to be parsed as six fake ingredients
+  // ("Contains _wheat_", "_nut_", ...) instead of being recognized and
+  // removed as allergen text.
+  const label =
+    'Noodles {Wheat flour, Palm oil.} Contains _Wheat_ and _nut_. ' +
+    'May contains _Milk_, _Mustard_, _Oats_ and _Soy_.';
+
+  const { ingredients, allergens } = parseLabel(label);
+
+  assert.deepEqual([...allergens].sort(), ['milk', 'mustard', 'nut', 'oats', 'soy', 'wheat']);
+  for (const fake of ['Contains _wheat_', '_nut_', 'May Contains _milk_', '_mustard_', '_oats_', '_soy_']) {
+    assert.ok(!byName(ingredients, fake), `"${fake}" must not appear as a fake ingredient`);
+  }
 });

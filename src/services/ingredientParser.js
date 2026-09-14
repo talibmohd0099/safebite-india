@@ -82,7 +82,7 @@ const FOOTNOTE_MARKERS = /[#*†‡^]/g;
 // the ingredients list — they're useful information, but they are not
 // separate ingredients and must not be double-counted.
 const ALLERGEN_WORDS = [
-  'wheat', 'milk', 'soya', 'soy', 'peanut', 'peanuts', 'nuts', 'tree nuts',
+  'wheat', 'milk', 'soya', 'soy', 'peanut', 'peanuts', 'nut', 'nuts', 'tree nuts',
   'egg', 'eggs', 'fish', 'shellfish', 'crustacean', 'gluten', 'sesame',
   'mustard', 'celery', 'sulphite', 'sulphites', 'sulfite', 'sulfites',
   'lupin', 'molluscs', 'cashew', 'almond', 'almonds',
@@ -126,6 +126,21 @@ export function splitTopLevel(text) {
   let depth = 0;
   let current = '';
 
+  // The mid-bracket period rescue below is only worth its cost when this
+  // text's brackets are genuinely unbalanced overall (common in OCR'd
+  // text) -- otherwise it does more harm than good. A real Maggi label
+  // reads "Noodles {Wheat flour, Palm oil, ... Humectant (451(i)).}
+  // Masala {...}." -- the sentence's full stop sits INSIDE the group,
+  // right before its closing brace. Forcing a flush there (unconditionally,
+  // as this used to) splits that whole group in half at the period: every
+  // real ingredient ends up trapped in one over-long blob that later fails
+  // the "does this look like one ingredient name" check and gets silently
+  // dropped, leaving only whatever came after (here, the allergen
+  // sentence) to be read as the entire ingredients list. Confirmed against
+  // a real seeded product that scored 98/100 on exactly this bug -- its
+  // six "ingredients" were literally "Contains _Wheat_", "_nut_", etc.
+  const balanced = isBracketBalanced(text);
+
   const flush = () => {
     if (current.trim()) parts.push(current.trim());
     current = '';
@@ -138,12 +153,9 @@ export function splitTopLevel(text) {
     else if (CLOSERS.includes(ch)) depth = Math.max(0, depth - 1);
 
     // A period ends a sentence — but not inside a decimal like "0.03%".
-    // This check runs even at depth > 0: a missing or extra bracket
-    // somewhere earlier in the label (common in OCR'd text) can leave
-    // depth permanently stuck above 0, and without this, that one typo
-    // would swallow everything for the rest of the label into one
-    // unsplittable blob instead of just the one malformed group.
-    if (ch === '.') {
+    // Only forced through at depth > 0 when the text is unbalanced --
+    // see the comment above.
+    if (ch === '.' && (depth === 0 || !balanced)) {
       const prev = text[i - 1];
       const next = text[i + 1];
       const insideNumber = /\d/.test(prev || '') && /\d/.test(next || '');
@@ -390,11 +402,28 @@ function extractAllergens(text) {
 }
 
 /**
+ * Strips markdown emphasis underscores that occasionally leak into AI-
+ * generated/repaired label text unstripped -- e.g. a real seeded label
+ * came through as "Contains _Wheat_ and _nut_. May contains _Milk_,
+ * _Mustard_, ...". Underscores otherwise have no legitimate use in a
+ * food label, unlike "*", which is a real footnote marker elsewhere on
+ * Indian labels (see FOOTNOTE_MARKERS) and is deliberately left alone
+ * here. Run before allergen extraction specifically because
+ * extractAllergens matches against a plain-word list (ALLERGEN_WORDS)
+ * -- "_wheat_" doesn't match "wheat", so the whole "Contains ..." clause
+ * was silently falling through to be parsed as ordinary ingredients
+ * instead of being recognized and removed as an allergen declaration.
+ */
+function stripMarkdownEmphasis(text) {
+  return text.replace(/_([^_\n]+)_/g, '$1');
+}
+
+/**
  * Parse a label into both its ingredients and its declared allergens.
  */
 export function parseLabel(labelText) {
   if (!labelText || !labelText.trim()) return { ingredients: [], allergens: [] };
-  const { remaining, allergens } = extractAllergens(labelText);
+  const { remaining, allergens } = extractAllergens(stripMarkdownEmphasis(labelText));
   return { ingredients: parseIngredients(remaining), allergens };
 }
 
@@ -499,34 +528,50 @@ export function parseIngredients(labelText) {
     // single-entry parsing, mangling the whole clause into one unnamed
     // blob, and silently dropping it as "not a real ingredient name".
     const topBrackets = findAllTopLevelBrackets(cleaned);
-    const compound = topBrackets.find((b) => b.inner.includes(','));
-    if (compound) {
-      // A sibling bracket that states nothing but a percentage -- e.g.
-      // that trailing "(63%)" -- is this whole group's share of the
-      // product, not any one child's. Split it evenly across the
-      // children instead of discarding it, but let a child that states
-      // its own percentage keep that instead. When more than one
-      // percentage-only bracket exists in the entry (an outer wrapper's
-      // plus this group's own), take the one closest to this compound
-      // bracket rather than whichever appears first in the string.
-      const pctCandidates = topBrackets.filter((b) => b !== compound && isPurePercentageBracket(b.inner));
-      const pctBracket = pctCandidates.length > 0
-        ? pctCandidates.reduce((closest, b) =>
-            bracketGap(compound, b) < bracketGap(compound, closest) ? b : closest)
-        : null;
-      const subEntries = splitTopLevel(compound.inner);
-      const perMemberPercentage =
-        pctBracket && subEntries.length > 0
-          ? parseFloat(pctBracket.inner) / subEntries.length
+    // More than one of these can appear in a single entry -- e.g. two
+    // section groups glued together with no delimiter splitTopLevel
+    // would catch between them ("Noodles {...} Masala {...}."). Taking
+    // only the first (as this used to) silently dropped every group
+    // after it -- found via a real seeded product, though there the
+    // real two groups happened to have a newline between them so they
+    // were already separate entries; this loop is what protects a label
+    // that DOESN'T have that separator too.
+    const compounds = topBrackets.filter((b) => b.inner.includes(','));
+    if (compounds.length > 0) {
+      for (const compound of compounds) {
+        // A sibling bracket that states nothing but a percentage -- e.g.
+        // that trailing "(63%)" -- is this whole group's share of the
+        // product, not any one child's. Split it evenly across the
+        // children instead of discarding it, but let a child that states
+        // its own percentage keep that instead. When more than one
+        // percentage-only bracket exists in the entry (an outer wrapper's
+        // plus this group's own), take the one closest to this compound
+        // bracket rather than whichever appears first in the string.
+        const pctCandidates = topBrackets.filter((b) => b !== compound && isPurePercentageBracket(b.inner));
+        const pctBracket = pctCandidates.length > 0
+          ? pctCandidates.reduce((closest, b) =>
+              bracketGap(compound, b) < bracketGap(compound, closest) ? b : closest)
           : null;
+        const subEntries = splitTopLevel(compound.inner);
+        const perMemberPercentage =
+          pctBracket && subEntries.length > 0
+            ? parseFloat(pctBracket.inner) / subEntries.length
+            : null;
 
-      // The outermost bracket defines the slot -- a nested group inside
-      // it ("(Dehydrated Vegetables (Onion, Carrot))") is still part of
-      // that same one declared component, so children inherit rather
-      // than starting a new group of their own.
-      const childGroup = groupId || newGroupId();
-      for (const subEntry of subEntries) {
-        processEntry(subEntry, childGroup, perMemberPercentage);
+        // The outermost bracket defines the slot -- a nested group inside
+        // it ("(Dehydrated Vegetables (Onion, Carrot))") is still part of
+        // that same one declared component, so children inherit rather
+        // than starting a new group of their own. Computed fresh per
+        // compound (not once outside the loop) so two independent
+        // sibling groups ("Noodles"'s and "Masala"'s) each get their own
+        // group instead of being merged into one shared quantity slot --
+        // only actually matters when groupId itself is null here; when
+        // it's already inherited from a real outer parent, every
+        // sibling correctly reuses that same one.
+        const childGroup = groupId || newGroupId();
+        for (const subEntry of subEntries) {
+          processEntry(subEntry, childGroup, perMemberPercentage);
+        }
       }
       return;
     }
