@@ -4,6 +4,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getHistoryById, updateHistoryProductName, refreshHistoryEntry, saveToHistory, getScoreColor, getIngredientSeverity } from '../utils/storage';
 import { updateProductName, getCachedReport, getSaferAlternatives, deleteReport, saveReport } from '../services/productCache';
 import { analyzeText } from '../services/analyzeText';
+import { lookupBarcode } from '../services/openFoodFacts';
 import { getRelatedNews } from '../services/newsRepo';
 import { useLanguage } from '../contexts/LanguageContext';
 import ScoreCircle from '../components/ScoreCircle';
@@ -189,7 +190,20 @@ export default function Result() {
     setRefreshing(true);
     setRefreshError('');
     try {
-      const analysis = await analyzeText(result.ingredientsText, result.productName, result.brand, null, result.imageUrl);
+      // The cached report never stored the original nutrition-panel
+      // numbers (they weren't collected before dailyHabitCheck.js
+      // existed, and still aren't for text/photo-sourced scans) -- a
+      // barcode-sourced product can re-fetch them fresh from Open Food
+      // Facts here so refreshing an old scan can pick up a "daily habit"
+      // section it never had, not just a rescored ingredient list.
+      let nutrientsInfo = null;
+      if (result.lookupKey?.startsWith('barcode:')) {
+        const barcode = result.lookupKey.slice('barcode:'.length);
+        const found = await lookupBarcode(barcode).catch(() => null);
+        nutrientsInfo = found?.nutrientsInfo || null;
+      }
+
+      const analysis = await analyzeText(result.ingredientsText, result.productName, result.brand, null, result.imageUrl, nutrientsInfo);
       const fresh = analysis.report;
       fresh.ingredientsText = result.ingredientsText;
       fresh.lookupKey = result.lookupKey;
