@@ -129,8 +129,6 @@ export function buildScoreBreakdown(ingredients, finalScore) {
       reason: i.reason || null,
       healthEffects: i.healthEffects || null,
       category: i.category || null,
-      status: i.status || null,
-      penalty: i.penalty || 0,
       exact: (i.penalty || 0) * quantityWeight(i),
     }))
     .filter((c) => c.exact > 0)
@@ -145,18 +143,22 @@ export function buildScoreBreakdown(ingredients, finalScore) {
       .map((c) => c.idx)
   );
 
-  // reason/healthEffects/category/status -- the ingredient's own
+  // reason/healthEffects/category -- the ingredient's own
   // already-researched data (same fields IngredientCard shows), so
   // showing more detail per row costs nothing extra: no new AI call,
-  // just data already on hand.
+  // just data already on hand. Deliberately NOT status/severity --
+  // every row here already costs real points by construction, so it's
+  // coloured by how big that deduction is (see deductionSeverity in
+  // Result.jsx), not by the ingredient's overall safety tier, which
+  // could otherwise show a "safe"-status ingredient in the same green
+  // used everywhere else for "no concern at all" right next to its own
+  // negative point count.
   const items = contributions
     .map((c) => ({
       name: c.name,
       reason: c.reason,
       healthEffects: c.healthEffects,
       category: c.category,
-      status: c.status,
-      penalty: c.penalty,
       points: c.floor + (bumpIdx.has(c.idx) ? 1 : 0),
     }))
     .filter((item) => item.points > 0)

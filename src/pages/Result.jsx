@@ -32,6 +32,21 @@ const HABIT_NUTRIENT_LABEL_KEY = {
   transFatG: 'nutrientTransFatG',
 };
 
+// Colours a score-breakdown row by how big ITS deduction is relative to
+// the largest one in the list -- not by the ingredient's overall safety
+// status (getIngredientSeverity). Every row in this list already costs
+// real points by construction (buildScoreBreakdown filters out anything
+// with 0), so a "safe"-status ingredient that still lost a few points
+// (e.g. wheat gluten, edible starch) would otherwise render in the same
+// green used everywhere else in the app for "no concern at all" --
+// directly contradicting the negative number sitting right next to it.
+function deductionSeverity(points, maxPoints) {
+  const ratio = maxPoints > 0 ? points / maxPoints : 0;
+  if (ratio >= 0.66) return { color: 'var(--v-very-poor)', bg: 'var(--v-very-poor-bg)' };
+  if (ratio >= 0.33) return { color: 'var(--v-poor)', bg: 'var(--v-poor-bg)' };
+  return { color: 'var(--v-moderate)', bg: 'var(--v-moderate-bg)' };
+}
+
 function SectionHeader({ children, action }) {
   return (
     <div className="flex items-end justify-between px-5 pb-1.5 pt-7">
@@ -997,7 +1012,7 @@ export default function Result() {
               <div className="space-y-2 mb-3">
                 {visibleItems.map((item, i) => {
                   const expanded = expandedBreakdownRows.has(i);
-                  const severity = getIngredientSeverity(item);
+                  const severity = deductionSeverity(item.points, maxPoints);
                   const hasDetail = Boolean(item.reason || item.healthEffects);
                   return (
                     <div key={i} className="rounded-[14px] p-3" style={{ background: 'var(--fill)' }}>
