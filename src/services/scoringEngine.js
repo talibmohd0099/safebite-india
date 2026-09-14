@@ -123,7 +123,16 @@ export function buildScoreBreakdown(ingredients, finalScore) {
   const targetPoints = 100 - rawScore; // what the displayed items must sum to, exactly
 
   const contributions = ingredients
-    .map((i, idx) => ({ idx, name: i.name, reason: i.reason || null, exact: (i.penalty || 0) * quantityWeight(i) }))
+    .map((i, idx) => ({
+      idx,
+      name: i.name,
+      reason: i.reason || null,
+      healthEffects: i.healthEffects || null,
+      category: i.category || null,
+      status: i.status || null,
+      penalty: i.penalty || 0,
+      exact: (i.penalty || 0) * quantityWeight(i),
+    }))
     .filter((c) => c.exact > 0)
     .map((c) => ({ ...c, floor: Math.floor(c.exact), frac: c.exact - Math.floor(c.exact) }));
 
@@ -136,11 +145,20 @@ export function buildScoreBreakdown(ingredients, finalScore) {
       .map((c) => c.idx)
   );
 
-  // reason -- the ingredient's own already-researched one-line "why"
-  // (same text IngredientCard shows), so tapping a row for more detail
-  // costs nothing extra: no new AI call, just data already on hand.
+  // reason/healthEffects/category/status -- the ingredient's own
+  // already-researched data (same fields IngredientCard shows), so
+  // showing more detail per row costs nothing extra: no new AI call,
+  // just data already on hand.
   const items = contributions
-    .map((c) => ({ name: c.name, reason: c.reason, points: c.floor + (bumpIdx.has(c.idx) ? 1 : 0) }))
+    .map((c) => ({
+      name: c.name,
+      reason: c.reason,
+      healthEffects: c.healthEffects,
+      category: c.category,
+      status: c.status,
+      penalty: c.penalty,
+      points: c.floor + (bumpIdx.has(c.idx) ? 1 : 0),
+    }))
     .filter((item) => item.points > 0)
     .sort((a, b) => b.points - a.points);
 

@@ -3,33 +3,7 @@
 // one-line reason, expanding in place to the full detail.
 import { useState } from 'react';
 import { getIngredientSeverity } from '../utils/storage';
-
-// Deliberately generic for anything not clearly one of these -- guessing
-// a specific food icon for an ambiguous "other" category would be more
-// misleading than a neutral placeholder.
-const CATEGORY_ICONS = {
-  natural: '🌿',
-  protein: '🥩',
-  spice: '🌶️',
-  'flavour enhancer': '👅',
-  flavour: '👃',
-  flavor: '👃',
-  'acidity regulator': '⚗️',
-  sweetener: '🍬',
-  oil: '🫗',
-  fat: '🧈',
-  preservative: '🧪',
-  antioxidant: '🛡️',
-  emulsifier: '🧴',
-  color: '🎨',
-  colorant: '🎨',
-  'raising agent': '🫧',
-  stabilizer: '🧷',
-};
-
-function categoryIcon(category) {
-  return CATEGORY_ICONS[(category || '').toLowerCase()] || '🔹';
-}
+import { categoryIcon } from '../utils/categoryIcon';
 
 // Open Food Facts' percent estimates arrive unrounded -- a real one seen
 // in production was "0.0000461935997009277% of product", which is noise
