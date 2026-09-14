@@ -78,14 +78,14 @@ function quantityWeight(ingredient) {
   return TRACE_CATEGORIES.has((ingredient.category || '').toLowerCase()) ? 0.5 : 1;
 }
 
+function totalPenaltyOf(ingredients) {
+  return ingredients.reduce((sum, ing) => sum + (ing.penalty || 0) * quantityWeight(ing), 0);
+}
+
 function computeScore(ingredients) {
   if (ingredients.length === 0) return 100;
 
-  const totalPenalty = ingredients.reduce(
-    (sum, ing) => sum + (ing.penalty || 0) * quantityWeight(ing),
-    0
-  );
-  let score = Math.max(0, Math.min(100, Math.round(100 - totalPenalty)));
+  let score = Math.max(0, Math.min(100, Math.round(100 - totalPenaltyOf(ingredients))));
 
   if (ingredients.some((i) => i.status === 'harmful')) {
     score = squeezeToCap(score, HARMFUL_SCORE_CAP, HARMFUL_SCORE_FLOOR);
@@ -94,6 +94,63 @@ function computeScore(ingredients) {
   }
 
   return score;
+}
+
+// A truthful "why did this score X" breakdown -- there is no "Processing"
+// or "Sodium" bucket anywhere in this formula (sodium/sugar aren't
+// scoring inputs at all, see dailyHabitCheck.js for that, entirely
+// separate), so the only honest breakdown is by the ingredient that
+// actually cost the points. Shares totalPenaltyOf/the same rounding
+// order with computeScore above so `rawScore` here is guaranteed to
+// match its pre-cap intermediate exactly, not just approximately --
+// otherwise a ±1 rounding drift between the two could make `wasCapped`
+// fire (or miss) right at a cap boundary.
+//
+// Rounding each ingredient's contribution independently (Math.round on
+// each, then summing) does NOT reliably reproduce the real total -- with
+// enough ingredients each rounding up "a little", the visible line items
+// can add up to several points more or less than the actual score change
+// (found on a real seeded product: 14 ingredients individually rounded
+// summed to 42, implying a raw score of 58, while the real rounded-once
+// score was 61 -- a 3-point gap a user doing the math themselves would
+// have caught immediately). Largest-remainder rounding fixes this: floor
+// every contribution, then hand out the few leftover whole points to
+// whichever ingredients had the largest fractional part, so the
+// displayed items always sum to exactly the shown score change.
+function buildScoreBreakdown(ingredients, finalScore) {
+  const totalPenalty = totalPenaltyOf(ingredients);
+  const rawScore = Math.max(0, Math.min(100, Math.round(100 - totalPenalty)));
+  const targetPoints = 100 - rawScore; // what the displayed items must sum to, exactly
+
+  const contributions = ingredients
+    .map((i, idx) => ({ idx, name: i.name, exact: (i.penalty || 0) * quantityWeight(i) }))
+    .filter((c) => c.exact > 0)
+    .map((c) => ({ ...c, floor: Math.floor(c.exact), frac: c.exact - Math.floor(c.exact) }));
+
+  const flooredTotal = contributions.reduce((sum, c) => sum + c.floor, 0);
+  const leftoverPoints = targetPoints - flooredTotal; // always >= 0 (floor(x) <= x for every term)
+  const bumpIdx = new Set(
+    [...contributions]
+      .sort((a, b) => b.frac - a.frac)
+      .slice(0, leftoverPoints)
+      .map((c) => c.idx)
+  );
+
+  const items = contributions
+    .map((c) => ({ name: c.name, points: c.floor + (bumpIdx.has(c.idx) ? 1 : 0) }))
+    .filter((item) => item.points > 0)
+    .sort((a, b) => b.points - a.points);
+
+  const hasHarmful = ingredients.some((i) => i.status === 'harmful');
+  const wasCapped = rawScore !== finalScore;
+
+  return {
+    items,
+    rawScore,
+    finalScore,
+    wasCapped,
+    capReason: wasCapped ? (hasHarmful ? 'harmful' : 'concerning') : null,
+  };
 }
 
 // The fallback recommendations, used when the AI-written per-product one
@@ -174,6 +231,7 @@ export function buildReport(ingredients, { productName, brand, imageUrl } = {}) 
     positives,
     recommendation: recommendationFor(score),
     hasEstimatedQuantities,
+    scoreBreakdown: buildScoreBreakdown(ingredients, score),
   };
 }
 

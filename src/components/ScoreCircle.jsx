@@ -40,8 +40,8 @@ export default function ScoreCircle({ score, size = 'large', showLabel = false }
   }, [clamped]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const liveColors = getScoreColor(liveValue);
-  const svgSize = size === 'large' ? 112 : 64;
-  const strokeWidth = size === 'large' ? 9 : 6;
+  const svgSize = size === 'xl' ? 144 : size === 'large' ? 112 : 64;
+  const strokeWidth = size === 'xl' ? 11 : size === 'large' ? 9 : 6;
   const radius = svgSize / 2 - strokeWidth;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (liveValue / 100) * circumference;
@@ -73,12 +73,12 @@ export default function ScoreCircle({ score, size = 'large', showLabel = false }
 
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span
-            className={`${size === 'large' ? 'text-4xl' : 'text-xl'} font-bold leading-none tracking-tight tabular-nums`}
+            className={`${size === 'xl' ? 'text-5xl' : size === 'large' ? 'text-4xl' : 'text-xl'} font-bold leading-none tracking-tight tabular-nums`}
             style={{ color: liveColors.color }}
           >
             {Math.round(liveValue)}
           </span>
-          {size === 'large' && (
+          {(size === 'large' || size === 'xl') && (
             <span className="text-xs mt-1" style={{ color: 'var(--label-2)' }}>
               out of 100
             </span>

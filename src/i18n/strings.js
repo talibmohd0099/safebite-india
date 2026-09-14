@@ -27,6 +27,21 @@ export const STRINGS = {
     refreshAnalysis: 'Refresh analysis',
     refreshing: 'Refreshing…',
 
+    whyScoreLink: 'Why {score}?',
+    scoreBreakdownTitle: 'Why did this score {score}?',
+    scoreBreakdownIntro: "Every ingredient pulls the score down by a different amount, based on how concerning it is and how much of the product it makes up. Here's exactly where the points went.",
+    scoreBreakdownBase: 'Starting point',
+    scoreBreakdownFinal: 'Final score',
+    scoreBreakdownCappedHarmful: "Because this product contains a harmful ingredient, the raw score of {rawScore} was capped down to {finalScore} — one harmful ingredient shouldn't be diluted by everything else being fine.",
+    scoreBreakdownCappedConcerning: "Because this product contains a concerning ingredient, the raw score of {rawScore} was capped down to {finalScore}, so this can't rate higher than \"Moderate\" overall.",
+
+    readMore: 'Read more',
+    readLess: 'Show less',
+
+    quickHealthCheck: 'Quick health check',
+    habitBarCaption: '{percent}% of your daily {nutrient} limit, in {servingText}.',
+    habitSeeMore: 'See what daily eating adds up to',
+
     noIngredientsAnalyzed: 'No ingredients analyzed',
     nothingFlagged: 'Nothing flagged across {count} ingredients',
     someFlagged: '{flagged} of {total} ingredients raise a flag',
@@ -43,7 +58,6 @@ export const STRINGS = {
 
     sectionSummary: 'Summary',
     sectionBreakdown: 'Breakdown',
-    sectionRecommendation: 'Our recommendation',
     sectionAtAGlance: 'At a glance',
     sectionRelatedReading: 'Related reading',
 
@@ -72,11 +86,10 @@ export const STRINGS = {
 
     crossChecked: 'Cross-checked against FSSAI and EU/EFSA standards · AI-analyzed',
     disclaimer: 'SafeBite is an informational tool, not medical advice. Always consult a healthcare professional for dietary guidance.',
-    scanAnother: 'Scan another product',
+    scanAnother: 'Scan another food',
 
     // "If this became a daily habit" -- a rule-based projection against
     // WHO's published daily limits (dailyHabitCheck.js), never AI text.
-    habitTeaser: "{percent}% of your day's {nutrient} limit in {servingText} — tap to see what daily eating adds up to.",
     habitTitle: '🕐 If this became a daily habit...',
     habitIntro: "Not a one-off snack question — this is what adds up if it becomes part of your regular routine.",
     habitMathHeader: 'The math',
@@ -128,6 +141,21 @@ export const STRINGS = {
     refreshAnalysis: 'फिर से जांचें',
     refreshing: 'जांच रहे हैं…',
 
+    whyScoreLink: '{score} ही क्यों?',
+    scoreBreakdownTitle: 'यह स्कोर {score} ही क्यों है?',
+    scoreBreakdownIntro: 'हर सामग्री स्कोर को अलग-अलग मात्रा में घटाती है — यह इस पर निर्भर करता है कि वह कितनी चिंताजनक है और प्रोडक्ट में कितनी मात्रा में है। नीचे देखें पॉइंट्स कहां-कहां कटे।',
+    scoreBreakdownBase: 'शुरुआती स्कोर',
+    scoreBreakdownFinal: 'फाइनल स्कोर',
+    scoreBreakdownCappedHarmful: 'इस प्रोडक्ट में एक हानिकारक सामग्री होने के कारण, {rawScore} का असली स्कोर घटाकर {finalScore} कर दिया गया है — एक हानिकारक सामग्री को बाकी सब ठीक होने से छुपाना सही नहीं है।',
+    scoreBreakdownCappedConcerning: 'इस प्रोडक्ट में एक चिंताजनक सामग्री होने के कारण, {rawScore} का असली स्कोर घटाकर {finalScore} कर दिया गया है, जिससे यह "चिंताजनक" से ऊपर रेट नहीं हो सकता।',
+
+    readMore: 'और पढ़ें',
+    readLess: 'कम दिखाएं',
+
+    quickHealthCheck: 'जल्दी हेल्थ चेक',
+    habitBarCaption: '{servingText} में आपकी दिन की {nutrient} लिमिट का {percent}%।',
+    habitSeeMore: 'रोज़ खाने पर क्या होता है, यह देखें',
+
     noIngredientsAnalyzed: 'कोई सामग्री जांची नहीं गई',
     nothingFlagged: '{count} सामग्रियों में कुछ भी चिंताजनक नहीं मिला',
     someFlagged: '{total} में से {flagged} सामग्रियां चिंता की बात हैं',
@@ -144,7 +172,6 @@ export const STRINGS = {
 
     sectionSummary: 'सारांश',
     sectionBreakdown: 'विवरण',
-    sectionRecommendation: 'हमारी सलाह',
     sectionAtAGlance: 'एक नज़र में',
     sectionRelatedReading: 'इससे जुड़ी खबरें',
 
@@ -173,9 +200,8 @@ export const STRINGS = {
 
     crossChecked: 'FSSAI और EU/EFSA स्टैंडर्ड से जांचा गया · AI से विश्लेषित',
     disclaimer: 'SafeBite एक जानकारी देने वाला टूल है, मेडिकल सलाह नहीं। खानपान से जुड़ी सलाह के लिए हमेशा किसी हेल्थकेयर प्रोफेशनल से सलाह लें।',
-    scanAnother: 'एक और प्रोडक्ट स्कैन करें',
+    scanAnother: 'एक और चीज़ स्कैन करें',
 
-    habitTeaser: '{servingText} में आपकी दिन की {nutrient} लिमिट का {percent}% — रोज़ खाने पर क्या होता है, यह देखने के लिए टैप करें।',
     habitTitle: '🕐 अगर यह रोज़ की आदत बन जाए...',
     habitIntro: 'यह सिर्फ एक बार खाने का सवाल नहीं — अगर यह आपकी रोज़ की आदत बन जाए तो असर ऐसा दिखेगा।',
     habitMathHeader: 'गणित समझें',

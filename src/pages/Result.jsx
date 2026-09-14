@@ -112,6 +112,8 @@ export default function Result() {
   const [alternatives, setAlternatives] = useState([]);
   const [relatedNews, setRelatedNews] = useState([]);
   const [showHabitModal, setShowHabitModal] = useState(false);
+  const [showScoreModal, setShowScoreModal] = useState(false);
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState('');
 
@@ -310,7 +312,9 @@ export default function Result() {
       <div className="px-5 pt-1 pb-5">
         {result.imageUrl && (
           <div className="flex justify-center mb-4">
-            <ProductImage src={result.imageUrl} size={152} />
+            <div className="rounded-[20px] p-3" style={{ background: 'var(--bg-card)', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+              <ProductImage src={result.imageUrl} size={132} />
+            </div>
           </div>
         )}
         <div className="min-w-0">
@@ -366,37 +370,64 @@ export default function Result() {
         </div>
       </div>
 
-      {/* Score hero */}
-      <div className="mx-4 rounded-[20px] p-5 flex items-center gap-5" style={{ background: 'var(--bg-card)' }}>
-        <ScoreCircle score={score} size="large" />
-        <div className="min-w-0">
-          <p className="text-[24px] font-bold tracking-tight leading-tight" style={{ color: scoreColors.color }}>
-            {result.verdict || scoreColors.label}
-          </p>
-          <p className="text-[15px] mt-0.5" style={{ color: 'var(--label-2)' }}>
-            {ingredients.length === 0
-              ? t('noIngredientsAnalyzed')
-              : flaggedCount === 0
-                ? t('nothingFlagged', { count: ingredients.length })
-                : t('someFlagged', { flagged: flaggedCount, total: ingredients.length })}
-          </p>
-          <Link to="/about#how-score-works" className="inline-block text-[15px] mt-2" style={{ color: 'var(--tint)' }}>
-            {t('howCalculated')}
-          </Link>
-          {result.ingredientsText && (
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="tap-scale block text-[15px] mt-1.5"
-              style={{ color: 'var(--tint)', opacity: refreshing ? 0.6 : 1 }}
-            >
-              {refreshing ? t('refreshing') : t('refreshAnalysis')}
-            </button>
-          )}
-          {refreshError && (
-            <p className="text-[13px] mt-1" style={{ color: 'var(--v-poor)' }}>{refreshError}</p>
-          )}
+      {/* Score hero -- the single most important thing on this page, so
+          it gets the biggest visual weight: an enlarged score circle, the
+          plain-English recommendation right underneath it (moved up from
+          its own separate section further down the page -- no need to
+          scroll to find out "should I eat this?"), and a link into the
+          real, ingredient-by-ingredient reason for this exact number. */}
+      <div className="mx-4 rounded-[20px] p-5" style={{ background: 'var(--bg-card)' }}>
+        <div className="flex items-center gap-5">
+          <ScoreCircle score={score} size="xl" />
+          <div className="min-w-0">
+            <p className="text-[24px] font-bold tracking-tight leading-tight" style={{ color: scoreColors.color }}>
+              {result.verdict || scoreColors.label}
+            </p>
+            <p className="text-[15px] mt-0.5" style={{ color: 'var(--label-2)' }}>
+              {ingredients.length === 0
+                ? t('noIngredientsAnalyzed')
+                : flaggedCount === 0
+                  ? t('nothingFlagged', { count: ingredients.length })
+                  : t('someFlagged', { flagged: flaggedCount, total: ingredients.length })}
+            </p>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+              {ingredients.length > 0 && (
+                <button
+                  onClick={() => setShowScoreModal(true)}
+                  className="tap-scale text-[15px] font-semibold"
+                  style={{ color: 'var(--tint)' }}
+                >
+                  {t('whyScoreLink', { score })}
+                </button>
+              )}
+              <Link to="/about#how-score-works" className="text-[13px]" style={{ color: 'var(--label-3)' }}>
+                {t('howCalculated')}
+              </Link>
+            </div>
+            {result.ingredientsText && (
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="tap-scale block text-[13px] mt-1.5"
+                style={{ color: 'var(--label-3)', opacity: refreshing ? 0.6 : 1 }}
+              >
+                {refreshing ? t('refreshing') : t('refreshAnalysis')}
+              </button>
+            )}
+            {refreshError && (
+              <p className="text-[13px] mt-1" style={{ color: 'var(--v-poor)' }}>{refreshError}</p>
+            )}
+          </div>
         </div>
+
+        {displayRecommendation && (
+          <div className="flex gap-2.5 items-start mt-4 pt-4" style={{ borderTop: '1px solid var(--separator)' }}>
+            <span className="text-[16px] leading-none mt-0.5 flex-shrink-0">💡</span>
+            <p className="text-[14px] leading-relaxed font-medium" style={{ color: 'var(--label-1)' }}>
+              {displayRecommendation}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* A plain ingredient score can't say WHY a product exists -- an
@@ -439,43 +470,6 @@ export default function Result() {
         </div>
       )}
 
-      {/* Compact, attention-grabbing teaser near the score -- tapping
-          it opens the full math + short/medium/long-term breakdown in a
-          modal (see the createPortal block below), rather than pushing
-          the score/verdict down the page with the full card inline. */}
-      {habitDisplay && (
-        <button
-          onClick={() => setShowHabitModal(true)}
-          className="tap-scale mx-4 mt-3 rounded-[14px] px-4 py-3 flex items-center gap-3 text-left"
-          style={{ background: 'var(--v-poor-bg)', width: 'calc(100% - 2rem)' }}
-        >
-          <span className="text-[18px] leading-none flex-shrink-0">⚠️</span>
-          <span className="flex-1 min-w-0 text-[13px] leading-snug font-semibold" style={{ color: 'var(--v-poor)' }}>
-            {t('habitTeaser', { percent: habitDisplay.percent, nutrient: habitDisplay.nutrientLabel, servingText: habitDisplay.servingText })}
-          </span>
-          <svg viewBox="0 0 8 13" fill="none" className="w-2 h-3 flex-shrink-0" style={{ color: 'var(--v-poor)' }}>
-            <path d="M1.5 1.5L6.5 6.5l-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-      )}
-
-      {/* Safer alternatives -- only for a genuinely low score, and only
-          when the catalog actually has a better-scoring product in the
-          same category to suggest. No AI call: same category-keyword
-          match Category.jsx browses by, filtered to a "Good"-or-better
-          score, so every suggestion here is a real, already-verified
-          product rather than something a model guessed at. */}
-      {alternatives.length > 0 && (
-        <>
-          <SectionHeader>{t('saferAlternatives')}</SectionHeader>
-          <div className="flex gap-3 overflow-x-auto px-4 pb-1" style={{ scrollbarWidth: 'none' }}>
-            {alternatives.map((item) => (
-              <ProductStripCard key={item.lookupKey} item={item} onClick={() => openAlternative(item)} />
-            ))}
-          </div>
-        </>
-      )}
-
       <SegmentedControl
         value={view}
         onChange={setView}
@@ -498,9 +492,23 @@ export default function Result() {
               >
                 📄
               </span>
-              <p className="text-[15px] leading-relaxed pt-1" style={{ color: 'var(--label-1)' }}>
-                {displaySummary}
-              </p>
+              <div className="min-w-0 pt-1">
+                <p
+                  className={`text-[15px] leading-relaxed ${!summaryExpanded && displaySummary.length > 100 ? 'line-clamp-2' : ''}`}
+                  style={{ color: 'var(--label-1)' }}
+                >
+                  {displaySummary}
+                </p>
+                {displaySummary.length > 100 && (
+                  <button
+                    onClick={() => setSummaryExpanded((v) => !v)}
+                    className="tap-scale text-[13px] font-semibold mt-1"
+                    style={{ color: 'var(--tint)' }}
+                  >
+                    {summaryExpanded ? t('readLess') : t('readMore')}
+                  </button>
+                )}
+              </div>
             </div>
           </Group>
         </>
@@ -545,26 +553,6 @@ export default function Result() {
         </>
       )}
 
-      {/* Recommendation */}
-      {view === 'overview' && displayRecommendation && (
-        <>
-          <SectionHeader>{t('sectionRecommendation')}</SectionHeader>
-          <Group>
-            <div className="flex gap-3 items-center px-4 py-3.5">
-              <span
-                className="w-9 h-9 rounded-[10px] flex-shrink-0 flex items-center justify-center text-[16px]"
-                style={{ background: 'var(--v-good-bg)' }}
-              >
-                💡
-              </span>
-              <p className="text-[15px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
-                {displayRecommendation}
-              </p>
-            </div>
-          </Group>
-        </>
-      )}
-
       {/* Flags + Positives — side by side when both exist, so "at a
           glance" actually reads as one glance rather than two scrolls */}
       {view === 'overview' && (result.flags?.length > 0 || result.positives?.length > 0) && (
@@ -577,6 +565,68 @@ export default function Result() {
             {result.positives?.length > 0 && (
               <ListCard title={t('goodThings')} dotColor="var(--v-good)" items={displayPositives} />
             )}
+          </div>
+        </>
+      )}
+
+      {/* Quick health check -- a de-emphasized, lower-down progress bar
+          (moved down from a near-score attention-grabbing teaser on
+          purpose) since the score/verdict above should stay the clear
+          priority on this page. Tapping "See what daily eating adds up
+          to" opens the same full math + short/medium/long-term modal as
+          before -- only the entry point moved, not the content. */}
+      {view === 'overview' && habitDisplay && (
+        <>
+          <SectionHeader>⚡ {t('quickHealthCheck')}</SectionHeader>
+          <Group>
+            <div className="px-4 py-3.5">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[14px] font-semibold capitalize" style={{ color: 'var(--label-1)' }}>
+                  {habitDisplay.nutrientLabel}
+                </span>
+                <span className="text-[14px] font-bold" style={{ color: habitDisplay.percent >= 50 ? 'var(--v-poor)' : 'var(--v-moderate)' }}>
+                  {habitDisplay.percent}%
+                </span>
+              </div>
+              <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--fill)' }}>
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${Math.min(100, habitDisplay.percent)}%`,
+                    background: habitDisplay.percent >= 50 ? 'var(--v-poor)' : 'var(--v-moderate)',
+                  }}
+                />
+              </div>
+              <p className="text-[13px] leading-relaxed mt-2" style={{ color: 'var(--label-2)' }}>
+                {t('habitBarCaption', { percent: habitDisplay.percent, nutrient: habitDisplay.nutrientLabel, servingText: habitDisplay.servingText })}
+              </p>
+              <button
+                onClick={() => setShowHabitModal(true)}
+                className="tap-scale text-[13px] font-semibold mt-2"
+                style={{ color: 'var(--tint)' }}
+              >
+                {t('habitSeeMore')} →
+              </button>
+            </div>
+          </Group>
+        </>
+      )}
+
+      {/* Safer alternatives -- moved below the point where the user has
+          already seen why this product scored what it did (was right
+          under the score before), only for a genuinely low score, and
+          only when the catalog actually has a better-scoring product in
+          the same category to suggest. No AI call: same category-keyword
+          match Category.jsx browses by, filtered to a "Good"-or-better
+          score, so every suggestion here is a real, already-verified
+          product rather than something a model guessed at. */}
+      {view === 'overview' && alternatives.length > 0 && (
+        <>
+          <SectionHeader>{t('saferAlternatives')}</SectionHeader>
+          <div className="flex gap-3 overflow-x-auto px-4 pb-1" style={{ scrollbarWidth: 'none' }}>
+            {alternatives.map((item) => (
+              <ProductStripCard key={item.lookupKey} item={item} onClick={() => openAlternative(item)} />
+            ))}
           </div>
         </>
       )}
@@ -806,10 +856,88 @@ export default function Result() {
         </button>
       </div>
 
+      {/* Real, ingredient-by-ingredient reason for this exact score --
+          opened by "Why {score}?" in the score hero, above. No invented
+          categories (no "Processing", no "Sodium" bucket) -- this
+          formula only ever subtracts by ingredient, so that's the only
+          honest way to explain it. When a harmful/concerning ingredient
+          forced a cap (see scoringEngine.js's squeezeToCap), that's
+          shown as a plain adjustment note, not folded into a fake line
+          item that would make the numbers not add up. */}
+      {showScoreModal && result.scoreBreakdown && (() => {
+        const breakdown = result.scoreBreakdown;
+        return createPortal(
+          <div
+            className="fixed inset-0 z-[999] bg-black/50 flex items-end sm:items-center justify-center"
+            onClick={() => setShowScoreModal(false)}
+          >
+            <div
+              className="relative w-full sm:max-w-[480px] max-h-[85vh] overflow-y-auto rounded-t-[24px] sm:rounded-[20px] p-5"
+              style={{ background: 'var(--bg-card)' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setShowScoreModal(false)}
+                aria-label="Close"
+                className="tap-scale absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-[18px]"
+                style={{ background: 'var(--fill)', color: 'var(--label-2)' }}
+              >
+                ×
+              </button>
+
+              <p className="text-[17px] font-bold pr-8 mb-2" style={{ color: 'var(--label-1)' }}>
+                {t('scoreBreakdownTitle', { score })}
+              </p>
+              <p className="text-[13px] leading-relaxed mb-3" style={{ color: 'var(--label-2)' }}>
+                {t('scoreBreakdownIntro')}
+              </p>
+
+              <div className="rounded-[12px] overflow-hidden mb-3" style={{ background: 'var(--fill)' }}>
+                <div className="flex items-center justify-between px-3.5 py-2.5" style={{ borderBottom: '1px solid var(--separator)' }}>
+                  <span className="text-[14px] font-semibold" style={{ color: 'var(--label-1)' }}>{t('scoreBreakdownBase')}</span>
+                  <span className="text-[14px] font-bold tabular-nums" style={{ color: 'var(--label-1)' }}>100</span>
+                </div>
+                {breakdown.items.map((item, i) => (
+                  <div key={i} className="flex items-center justify-between px-3.5 py-2" style={{ borderBottom: '1px solid var(--separator)' }}>
+                    <span className="text-[14px]" style={{ color: 'var(--label-1)' }}>{item.name}</span>
+                    <span className="text-[14px] font-semibold tabular-nums" style={{ color: 'var(--v-poor)' }}>−{item.points}</span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between px-3.5 py-2.5">
+                  <span className="text-[14px] font-bold" style={{ color: 'var(--label-1)' }}>
+                    {breakdown.wasCapped ? t('scoreBreakdownBase') + ' → ' + breakdown.rawScore : t('scoreBreakdownFinal')}
+                  </span>
+                  <span className="text-[16px] font-bold tabular-nums" style={{ color: scoreColors.color }}>
+                    {breakdown.wasCapped ? breakdown.rawScore : breakdown.finalScore}
+                  </span>
+                </div>
+              </div>
+
+              {breakdown.wasCapped && (
+                <div className="rounded-[12px] px-3.5 py-3 mb-3" style={{ background: 'var(--v-poor-bg)' }}>
+                  <p className="text-[13px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
+                    {t(breakdown.capReason === 'harmful' ? 'scoreBreakdownCappedHarmful' : 'scoreBreakdownCappedConcerning', {
+                      rawScore: breakdown.rawScore,
+                      finalScore: breakdown.finalScore,
+                    })}
+                  </p>
+                  <div className="flex items-center justify-between mt-2 pt-2" style={{ borderTop: '1px solid rgba(0,0,0,0.08)' }}>
+                    <span className="text-[14px] font-bold" style={{ color: 'var(--label-1)' }}>{t('scoreBreakdownFinal')}</span>
+                    <span className="text-[16px] font-bold tabular-nums" style={{ color: scoreColors.color }}>{breakdown.finalScore}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>,
+          document.body
+        );
+      })()}
+
       {/* Full "if this became a daily habit" breakdown -- opened by the
-          compact teaser near the score, above. A modal rather than its
-          own route/URL: this is supplementary detail about the product
-          already on screen, not content that needs its own deep link. */}
+          "Quick health check" progress bar above, further down the
+          page. A modal rather than its own route/URL: this is
+          supplementary detail about the product already on screen, not
+          content that needs its own deep link. */}
       {showHabitModal && habitDisplay && createPortal(
         <div
           className="fixed inset-0 z-[999] bg-black/50 flex items-end sm:items-center justify-center"
