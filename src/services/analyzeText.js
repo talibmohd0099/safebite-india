@@ -108,6 +108,7 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
     if (insights?.recommendation) report.recommendation = insights.recommendation;
     if (insights?.isCondimentOrSeasoning) report.isCondimentOrSeasoning = true;
     if (insights?.usefulContext) report.usefulContext = insights.usefulContext;
+    if (insights?.story) report.story = insights.story;
   }
 
   return {

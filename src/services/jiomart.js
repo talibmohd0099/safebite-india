@@ -36,6 +36,8 @@
 // else this file does. Treat the first real run as reconnaissance, not
 // production seeding.
 
+import { GEMINI_API_KEYS, callGemini } from './geminiService.js';
+
 const SITEMAP_CANDIDATES = [
   'https://www.jiomart.com/sitemap.xml',
   'https://www.jiomart.com/sitemap_index.xml',
@@ -45,7 +47,6 @@ const SITEMAP_CANDIDATES = [
 // as blinkit.js: a cloud CI runner's IP range is what anti-scraping
 // systems flag hardest, and this is the one lever available against that.
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
-const GEMINI_MODEL = 'gemini-3.1-flash-lite';
 
 // Filled in from a real --list run plus manually checking what's actually
 // inside each candidate sitemap (fetched live, not guessed) -- unlike
@@ -259,8 +260,7 @@ Rules:
  * rather than infer anything.
  */
 export async function extractIngredientsWithAI(productName, text) {
-  const apiKey = process.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) return null;
+  if (GEMINI_API_KEYS.length === 0) return null;
 
   const shown = text.slice(0, 4000);
   if (!shown.trim()) return null;
@@ -276,18 +276,12 @@ export async function extractIngredientsWithAI(productName, text) {
   };
 
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-    );
-    if (!res.ok) return null;
+    const { text: reply, finishReason } = await callGemini(body);
+    if (finishReason !== 'STOP') return null;
 
-    const data = await res.json();
-    if (data.candidates?.[0]?.finishReason !== 'STOP') return null;
-
-    const text2 = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-    if (!text2 || /^NONE\b/i.test(text2) || text2.length < 12) return null;
-    return text2;
+    const trimmed = reply?.trim();
+    if (!trimmed || /^NONE\b/i.test(trimmed) || trimmed.length < 12) return null;
+    return trimmed;
   } catch {
     return null;
   }

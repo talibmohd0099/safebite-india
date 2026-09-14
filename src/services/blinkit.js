@@ -13,6 +13,7 @@
 // disallows /s/* (search); nothing here touches it.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { GEMINI_API_KEYS, callGemini } from './geminiService.js';
 
 const SITEMAP_INDEX = 'https://blinkit.com/sitemap.xml';
 // A real browser UA, not a self-identifying bot string. Manual testing
@@ -20,7 +21,6 @@ const SITEMAP_INDEX = 'https://blinkit.com/sitemap.xml';
 // IP range is the kind of traffic anti-scraping systems flag hardest —
 // this is the one lever available to try to get past that.
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
-const GEMINI_MODEL = 'gemini-3.1-flash-lite';
 
 // The groups worth scanning for a food-label app. The sitemap also
 // carries fashion, electronics and pet care, which have nothing to score.
@@ -145,8 +145,7 @@ Rules:
  * invented ingredient list is far worse here than no data.
  */
 export async function extractIngredientsWithAI(productName, attributes) {
-  const apiKey = process.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) return null;
+  if (GEMINI_API_KEYS.length === 0) return null;
 
   const shown = Object.entries(attributes)
     .filter(([name]) => !NOISE_ATTRIBUTES.test(name))
@@ -166,18 +165,12 @@ export async function extractIngredientsWithAI(productName, attributes) {
   };
 
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-    );
-    if (!res.ok) return null;
+    const { text, finishReason } = await callGemini(body);
+    if (finishReason !== 'STOP') return null;
 
-    const data = await res.json();
-    if (data.candidates?.[0]?.finishReason !== 'STOP') return null;
-
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-    if (!text || /^NONE\b/i.test(text) || text.length < 12) return null;
-    return text;
+    const trimmed = text?.trim();
+    if (!trimmed || /^NONE\b/i.test(trimmed) || trimmed.length < 12) return null;
+    return trimmed;
   } catch {
     return null;
   }

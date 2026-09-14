@@ -391,6 +391,7 @@ export default function Result() {
         options={[
           { value: 'overview', label: 'Overview' },
           { value: 'ingredients', label: `Ingredients (${ingredients.length})` },
+          ...(result.story ? [{ value: 'story', label: 'Story' }] : []),
         ]}
       />
 
@@ -573,6 +574,116 @@ export default function Result() {
               <p className="px-5 pt-2 text-[13px] leading-relaxed" style={{ color: 'var(--label-3)' }}>
                 Compare this against the list above — if something on your pack isn't here, it was missed while reading the label.
               </p>
+            </>
+          )}
+        </>
+      )}
+
+      {/* Story -- history/legacy, why it's used, controversy, myth vs
+          fact. Only ever rendered when the AI had genuine, specific
+          things to say (see geminiService.js's "story" rules) -- never
+          fabricated filler for an unfamiliar generic product, which is
+          also why the tab itself only appears when this exists. */}
+      {view === 'story' && result.story && (
+        <>
+          {result.story.headline && (
+            <div className="mx-4 mt-4 rounded-[16px] px-5 py-4" style={{ background: 'var(--tint-bg)' }}>
+              <p className="text-[17px] font-bold leading-snug" style={{ color: 'var(--label-1)' }}>
+                {result.story.headline}
+              </p>
+            </div>
+          )}
+
+          {result.story.history && (
+            <>
+              <SectionHeader>History &amp; legacy</SectionHeader>
+              <Group>
+                <div className="flex gap-3 items-start px-4 py-3.5">
+                  <span
+                    className="w-9 h-9 rounded-[10px] flex-shrink-0 flex items-center justify-center text-[16px]"
+                    style={{ background: 'var(--tint-bg)' }}
+                  >
+                    📜
+                  </span>
+                  <p className="text-[15px] leading-relaxed pt-1" style={{ color: 'var(--label-1)' }}>
+                    {result.story.history}
+                  </p>
+                </div>
+              </Group>
+            </>
+          )}
+
+          {result.story.whyItsUsed && (
+            <>
+              <SectionHeader>Why it's used</SectionHeader>
+              <Group>
+                <div className="flex gap-3 items-start px-4 py-3.5">
+                  <span
+                    className="w-9 h-9 rounded-[10px] flex-shrink-0 flex items-center justify-center text-[16px]"
+                    style={{ background: 'var(--v-good-bg)' }}
+                  >
+                    ⚙️
+                  </span>
+                  <p className="text-[15px] leading-relaxed pt-1" style={{ color: 'var(--label-1)' }}>
+                    {result.story.whyItsUsed}
+                  </p>
+                </div>
+              </Group>
+            </>
+          )}
+
+          {result.story.controversy && (
+            <>
+              <SectionHeader>Controversy</SectionHeader>
+              <Group>
+                <div className="flex gap-3 items-start px-4 py-3.5">
+                  <span
+                    className="w-9 h-9 rounded-[10px] flex-shrink-0 flex items-center justify-center text-[16px]"
+                    style={{ background: 'var(--v-poor-bg)' }}
+                  >
+                    ⚠️
+                  </span>
+                  <p className="text-[15px] leading-relaxed pt-1" style={{ color: 'var(--label-1)' }}>
+                    {result.story.controversy}
+                  </p>
+                </div>
+              </Group>
+            </>
+          )}
+
+          {result.story.mythVsFact?.length > 0 && (
+            <>
+              <SectionHeader>Myth vs fact</SectionHeader>
+              <div className="mx-4 space-y-2.5">
+                {result.story.mythVsFact.map((pair, i) => (
+                  <div key={i} className="rounded-[14px] p-3.5" style={{ background: 'var(--bg-card)' }}>
+                    <div className="flex gap-2.5 items-start mb-2.5">
+                      <span
+                        className="w-5 h-5 mt-0.5 rounded-full flex-shrink-0 flex items-center justify-center text-[11px] font-bold"
+                        style={{ background: 'var(--v-poor-bg)', color: 'var(--v-poor)' }}
+                      >
+                        ✗
+                      </span>
+                      <p className="text-[14px] leading-relaxed" style={{ color: 'var(--label-2)' }}>
+                        <span className="font-semibold" style={{ color: 'var(--label-1)' }}>Myth: </span>
+                        {pair.myth}
+                      </p>
+                    </div>
+                    <div className="flex gap-2.5 items-start">
+                      <span
+                        className="w-5 h-5 mt-0.5 rounded-full flex-shrink-0 flex items-center justify-center text-[11px] font-bold"
+                        style={{ background: 'var(--v-good-bg)', color: 'var(--v-good)' }}
+                      >
+                        ✓
+                      </span>
+                      <p className="text-[14px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
+                        <span className="font-semibold">Fact: </span>
+                        {pair.fact}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </>
           )}
         </>
