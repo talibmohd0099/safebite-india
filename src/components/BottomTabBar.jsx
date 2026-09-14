@@ -3,16 +3,18 @@
 // of buried in the top header -- the standard pattern for an app with
 // only a handful of top-level screens.
 import { Link, useLocation } from 'react-router-dom';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const TABS = [
-  { path: '/', label: 'Scan', icon: '🔍' },
-  { path: '/history', label: 'History', icon: '📋' },
-  { path: '/news', label: 'News', icon: '📰' },
-  { path: '/about', label: 'About', icon: '🛡️' },
+  { path: '/', key: 'navScan', icon: '🔍' },
+  { path: '/history', key: 'navHistory', icon: '📋' },
+  { path: '/news', key: 'navNews', icon: '📰' },
+  { path: '/about', key: 'navAbout', icon: '🛡️' },
 ];
 
 export default function BottomTabBar() {
   const location = useLocation();
+  const { t } = useLanguage();
 
   return (
     <nav
@@ -32,7 +34,7 @@ export default function BottomTabBar() {
                 {tab.icon}
               </span>
               <span className={`text-[11px] font-semibold ${active ? 'text-green-700 dark:text-green-400' : 'text-slate-400 dark:text-slate-500'}`}>
-                {tab.label}
+                {t(tab.key)}
               </span>
             </Link>
           );

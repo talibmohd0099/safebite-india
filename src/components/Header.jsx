@@ -4,6 +4,7 @@
 import { Link } from 'react-router-dom';
 import headerIcon from '../assets/header-icon.png';
 import { useTheme } from '../hooks/useTheme';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const THEME_SEQUENCE = { light: 'dark', dark: 'system', system: 'light' };
 const THEME_ICON = { light: '☀️', dark: '🌙', system: '🌓' };
@@ -23,6 +24,23 @@ function ThemeToggle() {
   );
 }
 
+// Shows the OTHER language's label -- tapping it switches you TO that
+// language, same convention as most Indian apps' language switchers.
+function LanguageToggle() {
+  const { language, setLanguage } = useLanguage();
+  const next = language === 'en' ? 'hi' : 'en';
+  return (
+    <button
+      onClick={() => setLanguage(next)}
+      aria-label={next === 'hi' ? 'हिंदी में बदलें' : 'Switch to English'}
+      title={next === 'hi' ? 'हिंदी में बदलें' : 'Switch to English'}
+      className="tap-scale w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
+    >
+      {next === 'hi' ? 'हिं' : 'EN'}
+    </button>
+  );
+}
+
 export default function Header() {
   return (
     <header className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 sticky top-0 z-40">
@@ -36,7 +54,10 @@ export default function Header() {
             <span className="text-[11px] font-bold text-green-600 dark:text-green-400 leading-none uppercase tracking-wide">India</span>
           </span>
         </Link>
-        <ThemeToggle />
+        <div className="flex items-center gap-2">
+          <LanguageToggle />
+          <ThemeToggle />
+        </div>
       </div>
     </header>
   );

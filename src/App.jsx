@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
+import { LanguageProvider } from './contexts/LanguageContext';
 import Header from './components/Header';
 import BottomTabBar from './components/BottomTabBar';
 import SplashScreen from './components/SplashScreen';
@@ -57,25 +58,27 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true);
 
   return (
-    <HashRouter>
-      <AndroidBackButton />
-      <div className="min-h-screen" style={{ background: 'var(--bg-grouped)' }}>
-        <Header />
-        <main>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/result/:id" element={<Result />} />
-            <Route path="/history" element={<History />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/browse" element={<Browse />} />
-            <Route path="/category/:id" element={<Category />} />
-            <Route path="/popular" element={<PopularSearches />} />
-            <Route path="/news" element={<News />} />
-          </Routes>
-        </main>
-        <BottomTabBar />
-      </div>
-      {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
-    </HashRouter>
+    <LanguageProvider>
+      <HashRouter>
+        <AndroidBackButton />
+        <div className="min-h-screen" style={{ background: 'var(--bg-grouped)' }}>
+          <Header />
+          <main>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/result/:id" element={<Result />} />
+              <Route path="/history" element={<History />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/browse" element={<Browse />} />
+              <Route path="/category/:id" element={<Category />} />
+              <Route path="/popular" element={<PopularSearches />} />
+              <Route path="/news" element={<News />} />
+            </Routes>
+          </main>
+          <BottomTabBar />
+        </div>
+        {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
+      </HashRouter>
+    </LanguageProvider>
   );
 }

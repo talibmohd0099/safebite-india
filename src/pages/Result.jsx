@@ -5,6 +5,7 @@ import { getHistoryById, updateHistoryProductName, refreshHistoryEntry, saveToHi
 import { updateProductName, getCachedReport, getSaferAlternatives, deleteReport, saveReport } from '../services/productCache';
 import { analyzeText } from '../services/analyzeText';
 import { getRelatedNews } from '../services/newsRepo';
+import { useLanguage } from '../contexts/LanguageContext';
 import ScoreCircle from '../components/ScoreCircle';
 import IngredientCard from '../components/IngredientCard';
 import ProductImage from '../components/ProductImage';
@@ -84,6 +85,7 @@ function ListCard({ title, dotColor, items }) {
 export default function Result() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [result, setResult] = useState(null);
   const [filter, setFilter] = useState('all');
   const [view, setView] = useState('overview');
@@ -206,11 +208,11 @@ export default function Result() {
   // counts can never disagree with the colours shown next to each row.
   const severityOf = (ing) => getIngredientSeverity(ing).label;
   const tiers = [
-    { key: 'Harmful', label: 'Harmful', color: 'var(--v-very-poor)', bg: 'var(--v-very-poor-bg)', icon: '⚠' },
-    { key: 'Concerning', label: 'Concerning', color: 'var(--v-poor)', bg: 'var(--v-poor-bg)', icon: '!' },
-    { key: 'Highly processed', label: 'Processed', color: 'var(--v-moderate)', bg: 'var(--v-moderate-bg)', icon: '−' },
-    { key: 'Fine', label: 'Fine', color: 'var(--v-good)', bg: 'var(--v-good-bg)', icon: '✓' },
-  ].map((t) => ({ ...t, count: ingredients.filter((i) => severityOf(i) === t.key).length }));
+    { key: 'Harmful', label: t('tierHarmful'), color: 'var(--v-very-poor)', bg: 'var(--v-very-poor-bg)', icon: '⚠' },
+    { key: 'Concerning', label: t('tierConcerning'), color: 'var(--v-poor)', bg: 'var(--v-poor-bg)', icon: '!' },
+    { key: 'Highly processed', label: t('tierProcessed'), color: 'var(--v-moderate)', bg: 'var(--v-moderate-bg)', icon: '−' },
+    { key: 'Fine', label: t('tierFine'), color: 'var(--v-good)', bg: 'var(--v-good-bg)', icon: '✓' },
+  ].map((tier) => ({ ...tier, count: ingredients.filter((i) => severityOf(i) === tier.key).length }));
 
   const flaggedCount = ingredients.filter((i) => ['Harmful', 'Concerning'].includes(severityOf(i))).length;
   const filteredIngredients = filter === 'all' ? ingredients : ingredients.filter((i) => severityOf(i) === filter);
@@ -232,7 +234,7 @@ export default function Result() {
         <svg viewBox="0 0 12 20" fill="none" className="w-3 h-5">
           <path d="M10 2L2 10l8 8" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        Scan
+        {t('backToScan')}
       </button>
 
       {/* Title */}
@@ -260,11 +262,11 @@ export default function Result() {
                   if (e.key === 'Enter') saveName();
                   if (e.key === 'Escape') setEditingName(false);
                 }}
-                placeholder="Enter product name"
+                placeholder={t('enterProductName')}
                 className="flex-1 min-w-0 text-[26px] font-bold tracking-tight bg-transparent border-b-2 focus:outline-none"
                 style={{ color: 'var(--label-1)', borderColor: 'var(--tint)' }}
               />
-              <button onClick={saveName} className="text-[17px]" style={{ color: 'var(--tint)' }} aria-label="Save name">Done</button>
+              <button onClick={saveName} className="text-[17px]" style={{ color: 'var(--tint)' }} aria-label="Save name">{t('done')}</button>
             </div>
           ) : (
             <h1 className="text-[26px] leading-[1.15] font-bold tracking-tight flex items-start gap-2 mb-2" style={{ color: 'var(--label-1)' }}>
@@ -275,21 +277,21 @@ export default function Result() {
                 style={{ color: 'var(--tint)' }}
                 aria-label="Edit product name"
               >
-                Edit
+                {t('edit')}
               </button>
             </h1>
           )}
 
           {result.productName === 'Unknown Product' && !editingName ? (
             <p className="text-[13px]" style={{ color: 'var(--v-poor)' }}>
-              We couldn't identify this product — tap Edit to name it yourself.
+              {t('unknownProductHint')}
             </p>
           ) : (
             <span
               className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
               style={{ background: 'var(--fill)', color: 'var(--label-2)' }}
             >
-              📦 Packaged Food
+              {t('packagedFood')}
             </span>
           )}
         </div>
@@ -304,13 +306,13 @@ export default function Result() {
           </p>
           <p className="text-[15px] mt-0.5" style={{ color: 'var(--label-2)' }}>
             {ingredients.length === 0
-              ? 'No ingredients analyzed'
+              ? t('noIngredientsAnalyzed')
               : flaggedCount === 0
-                ? `Nothing flagged across ${ingredients.length} ingredients`
-                : `${flaggedCount} of ${ingredients.length} ingredients raise a flag`}
+                ? t('nothingFlagged', { count: ingredients.length })
+                : t('someFlagged', { flagged: flaggedCount, total: ingredients.length })}
           </p>
           <Link to="/about#how-score-works" className="inline-block text-[15px] mt-2" style={{ color: 'var(--tint)' }}>
-            How is this calculated?
+            {t('howCalculated')}
           </Link>
           {result.ingredientsText && (
             <button
@@ -319,7 +321,7 @@ export default function Result() {
               className="tap-scale block text-[15px] mt-1.5"
               style={{ color: 'var(--tint)', opacity: refreshing ? 0.6 : 1 }}
             >
-              {refreshing ? 'Refreshing…' : 'Refresh analysis'}
+              {refreshing ? t('refreshing') : t('refreshAnalysis')}
             </button>
           )}
           {refreshError && (
@@ -339,7 +341,7 @@ export default function Result() {
           <span className="text-[18px] leading-none mt-0.5 flex-shrink-0">🎯</span>
           <div className="min-w-0">
             <p className="text-[13px] font-bold mb-0.5" style={{ color: 'var(--v-good)' }}>
-              When this is actually useful
+              {t('usefulContextTitle')}
             </p>
             <p className="text-[13px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
               {result.usefulContext}
@@ -355,7 +357,7 @@ export default function Result() {
         <div className="mx-4 mt-3 rounded-[14px] px-4 py-3 flex gap-3 items-start" style={{ background: 'var(--tint-bg)' }}>
           <span className="text-[16px] leading-none mt-0.5 flex-shrink-0">🥄</span>
           <p className="text-[13px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
-            Used in small amounts — this score reflects the seasoning itself, not the dish you add it to.
+            {t('seasoningNote')}
           </p>
         </div>
       )}
@@ -363,7 +365,7 @@ export default function Result() {
       {result.hasEstimatedQuantities && (
         <div className="mx-4 mt-3 rounded-[14px] px-4 py-3" style={{ background: 'var(--bg-card)' }}>
           <p className="text-[13px] leading-relaxed" style={{ color: 'var(--label-2)' }}>
-            This label doesn't state an exact percentage for every ingredient, so part of this score is a reasonable estimate rather than the product's exact measured composition.
+            {t('estimatedQtyNote')}
           </p>
         </div>
       )}
@@ -376,7 +378,7 @@ export default function Result() {
           product rather than something a model guessed at. */}
       {alternatives.length > 0 && (
         <>
-          <SectionHeader>Safer alternatives in this category</SectionHeader>
+          <SectionHeader>{t('saferAlternatives')}</SectionHeader>
           <div className="flex gap-3 overflow-x-auto px-4 pb-1" style={{ scrollbarWidth: 'none' }}>
             {alternatives.map((item) => (
               <ProductStripCard key={item.lookupKey} item={item} onClick={() => openAlternative(item)} />
@@ -389,16 +391,16 @@ export default function Result() {
         value={view}
         onChange={setView}
         options={[
-          { value: 'overview', label: 'Overview' },
-          { value: 'ingredients', label: `Ingredients (${ingredients.length})` },
-          ...(result.story ? [{ value: 'story', label: 'Story' }] : []),
+          { value: 'overview', label: t('tabOverview') },
+          { value: 'ingredients', label: t('tabIngredients', { count: ingredients.length }) },
+          ...(result.story ? [{ value: 'story', label: t('tabStory') }] : []),
         ]}
       />
 
       {/* Summary */}
       {view === 'overview' && result.summary && (
         <>
-          <SectionHeader>Summary</SectionHeader>
+          <SectionHeader>{t('sectionSummary')}</SectionHeader>
           <Group>
             <div className="flex gap-3 items-start px-4 py-3.5">
               <span
@@ -418,7 +420,7 @@ export default function Result() {
       {/* Breakdown — tapping a tile jumps to the Ingredients tab filtered to that category */}
       {view === 'overview' && ingredients.length > 0 && (
         <>
-          <SectionHeader>Breakdown</SectionHeader>
+          <SectionHeader>{t('sectionBreakdown')}</SectionHeader>
           <div className="mx-4 grid grid-cols-4 gap-2">
             {tiers.map((tier) => {
               const active = filter === tier.key;
@@ -457,7 +459,7 @@ export default function Result() {
       {/* Recommendation */}
       {view === 'overview' && result.recommendation && (
         <>
-          <SectionHeader>Our recommendation</SectionHeader>
+          <SectionHeader>{t('sectionRecommendation')}</SectionHeader>
           <Group>
             <div className="flex gap-3 items-center px-4 py-3.5">
               <span
@@ -478,13 +480,13 @@ export default function Result() {
           glance" actually reads as one glance rather than two scrolls */}
       {view === 'overview' && (result.flags?.length > 0 || result.positives?.length > 0) && (
         <>
-          <SectionHeader>At a glance</SectionHeader>
+          <SectionHeader>{t('sectionAtAGlance')}</SectionHeader>
           <div className={`grid gap-2.5 mx-4 ${result.flags?.length > 0 && result.positives?.length > 0 ? 'grid-cols-2' : 'grid-cols-1'}`}>
             {result.flags?.length > 0 && (
-              <ListCard title="Watch out for" dotColor="var(--v-poor)" items={result.flags} />
+              <ListCard title={t('watchOutFor')} dotColor="var(--v-poor)" items={result.flags} />
             )}
             {result.positives?.length > 0 && (
-              <ListCard title="Good things" dotColor="var(--v-good)" items={result.positives} />
+              <ListCard title={t('goodThings')} dotColor="var(--v-good)" items={result.positives} />
             )}
           </div>
         </>
@@ -496,7 +498,7 @@ export default function Result() {
           to read, not for every product. */}
       {view === 'overview' && relatedNews.length > 0 && (
         <>
-          <SectionHeader>Related reading</SectionHeader>
+          <SectionHeader>{t('sectionRelatedReading')}</SectionHeader>
           <div className="mx-4">
             {relatedNews.map((item) => (
               <NewsCard key={item.id} item={item} />
@@ -511,18 +513,21 @@ export default function Result() {
           <SectionHeader
             action={filter !== 'all' && (
               <button onClick={() => setFilter('all')} className="text-[13px]" style={{ color: 'var(--tint)' }}>
-                Show all
+                {t('showAll')}
               </button>
             )}
           >
             {filter === 'all'
-              ? `All ${ingredients.length} ingredients`
-              : `${filteredIngredients.length} ${filter.toLowerCase()}`}
+              ? t('allIngredientsCount', { count: ingredients.length })
+              : t('filteredCount', {
+                  count: filteredIngredients.length,
+                  label: (tiers.find((tier) => tier.key === filter)?.label || '').toLowerCase(),
+                })}
           </SectionHeader>
           {filteredIngredients.length === 0 ? (
             <Group>
               <p className="px-4 py-4 text-[15px] text-center" style={{ color: 'var(--label-2)' }}>
-                None in this category.
+                {t('noneInCategory')}
               </p>
             </Group>
           ) : filter === 'all' ? (
@@ -565,14 +570,14 @@ export default function Result() {
           {/* Raw label */}
           {result.ingredientsText && (
             <>
-              <SectionHeader>As read from the label</SectionHeader>
+              <SectionHeader>{t('asReadFromLabel')}</SectionHeader>
               <Group>
                 <p className="px-4 py-3.5 text-[13px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: 'var(--label-2)' }}>
                   {result.ingredientsText}
                 </p>
               </Group>
               <p className="px-5 pt-2 text-[13px] leading-relaxed" style={{ color: 'var(--label-3)' }}>
-                Compare this against the list above — if something on your pack isn't here, it was missed while reading the label.
+                {t('compareLabelNote')}
               </p>
             </>
           )}
@@ -596,7 +601,7 @@ export default function Result() {
 
           {result.story.history && (
             <>
-              <SectionHeader>History &amp; legacy</SectionHeader>
+              <SectionHeader>{t('storyHistory')}</SectionHeader>
               <Group>
                 <div className="flex gap-3 items-start px-4 py-3.5">
                   <span
@@ -615,7 +620,7 @@ export default function Result() {
 
           {result.story.whyItsUsed && (
             <>
-              <SectionHeader>Why it's used</SectionHeader>
+              <SectionHeader>{t('storyWhyUsed')}</SectionHeader>
               <Group>
                 <div className="flex gap-3 items-start px-4 py-3.5">
                   <span
@@ -634,7 +639,7 @@ export default function Result() {
 
           {result.story.controversy && (
             <>
-              <SectionHeader>Controversy</SectionHeader>
+              <SectionHeader>{t('storyControversy')}</SectionHeader>
               <Group>
                 <div className="flex gap-3 items-start px-4 py-3.5">
                   <span
@@ -653,7 +658,7 @@ export default function Result() {
 
           {result.story.mythVsFact?.length > 0 && (
             <>
-              <SectionHeader>Myth vs fact</SectionHeader>
+              <SectionHeader>{t('storyMythVsFact')}</SectionHeader>
               <div className="mx-4 space-y-2.5">
                 {result.story.mythVsFact.map((pair, i) => (
                   <div key={i} className="rounded-[14px] p-3.5" style={{ background: 'var(--bg-card)' }}>
@@ -665,7 +670,7 @@ export default function Result() {
                         ✗
                       </span>
                       <p className="text-[14px] leading-relaxed" style={{ color: 'var(--label-2)' }}>
-                        <span className="font-semibold" style={{ color: 'var(--label-1)' }}>Myth: </span>
+                        <span className="font-semibold" style={{ color: 'var(--label-1)' }}>{t('mythLabel')}</span>
                         {pair.myth}
                       </p>
                     </div>
@@ -677,7 +682,7 @@ export default function Result() {
                         ✓
                       </span>
                       <p className="text-[14px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
-                        <span className="font-semibold">Fact: </span>
+                        <span className="font-semibold">{t('factLabel')}</span>
                         {pair.fact}
                       </p>
                     </div>
@@ -692,10 +697,10 @@ export default function Result() {
       {/* Verification + disclaimer */}
       <div className="px-5 pt-8 text-center">
         <p className="text-[12px] leading-relaxed" style={{ color: 'var(--label-3)' }}>
-          Cross-checked against FSSAI and EU/EFSA standards · AI-analyzed
+          {t('crossChecked')}
         </p>
         <p className="text-[12px] leading-relaxed mt-2" style={{ color: 'var(--label-3)' }}>
-          SafeBite is an informational tool, not medical advice. Always consult a healthcare professional for dietary guidance.
+          {t('disclaimer')}
         </p>
         <p className="text-[12px] mt-2" style={{ color: 'var(--label-3)' }}>
           {reportId} · {savedDate}
@@ -708,7 +713,7 @@ export default function Result() {
           className="tap-scale w-full py-3.5 rounded-[14px] text-[17px] font-semibold text-white"
           style={{ background: 'var(--tint)' }}
         >
-          Scan another product
+          {t('scanAnother')}
         </button>
       </div>
     </div>
