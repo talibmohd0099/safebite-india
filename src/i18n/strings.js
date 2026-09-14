@@ -76,12 +76,13 @@ export const STRINGS = {
 
     // "If this became a daily habit" -- a rule-based projection against
     // WHO's published daily limits (dailyHabitCheck.js), never AI text.
+    habitTeaser: "{percent}% of your day's {nutrient} limit in {servingText} — tap to see what daily eating adds up to.",
     habitTitle: '🕐 If this became a daily habit...',
     habitIntro: "Not a one-off snack question — this is what adds up if it becomes part of your regular routine.",
     habitMathHeader: 'The math',
-    habitServingPack: 'A {grams}g pack',
+    habitServingPack: 'a {grams}g pack',
     habitServingPer100g: 'Every 100g',
-    habitMathLine1: '{servingText} has {amount}{unit} of {nutrient}.',
+    habitMathLine1: 'Based on {servingText}, this has {amount}{unit} of {nutrient}.',
     habitMathLine2: "WHO's recommended daily limit is {limit}{unit}.",
     habitMathLine3: "That's {percent}% of your entire day's limit, from this alone.",
     habitShortTermTitle: 'Short term (1–2 weeks)',
@@ -174,6 +175,7 @@ export const STRINGS = {
     disclaimer: 'SafeBite एक जानकारी देने वाला टूल है, मेडिकल सलाह नहीं। खानपान से जुड़ी सलाह के लिए हमेशा किसी हेल्थकेयर प्रोफेशनल से सलाह लें।',
     scanAnother: 'एक और प्रोडक्ट स्कैन करें',
 
+    habitTeaser: '{servingText} में आपकी दिन की {nutrient} लिमिट का {percent}% — रोज़ खाने पर क्या होता है, यह देखने के लिए टैप करें।',
     habitTitle: '🕐 अगर यह रोज़ की आदत बन जाए...',
     habitIntro: 'यह सिर्फ एक बार खाने का सवाल नहीं — अगर यह आपकी रोज़ की आदत बन जाए तो असर ऐसा दिखेगा।',
     habitMathHeader: 'गणित समझें',

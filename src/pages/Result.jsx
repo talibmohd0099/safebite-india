@@ -1,5 +1,6 @@
 // src/pages/Result.jsx
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getHistoryById, updateHistoryProductName, refreshHistoryEntry, saveToHistory, getScoreColor, getIngredientSeverity } from '../utils/storage';
 import { updateProductName, getCachedReport, getSaferAlternatives, deleteReport, saveReport } from '../services/productCache';
@@ -110,6 +111,7 @@ export default function Result() {
   const [nameInput, setNameInput] = useState('');
   const [alternatives, setAlternatives] = useState([]);
   const [relatedNews, setRelatedNews] = useState([]);
+  const [showHabitModal, setShowHabitModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState('');
 
@@ -272,6 +274,23 @@ export default function Result() {
         : result.story.mythVsFact,
   };
 
+  // Rule-based, not AI/translation content (see dailyHabitCheck.js) --
+  // resolved once here since it's used in both the compact teaser near
+  // the score and the full modal it opens.
+  const habitDisplay = result.dailyHabitCheck && (() => {
+    const habit = result.dailyHabitCheck;
+    const servingText = habit.servingGrams
+      ? t('habitServingPack', { grams: habit.servingGrams })
+      : t('habitServingPer100g');
+    return {
+      ...habit,
+      nutrientLabel: t(HABIT_NUTRIENT_LABEL_KEY[habit.nutrientKey]),
+      prefix: HABIT_KEY_PREFIX[habit.nutrientKey],
+      servingText,
+      displayAmount: habit.unit === 'mg' ? Math.round(habit.amount) : habit.amount,
+    };
+  })();
+
   return (
     <div className="page-in max-w-[560px] mx-auto pb-24" style={{ background: 'var(--bg-grouped)' }}>
 
@@ -420,6 +439,26 @@ export default function Result() {
         </div>
       )}
 
+      {/* Compact, attention-grabbing teaser near the score -- tapping
+          it opens the full math + short/medium/long-term breakdown in a
+          modal (see the createPortal block below), rather than pushing
+          the score/verdict down the page with the full card inline. */}
+      {habitDisplay && (
+        <button
+          onClick={() => setShowHabitModal(true)}
+          className="tap-scale mx-4 mt-3 rounded-[14px] px-4 py-3 flex items-center gap-3 text-left"
+          style={{ background: 'var(--v-poor-bg)', width: 'calc(100% - 2rem)' }}
+        >
+          <span className="text-[18px] leading-none flex-shrink-0">⚠️</span>
+          <span className="flex-1 min-w-0 text-[13px] leading-snug font-semibold" style={{ color: 'var(--v-poor)' }}>
+            {t('habitTeaser', { percent: habitDisplay.percent, nutrient: habitDisplay.nutrientLabel, servingText: habitDisplay.servingText })}
+          </span>
+          <svg viewBox="0 0 8 13" fill="none" className="w-2 h-3 flex-shrink-0" style={{ color: 'var(--v-poor)' }}>
+            <path d="M1.5 1.5L6.5 6.5l-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      )}
+
       {/* Safer alternatives -- only for a genuinely low score, and only
           when the catalog actually has a better-scoring product in the
           same category to suggest. No AI call: same category-keyword
@@ -541,70 +580,6 @@ export default function Result() {
           </div>
         </>
       )}
-
-      {/* "If this became a daily habit" -- a rule-based projection
-          against WHO's published daily limits (dailyHabitCheck.js), not
-          AI text and never an estimated number. Only present when we
-          have this exact product's real nutrition-panel data AND it
-          isn't a condiment/seasoning eaten a pinch at a time (see the
-          isCondimentOrSeasoning check at its call site in
-          analyzeText.js). */}
-      {view === 'overview' && result.dailyHabitCheck && (() => {
-        const habit = result.dailyHabitCheck;
-        const nutrientLabel = t(HABIT_NUTRIENT_LABEL_KEY[habit.nutrientKey]);
-        const prefix = HABIT_KEY_PREFIX[habit.nutrientKey];
-        const servingText = habit.servingGrams
-          ? t('habitServingPack', { grams: habit.servingGrams })
-          : t('habitServingPer100g');
-        const displayAmount = habit.unit === 'mg' ? Math.round(habit.amount) : habit.amount;
-
-        return (
-          <>
-            <SectionHeader>{t('habitTitle')}</SectionHeader>
-            <Group>
-              <div className="px-4 py-3.5 space-y-3.5">
-                <p className="text-[14px] leading-relaxed" style={{ color: 'var(--label-2)' }}>
-                  {t('habitIntro')}
-                </p>
-
-                <div className="rounded-[12px] p-3.5 space-y-1" style={{ background: 'var(--fill)' }}>
-                  <p className="text-[12px] font-semibold mb-1" style={{ color: 'var(--label-2)' }}>
-                    📊 {t('habitMathHeader')}
-                  </p>
-                  <p className="text-[14px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
-                    {t('habitMathLine1', { servingText, amount: displayAmount, unit: habit.unit, nutrient: nutrientLabel })}
-                  </p>
-                  <p className="text-[14px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
-                    {t('habitMathLine2', { limit: habit.limit, unit: habit.unit })}
-                  </p>
-                  <p className="text-[14px] font-semibold leading-relaxed pt-1" style={{ color: 'var(--v-poor)' }}>
-                    → {t('habitMathLine3', { percent: habit.percent })}
-                  </p>
-                </div>
-
-                {[
-                  { icon: '📅', titleKey: 'habitShortTermTitle', textKey: `${prefix}Short` },
-                  { icon: '📈', titleKey: 'habitMediumTermTitle', textKey: `${prefix}Medium` },
-                  { icon: '❤️', titleKey: 'habitLongTermTitle', textKey: `${prefix}Long` },
-                ].map(({ icon, titleKey, textKey }) => (
-                  <div key={titleKey}>
-                    <p className="text-[13px] font-semibold mb-0.5" style={{ color: 'var(--label-2)' }}>
-                      {icon} {t(titleKey)}
-                    </p>
-                    <p className="text-[14px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
-                      {t(textKey)}
-                    </p>
-                  </div>
-                ))}
-
-                <p className="text-[12px] leading-relaxed italic" style={{ color: 'var(--label-3)' }}>
-                  {t('habitDisclaimer')}
-                </p>
-              </div>
-            </Group>
-          </>
-        );
-      })()}
 
       {/* Related reading -- news/research whose title mentions this
           product's brand or one of its flagged ingredients specifically,
@@ -830,6 +805,81 @@ export default function Result() {
           {t('scanAnother')}
         </button>
       </div>
+
+      {/* Full "if this became a daily habit" breakdown -- opened by the
+          compact teaser near the score, above. A modal rather than its
+          own route/URL: this is supplementary detail about the product
+          already on screen, not content that needs its own deep link. */}
+      {showHabitModal && habitDisplay && createPortal(
+        <div
+          className="fixed inset-0 z-[999] bg-black/50 flex items-end sm:items-center justify-center"
+          onClick={() => setShowHabitModal(false)}
+        >
+          <div
+            className="relative w-full sm:max-w-[480px] max-h-[85vh] overflow-y-auto rounded-t-[24px] sm:rounded-[20px] p-5"
+            style={{ background: 'var(--bg-card)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowHabitModal(false)}
+              aria-label="Close"
+              className="tap-scale absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-[18px]"
+              style={{ background: 'var(--fill)', color: 'var(--label-2)' }}
+            >
+              ×
+            </button>
+
+            <p className="text-[17px] font-bold pr-8 mb-3" style={{ color: 'var(--label-1)' }}>
+              {t('habitTitle')}
+            </p>
+            <p className="text-[14px] leading-relaxed mb-3" style={{ color: 'var(--label-2)' }}>
+              {t('habitIntro')}
+            </p>
+
+            <div className="rounded-[12px] p-3.5 space-y-1 mb-3" style={{ background: 'var(--fill)' }}>
+              <p className="text-[12px] font-semibold mb-1" style={{ color: 'var(--label-2)' }}>
+                📊 {t('habitMathHeader')}
+              </p>
+              <p className="text-[14px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
+                {t('habitMathLine1', {
+                  servingText: habitDisplay.servingText,
+                  amount: habitDisplay.displayAmount,
+                  unit: habitDisplay.unit,
+                  nutrient: habitDisplay.nutrientLabel,
+                })}
+              </p>
+              <p className="text-[14px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
+                {t('habitMathLine2', { limit: habitDisplay.limit, unit: habitDisplay.unit })}
+              </p>
+              <p className="text-[14px] font-semibold leading-relaxed pt-1" style={{ color: 'var(--v-poor)' }}>
+                → {t('habitMathLine3', { percent: habitDisplay.percent })}
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                { icon: '📅', titleKey: 'habitShortTermTitle', textKey: `${habitDisplay.prefix}Short` },
+                { icon: '📈', titleKey: 'habitMediumTermTitle', textKey: `${habitDisplay.prefix}Medium` },
+                { icon: '❤️', titleKey: 'habitLongTermTitle', textKey: `${habitDisplay.prefix}Long` },
+              ].map(({ icon, titleKey, textKey }) => (
+                <div key={titleKey}>
+                  <p className="text-[13px] font-semibold mb-0.5" style={{ color: 'var(--label-2)' }}>
+                    {icon} {t(titleKey)}
+                  </p>
+                  <p className="text-[14px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
+                    {t(textKey)}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-[12px] leading-relaxed italic mt-3" style={{ color: 'var(--label-3)' }}>
+              {t('habitDisclaimer')}
+            </p>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
