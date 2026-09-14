@@ -12,6 +12,22 @@ import ProductImage from '../components/ProductImage';
 import ProductStripCard from '../components/ProductStripCard';
 import NewsCard from '../components/NewsCard';
 
+// Maps a dailyHabitCheck.js nutrientKey to the matching i18n string keys
+// (see src/i18n/strings.js) for its display name and its three
+// short/medium/long-term explanations.
+const HABIT_KEY_PREFIX = {
+  sodiumMg: 'habitSodium',
+  addedSugarG: 'habitAddedSugarG',
+  saturatedFatG: 'habitSaturatedFatG',
+  transFatG: 'habitTransFatG',
+};
+const HABIT_NUTRIENT_LABEL_KEY = {
+  sodiumMg: 'nutrientSodiumMg',
+  addedSugarG: 'nutrientAddedSugarG',
+  saturatedFatG: 'nutrientSaturatedFatG',
+  transFatG: 'nutrientTransFatG',
+};
+
 function SectionHeader({ children, action }) {
   return (
     <div className="flex items-end justify-between px-5 pb-1.5 pt-7">
@@ -511,6 +527,70 @@ export default function Result() {
           </div>
         </>
       )}
+
+      {/* "If this became a daily habit" -- a rule-based projection
+          against WHO's published daily limits (dailyHabitCheck.js), not
+          AI text and never an estimated number. Only present when we
+          have this exact product's real nutrition-panel data AND it
+          isn't a condiment/seasoning eaten a pinch at a time (see the
+          isCondimentOrSeasoning check at its call site in
+          analyzeText.js). */}
+      {view === 'overview' && result.dailyHabitCheck && (() => {
+        const habit = result.dailyHabitCheck;
+        const nutrientLabel = t(HABIT_NUTRIENT_LABEL_KEY[habit.nutrientKey]);
+        const prefix = HABIT_KEY_PREFIX[habit.nutrientKey];
+        const servingText = habit.servingGrams
+          ? t('habitServingPack', { grams: habit.servingGrams })
+          : t('habitServingPer100g');
+        const displayAmount = habit.unit === 'mg' ? Math.round(habit.amount) : habit.amount;
+
+        return (
+          <>
+            <SectionHeader>{t('habitTitle')}</SectionHeader>
+            <Group>
+              <div className="px-4 py-3.5 space-y-3.5">
+                <p className="text-[14px] leading-relaxed" style={{ color: 'var(--label-2)' }}>
+                  {t('habitIntro')}
+                </p>
+
+                <div className="rounded-[12px] p-3.5 space-y-1" style={{ background: 'var(--fill)' }}>
+                  <p className="text-[12px] font-semibold mb-1" style={{ color: 'var(--label-2)' }}>
+                    📊 {t('habitMathHeader')}
+                  </p>
+                  <p className="text-[14px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
+                    {t('habitMathLine1', { servingText, amount: displayAmount, unit: habit.unit, nutrient: nutrientLabel })}
+                  </p>
+                  <p className="text-[14px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
+                    {t('habitMathLine2', { limit: habit.limit, unit: habit.unit })}
+                  </p>
+                  <p className="text-[14px] font-semibold leading-relaxed pt-1" style={{ color: 'var(--v-poor)' }}>
+                    → {t('habitMathLine3', { percent: habit.percent })}
+                  </p>
+                </div>
+
+                {[
+                  { icon: '📅', titleKey: 'habitShortTermTitle', textKey: `${prefix}Short` },
+                  { icon: '📈', titleKey: 'habitMediumTermTitle', textKey: `${prefix}Medium` },
+                  { icon: '❤️', titleKey: 'habitLongTermTitle', textKey: `${prefix}Long` },
+                ].map(({ icon, titleKey, textKey }) => (
+                  <div key={titleKey}>
+                    <p className="text-[13px] font-semibold mb-0.5" style={{ color: 'var(--label-2)' }}>
+                      {icon} {t(titleKey)}
+                    </p>
+                    <p className="text-[14px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
+                      {t(textKey)}
+                    </p>
+                  </div>
+                ))}
+
+                <p className="text-[12px] leading-relaxed italic" style={{ color: 'var(--label-3)' }}>
+                  {t('habitDisclaimer')}
+                </p>
+              </div>
+            </Group>
+          </>
+        );
+      })()}
 
       {/* Related reading -- news/research whose title mentions this
           product's brand or one of its flagged ingredients specifically,

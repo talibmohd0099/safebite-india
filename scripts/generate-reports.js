@@ -29,7 +29,7 @@
 import { analyzeText } from '../src/services/analyzeText.js';
 import { saveReport } from '../src/services/productCache.js';
 import { getPendingProducts, markReportGenerated } from '../src/services/productsRepo.js';
-import { getPendingBlinkitProducts, markBlinkitReportGenerated, blinkitLookupKey } from '../src/services/blinkitProductsRepo.js';
+import { getPendingBlinkitProducts, markBlinkitReportGenerated, blinkitLookupKey, extractNutrientsForHabitCheck } from '../src/services/blinkitProductsRepo.js';
 import { isSupabaseConfigured } from '../src/services/supabaseClient.js';
 
 const GEMINI_PACING_MS = 1500; // proactive spacing, not just reacting to 429s
@@ -74,7 +74,8 @@ async function generateWithRetry(product) {
         product.product_name,
         product.brand,
         product.off_ingredients,
-        product.image_url
+        product.image_url,
+        product.nutrients_info
       );
       return { report, transient: false };
     } catch (err) {
@@ -112,6 +113,7 @@ function normalizeBlinkitProduct(row) {
     ingredients_text: row.ingredients_text,
     off_ingredients: null,
     image_url: row.image_url,
+    nutrients_info: extractNutrientsForHabitCheck(row.nutrition),
     markGenerated: () => markBlinkitReportGenerated(row.id),
   };
 }

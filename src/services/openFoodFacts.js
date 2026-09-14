@@ -45,6 +45,53 @@ function looksLikeValidIngredients(text) {
   return true;
 }
 
+function toNumber(value) {
+  const n = parseFloat(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Open Food Facts' serving_size is a free-text field a contributor typed
+// ("70 g", "1 pack (70g)", or just "70") -- pull the leading number.
+// This app only ever deals in solid packaged snacks (not drinks measured
+// in ml), so treating that number as grams is a safe assumption here.
+function parseServingGrams(servingSize, productQuantity) {
+  const fromServing = servingSize ? toNumber(String(servingSize).match(/[\d.]+/)?.[0]) : null;
+  if (fromServing) return fromServing;
+  return toNumber(productQuantity);
+}
+
+// Real, already-published nutrition-panel numbers for the "if this
+// became a daily habit" feature (dailyHabitCheck.js) -- never estimated,
+// so this returns null the moment the data genuinely isn't there rather
+// than guessing. OFF stores sodium/sugar/fat in GRAMS per 100g
+// regardless of what unit the contributor originally entered (confirmed
+// against a real product's live API response), so no unit-detection is
+// needed here, just a straight per-100g -> per-pack scale-up.
+function extractNutrientsForHabitCheck(product) {
+  const n = product?.nutriments;
+  if (!n) return null;
+
+  const packGrams = parseServingGrams(product.serving_size, product.product_quantity);
+  const scale = packGrams ? packGrams / 100 : 1;
+
+  const sodiumG = n.sodium_100g;
+  // WHO's sugar guidance is specifically about FREE/ADDED sugars, not
+  // sugars naturally present in whole foods -- prefer that field where
+  // OFF has it, and only fall back to total sugar when it doesn't.
+  const addedSugarG = typeof n['added-sugars_100g'] === 'number' ? n['added-sugars_100g'] : n.sugars_100g;
+  const saturatedFatG = n['saturated-fat_100g'];
+  const transFatG = n['trans-fat_100g'];
+
+  const nutrients = {};
+  if (typeof sodiumG === 'number') nutrients.sodiumMg = sodiumG * 1000 * scale;
+  if (typeof addedSugarG === 'number') nutrients.addedSugarG = addedSugarG * scale;
+  if (typeof saturatedFatG === 'number') nutrients.saturatedFatG = saturatedFatG * scale;
+  if (typeof transFatG === 'number') nutrients.transFatG = transFatG * scale;
+
+  if (Object.keys(nutrients).length === 0) return null;
+  return { nutrients, servingGrams: packGrams ? Math.round(packGrams) : null };
+}
+
 /**
  * Look up a product by barcode. Returns { found: false } if the
  * product isn't in the database (common for Indian regional/local
@@ -54,7 +101,7 @@ export async function lookupBarcode(barcode) {
   const cleaned = barcode.trim();
   if (!cleaned) return { found: false };
 
-  const url = `${BASE_URL}/${encodeURIComponent(cleaned)}.json?fields=product_name,ingredients_text,brands,ingredients,image_front_url`;
+  const url = `${BASE_URL}/${encodeURIComponent(cleaned)}.json?fields=product_name,ingredients_text,brands,ingredients,image_front_url,nutriments,serving_size,product_quantity`;
 
   let response;
   try {
@@ -107,6 +154,7 @@ export async function lookupBarcode(barcode) {
     imageUrl,
     ingredientsText: rawIngredients,
     offIngredients: data.product.ingredients || null,
+    nutrientsInfo: extractNutrientsForHabitCheck(data.product),
   };
 }
 

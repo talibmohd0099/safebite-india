@@ -188,8 +188,8 @@ export default function Home() {
     handleImageSelect(file);
   };
 
-  const startReview = ({ productName, brand, imageUrl, ingredientsText, notes, readable, source, lookupKey, offIngredients }) => {
-    setReview({ notes: notes || '', readable: readable !== false, source, lookupKey, brand: brand || null, imageUrl: imageUrl || null, offIngredients: offIngredients || null });
+  const startReview = ({ productName, brand, imageUrl, ingredientsText, notes, readable, source, lookupKey, offIngredients, nutrientsInfo }) => {
+    setReview({ notes: notes || '', readable: readable !== false, source, lookupKey, brand: brand || null, imageUrl: imageUrl || null, offIngredients: offIngredients || null, nutrientsInfo: nutrientsInfo || null });
     setReviewProductName(productName && productName !== 'Unknown Product' ? productName : '');
     setReviewText(ingredientsText || '');
   };
@@ -317,7 +317,7 @@ export default function Home() {
 
       if (!result) {
         setLoadingMessage('Looking up ingredients...');
-        const analysis = await analyzeText(reviewText.trim(), reviewProductName.trim(), review.brand, review.offIngredients, review.imageUrl);
+        const analysis = await analyzeText(reviewText.trim(), reviewProductName.trim(), review.brand, review.offIngredients, review.imageUrl, review.nutrientsInfo);
         result = analysis.report;
         result.ingredientsText = reviewText.trim();
 

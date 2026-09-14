@@ -12,6 +12,7 @@ import { generateProductInsights, repairLabelPunctuation } from './geminiService
 import { translateReportToHindi } from './translateService.js';
 import { applyOffPercentEstimates } from './openFoodFacts.js';
 import { estimateQuantities } from './quantityEstimator.js';
+import { buildDailyHabitCheck } from './dailyHabitCheck.js';
 
 /**
  * Analyze raw ingredients text end to end.
@@ -24,8 +25,16 @@ import { estimateQuantities } from './quantityEstimator.js';
  * as an ingredient lookup, not a product scan, and skip saving it to the
  * shared product cache (the ingredient itself is already cached in the
  * ingredients table, so caching it again as a "product" is redundant).
+ *
+ * nutrientsInfo (optional) -- real, already-known nutrition-panel
+ * numbers for this exact product ({ nutrients, servingLabel }, see
+ * openFoodFacts.js / blinkitProductsRepo.js), used only to power the
+ * "if this became a daily habit" projection. Never estimated -- when a
+ * caller has no real numbers for a product (e.g. pasted/photographed
+ * text with no nutrition panel), it's simply omitted and that section
+ * doesn't appear.
  */
-export async function analyzeText(rawText, productName, brand, offIngredients, imageUrl) {
+export async function analyzeText(rawText, productName, brand, offIngredients, imageUrl, nutrientsInfo) {
   // Only for parsing -- the caller keeps showing the user their real,
   // original scanned/typed text regardless of what happens here.
   let textToParse = rawText;
@@ -110,6 +119,15 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
     if (insights?.isCondimentOrSeasoning) report.isCondimentOrSeasoning = true;
     if (insights?.usefulContext) report.usefulContext = insights.usefulContext;
     if (insights?.story) report.story = insights.story;
+
+    // A masala scoring 95 isn't eaten by the spoonful -- the same reason
+    // isCondimentOrSeasoning already changes how the score itself reads
+    // means a "here's what a daily habit of this looks like" framing
+    // would be actively misleading for one, so it's skipped entirely.
+    if (nutrientsInfo && !report.isCondimentOrSeasoning) {
+      const habitCheck = buildDailyHabitCheck(nutrientsInfo.nutrients, nutrientsInfo.servingGrams);
+      if (habitCheck) report.dailyHabitCheck = habitCheck;
+    }
 
     // Hindi translation of everything above -- a completely separate
     // service/quota from Gemini, so it's safe to always attempt (falls
