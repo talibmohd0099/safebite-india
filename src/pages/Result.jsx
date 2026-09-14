@@ -7,6 +7,7 @@ import { updateProductName, getCachedReport, getSaferAlternatives, deleteReport,
 import { analyzeText } from '../services/analyzeText';
 import { lookupBarcode } from '../services/openFoodFacts';
 import { getRelatedNews } from '../services/newsRepo';
+import { buildScoreBreakdown } from '../services/scoringEngine';
 import { useLanguage } from '../contexts/LanguageContext';
 import ScoreCircle from '../components/ScoreCircle';
 import IngredientCard from '../components/IngredientCard';
@@ -292,6 +293,12 @@ export default function Result() {
       displayAmount: habit.unit === 'mg' ? Math.round(habit.amount) : habit.amount,
     };
   })();
+
+  // Pure ingredient math, no AI/network call -- computed on the fly for
+  // any report saved before this feature existed (result.scoreBreakdown
+  // missing) so "Why {score}?" works immediately on every already-cached
+  // product, not just ones that happen to get refreshed.
+  const scoreBreakdown = result.scoreBreakdown || (ingredients.length > 0 ? buildScoreBreakdown(ingredients, score) : null);
 
   return (
     <div className="page-in max-w-[560px] mx-auto pb-24" style={{ background: 'var(--bg-grouped)' }}>
@@ -864,8 +871,8 @@ export default function Result() {
           forced a cap (see scoringEngine.js's squeezeToCap), that's
           shown as a plain adjustment note, not folded into a fake line
           item that would make the numbers not add up. */}
-      {showScoreModal && result.scoreBreakdown && (() => {
-        const breakdown = result.scoreBreakdown;
+      {showScoreModal && scoreBreakdown && (() => {
+        const breakdown = scoreBreakdown;
         return createPortal(
           <div
             className="fixed inset-0 z-[999] bg-black/50 flex items-end sm:items-center justify-center"
@@ -905,7 +912,7 @@ export default function Result() {
                 ))}
                 <div className="flex items-center justify-between px-3.5 py-2.5">
                   <span className="text-[14px] font-bold" style={{ color: 'var(--label-1)' }}>
-                    {breakdown.wasCapped ? t('scoreBreakdownBase') + ' → ' + breakdown.rawScore : t('scoreBreakdownFinal')}
+                    {breakdown.wasCapped ? t('scoreBreakdownRawScore') : t('scoreBreakdownFinal')}
                   </span>
                   <span className="text-[16px] font-bold tabular-nums" style={{ color: scoreColors.color }}>
                     {breakdown.wasCapped ? breakdown.rawScore : breakdown.finalScore}

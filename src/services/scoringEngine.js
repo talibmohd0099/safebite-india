@@ -117,7 +117,7 @@ function computeScore(ingredients) {
 // every contribution, then hand out the few leftover whole points to
 // whichever ingredients had the largest fractional part, so the
 // displayed items always sum to exactly the shown score change.
-function buildScoreBreakdown(ingredients, finalScore) {
+export function buildScoreBreakdown(ingredients, finalScore) {
   const totalPenalty = totalPenaltyOf(ingredients);
   const rawScore = Math.max(0, Math.min(100, Math.round(100 - totalPenalty)));
   const targetPoints = 100 - rawScore; // what the displayed items must sum to, exactly
