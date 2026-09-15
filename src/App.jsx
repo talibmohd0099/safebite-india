@@ -14,6 +14,7 @@ import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-route
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { FamilyProvider } from './contexts/FamilyContext';
 import Header from './components/Header';
 import BottomTabBar from './components/BottomTabBar';
 import SplashScreen from './components/SplashScreen';
@@ -21,6 +22,7 @@ import Onboarding, { ONBOARDING_KEY } from './components/Onboarding';
 import Home from './pages/Home';
 import Result from './pages/Result';
 import History from './pages/History';
+import Family from './pages/Family';
 import About from './pages/About';
 import Browse from './pages/Browse';
 import Category from './pages/Category';
@@ -67,27 +69,30 @@ export default function App() {
 
   return (
     <LanguageProvider>
-      <HashRouter>
-        <AndroidBackButton />
-        <div className="min-h-screen" style={{ background: 'var(--bg-grouped)' }}>
-          <Header />
-          <main>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/result/:id" element={<Result />} />
-              <Route path="/history" element={<History />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/browse" element={<Browse />} />
-              <Route path="/category/:id" element={<Category />} />
-              <Route path="/popular" element={<PopularSearches />} />
-              <Route path="/news" element={<News />} />
-            </Routes>
-          </main>
-          <BottomTabBar />
-        </div>
-        {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
-        {!showSplash && showOnboarding && <Onboarding onDone={() => setShowOnboarding(false)} />}
-      </HashRouter>
+      <FamilyProvider>
+        <HashRouter>
+          <AndroidBackButton />
+          <div className="min-h-screen" style={{ background: 'var(--bg-grouped)' }}>
+            <Header />
+            <main>
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/result/:id" element={<Result />} />
+                <Route path="/history" element={<History />} />
+                <Route path="/family" element={<Family />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/browse" element={<Browse />} />
+                <Route path="/category/:id" element={<Category />} />
+                <Route path="/popular" element={<PopularSearches />} />
+                <Route path="/news" element={<News />} />
+              </Routes>
+            </main>
+            <BottomTabBar />
+          </div>
+          {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
+          {!showSplash && showOnboarding && <Onboarding onDone={() => setShowOnboarding(false)} />}
+        </HashRouter>
+      </FamilyProvider>
     </LanguageProvider>
   );
 }
