@@ -15,6 +15,39 @@
 
 import { getIngredientSeverity } from '../utils/storage.js';
 
+// The full set of selectable nutrition priorities, and their i18n keys
+// -- shared between the Family profile editor (src/pages/Family.jsx)
+// and the Result page's personal score card, so both always show the
+// exact same list/wording instead of two independently-maintained copies.
+export const PRIORITIES = [
+  'lowerSugar', 'lowerSodium', 'lowerSatFat', 'higherProtein',
+  'lessProcessed', 'fewerAdditives', 'lowerCalories', 'moreWholeFood',
+];
+export const PRIORITY_LABEL_KEY = {
+  lowerSugar: 'priorityLowerSugar',
+  lowerSodium: 'priorityLowerSodium',
+  lowerSatFat: 'priorityLowerSatFat',
+  higherProtein: 'priorityHigherProtein',
+  lessProcessed: 'priorityLessProcessed',
+  fewerAdditives: 'priorityFewerAdditives',
+  lowerCalories: 'priorityLowerCalories',
+  moreWholeFood: 'priorityMoreWholeFood',
+};
+
+// What's wrong with the PRODUCT (shown as the "why" reason) -- distinct
+// from PRIORITY_LABEL_KEY, which is what the PERSON wants. E.g. someone
+// selected "lower sodium" (the priority); the product's own problem is
+// "higher sodium" (the concern) -- same axis, opposite direction.
+export const PRIORITY_CONCERN_KEY = {
+  lowerSugar: 'concernSugar',
+  lowerSodium: 'concernSodium',
+  lowerSatFat: 'concernSatFat',
+  higherProtein: 'concernProtein',
+  lessProcessed: 'concernProcessed',
+  fewerAdditives: 'concernAdditives',
+  moreWholeFood: 'concernWholeFood',
+};
+
 // Each check answers one question: "does this product have a real,
 // already-detected characteristic that conflicts with this priority?"
 // All of them reuse ingredient fields buildReport() already computed
@@ -79,6 +112,19 @@ const PERSONAL_TIERS = [
 export function getPersonalScoreColor(score) {
   const tier = PERSONAL_TIERS.find((t) => score >= t.min) || PERSONAL_TIERS[PERSONAL_TIERS.length - 1];
   return { label: tier.label, color: `var(--v-${tier.token})`, bg: `var(--v-${tier.token}-bg)` };
+}
+
+// Same breakpoints again, but returning the i18n key for the "Should I
+// eat it?" answer word already used (and translated) for the universal
+// score on the Result page (eatAnswerYes/Mostly/Occasionally/Rarely/
+// Avoid) -- reused as-is for "Should {name} eat it?" so the two
+// features share one vocabulary instead of inventing a second.
+export function getPersonalEatAnswerKey(score) {
+  if (score >= 85) return 'eatAnswerYes';
+  if (score >= 65) return 'eatAnswerMostly';
+  if (score >= 45) return 'eatAnswerOccasionally';
+  if (score >= 25) return 'eatAnswerRarely';
+  return 'eatAnswerAvoid';
 }
 
 /**

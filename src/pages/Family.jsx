@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import { useFamily, RELATION_EMOJI } from '../contexts/FamilyContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { PRIORITIES, PRIORITY_LABEL_KEY } from '../services/personalAssessment';
 
 const RELATIONS = ['me', 'partner', 'child', 'parent', 'other'];
 const RELATION_LABEL_KEY = {
@@ -17,22 +18,6 @@ const RELATION_LABEL_KEY = {
   child: 'familyRelationChild',
   parent: 'familyRelationParent',
   other: 'familyRelationOther',
-};
-
-// Must match the PRIORITY_CHECKS keys in services/personalAssessment.js.
-const PRIORITIES = [
-  'lowerSugar', 'lowerSodium', 'lowerSatFat', 'higherProtein',
-  'lessProcessed', 'fewerAdditives', 'lowerCalories', 'moreWholeFood',
-];
-const PRIORITY_LABEL_KEY = {
-  lowerSugar: 'priorityLowerSugar',
-  lowerSodium: 'priorityLowerSodium',
-  lowerSatFat: 'priorityLowerSatFat',
-  higherProtein: 'priorityHigherProtein',
-  lessProcessed: 'priorityLessProcessed',
-  fewerAdditives: 'priorityFewerAdditives',
-  lowerCalories: 'priorityLowerCalories',
-  moreWholeFood: 'priorityMoreWholeFood',
 };
 
 function ProfileForm({ initial, onSave, onCancel }) {

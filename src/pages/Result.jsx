@@ -9,6 +9,13 @@ import { lookupBarcode } from '../services/openFoodFacts';
 import { getRelatedNews } from '../services/newsRepo';
 import { categoryIcon } from '../utils/categoryIcon';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useFamily } from '../contexts/FamilyContext';
+import {
+  calculatePersonalAssessment,
+  getPersonalEatAnswerKey,
+  PRIORITY_LABEL_KEY,
+  PRIORITY_CONCERN_KEY,
+} from '../services/personalAssessment';
 import ScoreCircle from '../components/ScoreCircle';
 import IngredientCard from '../components/IngredientCard';
 import ProductImage from '../components/ProductImage';
@@ -133,6 +140,8 @@ export default function Result() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t, language } = useLanguage();
+  const { profiles, activeProfileId, setActiveProfile } = useFamily();
+  const [selectedProfileId, setSelectedProfileId] = useState(activeProfileId);
   const [result, setResult] = useState(null);
   const [filter, setFilter] = useState('all');
   const [view, setView] = useState('overview');
@@ -147,6 +156,7 @@ export default function Result() {
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState('');
+  const [showWhyPersonal, setShowWhyPersonal] = useState(false);
 
   useEffect(() => {
     const data = getHistoryById(id);
@@ -270,6 +280,23 @@ export default function Result() {
   const verdictLabel = result.verdict || scoreColors.label;
   const eatAnswer = t(EAT_ANSWER_KEY[verdictLabel] || 'eatAnswerOccasionally');
   const ingredients = result.ingredients || [];
+
+  // Personal FoodGuard -- a second, derived layer on top of the same
+  // already-computed report. `activeProfile` falls back to null (not
+  // the family's default) if the remembered id points at a profile
+  // that's since been deleted elsewhere.
+  const activeProfile = profiles.find((p) => p.id === selectedProfileId) || null;
+  // A plain const, not useMemo -- this is a cheap synchronous pass over
+  // an already-resolved ingredient list (same cost class as `tiers`/
+  // `mainFactors` below, neither of which are memoized either), and a
+  // hook call here would run after the early return above on some
+  // renders, violating the Rules of Hooks.
+  const personalAssessment = activeProfile ? calculatePersonalAssessment(result, activeProfile) : null;
+  const selectProfile = (profileId) => {
+    setSelectedProfileId(profileId);
+    setActiveProfile(profileId);
+    setShowWhyPersonal(false);
+  };
 
   // Stats, dots and the filter all read from one severity scale, so the
   // counts can never disagree with the colours shown next to each row.
@@ -494,6 +521,137 @@ export default function Result() {
           </div>
         )}
       </div>
+
+      {/* Personal FoodGuard -- the same scanned product, re-evaluated
+          against a specific family member's selected priorities. The
+          general score/card above never changes; everything below is a
+          second, clearly-separated layer on top of it (see
+          services/personalAssessment.js). No profiles yet -> a small,
+          skippable prompt instead of forcing setup. */}
+      {profiles.length === 0 ? (
+        <div className="mx-4 mt-3 rounded-[14px] px-4 py-3.5 flex items-center gap-3" style={{ background: 'var(--bg-card)' }}>
+          <span className="text-[22px] flex-shrink-0">👪</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13.5px] font-bold" style={{ color: 'var(--label-1)' }}>
+              {t('personalMakeItPersonalTitle')}
+            </p>
+            <p className="text-[12.5px]" style={{ color: 'var(--label-2)' }}>
+              {t('personalMakeItPersonalBody')}
+            </p>
+          </div>
+          <Link to="/family" className="tap-scale text-[13px] font-semibold flex-shrink-0" style={{ color: 'var(--tint)' }}>
+            {t('familyCreateProfile')}
+          </Link>
+        </div>
+      ) : (
+        <div className="mx-4 mt-3">
+          <p className="text-[13px] font-semibold mb-2" style={{ color: 'var(--label-2)' }}>
+            {t('familyWhoIsThisFor')}
+          </p>
+          <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            {profiles.map((p) => {
+              const active = p.id === selectedProfileId;
+              const chipAssessment = calculatePersonalAssessment(result, p);
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => selectProfile(active ? null : p.id)}
+                  className="tap-scale flex-shrink-0 flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-full text-[13px] font-semibold"
+                  style={{ background: active ? 'var(--tint)' : 'var(--fill)', color: active ? '#fff' : 'var(--label-1)' }}
+                >
+                  <span
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-[13px] flex-shrink-0"
+                    style={{ background: active ? 'rgba(255,255,255,0.25)' : 'var(--bg-card)' }}
+                  >
+                    {p.avatarEmoji}
+                  </span>
+                  {p.nickname}
+                  <span style={{ color: active ? 'rgba(255,255,255,0.85)' : chipAssessment.tier.color }}>
+                    {chipAssessment.personalScore}
+                  </span>
+                </button>
+              );
+            })}
+            <Link
+              to="/family"
+              className="tap-scale flex-shrink-0 flex items-center px-3 py-2 rounded-full text-[13px] font-semibold"
+              style={{ background: 'var(--fill)', color: 'var(--tint)' }}
+            >
+              {t('personalAddChip')}
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {activeProfile && personalAssessment && (
+        <div className="mx-4 mt-3 rounded-[20px] p-5" style={{ background: 'var(--bg-card)', border: `1.5px solid ${personalAssessment.tier.color}` }}>
+          <div className="flex items-center gap-4">
+            <span
+              className="w-16 h-16 rounded-full flex flex-col items-center justify-center flex-shrink-0"
+              style={{ background: personalAssessment.tier.bg }}
+            >
+              <span className="text-[22px] font-bold leading-none tabular-nums" style={{ color: personalAssessment.tier.color }}>
+                {personalAssessment.personalScore}
+              </span>
+            </span>
+            <div className="min-w-0">
+              <p className="text-[13px] font-semibold" style={{ color: 'var(--label-2)' }}>
+                {t('personalScoreTitle', { name: activeProfile.nickname })}
+              </p>
+              <p className="text-[19px] font-bold tracking-tight" style={{ color: personalAssessment.tier.color }}>
+                {personalAssessment.tier.label}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-2.5 items-start mt-4 pt-4" style={{ borderTop: '1px solid var(--separator)' }}>
+            <span className="text-[18px] leading-none mt-0.5 flex-shrink-0">🍽️</span>
+            <p className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[13.5px] font-semibold" style={{ color: 'var(--label-2)' }}>
+                {t('shouldXEatIt', { name: activeProfile.nickname })}
+              </span>
+              <span className="text-[15px] font-bold" style={{ color: personalAssessment.tier.color }}>
+                {t(getPersonalEatAnswerKey(personalAssessment.personalScore))}
+              </span>
+            </p>
+          </div>
+
+          <button
+            onClick={() => setShowWhyPersonal((v) => !v)}
+            className="tap-scale mt-3 pl-[27px] text-[13px] font-semibold"
+            style={{ color: 'var(--tint)' }}
+          >
+            {t('personalWhyDifferent', { name: activeProfile.nickname })}
+          </button>
+
+          {showWhyPersonal && (
+            <div className="mt-2 pl-[27px] space-y-1.5 item-in">
+              {personalAssessment.hasNoConcerns ? (
+                <p className="text-[13px] leading-relaxed" style={{ color: 'var(--label-2)' }}>
+                  {t('personalNoConcerns', { name: activeProfile.nickname })}
+                </p>
+              ) : (
+                personalAssessment.matchedConcerns.map((c) => (
+                  <div key={c.priorityKey} className="rounded-[12px] p-2.5" style={{ background: 'var(--fill)' }}>
+                    <p className="text-[13px] font-semibold" style={{ color: 'var(--v-poor)' }}>
+                      ⚠ {t(PRIORITY_CONCERN_KEY[c.priorityKey])}
+                    </p>
+                    <p className="text-[12.5px] leading-relaxed mt-0.5" style={{ color: 'var(--label-2)' }}>
+                      {t('personalPriorityReason', {
+                        name: activeProfile.nickname,
+                        priority: t(PRIORITY_LABEL_KEY[c.priorityKey]).toLowerCase(),
+                      })}
+                    </p>
+                  </div>
+                ))
+              )}
+              <p className="text-[11.5px] leading-relaxed pt-1" style={{ color: 'var(--label-3)' }}>
+                {t('personalExplainerNote', { name: activeProfile.nickname })}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* A plain ingredient score can't say WHY a product exists -- an
           oral rehydration/glucose product scoring "Moderate" as an
