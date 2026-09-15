@@ -51,11 +51,22 @@ function toNumber(value) {
 }
 
 // Open Food Facts' serving_size is a free-text field a contributor typed
-// ("70 g", "1 pack (70g)", or just "70") -- pull the leading number.
+// -- "70 g" and "1 serving (100 g)" and "1 pack (35g)" are all real,
+// common formats. The naive "pull the leading number" reading breaks on
+// the last two: it grabs the "1" (a serving/pack COUNT) instead of the
+// actual gram weight that follows in parentheses -- confirmed against a
+// real product (Dal Makhani, serving_size "1 serving (100 g)"), where
+// that bug would have scaled every real nutrient number down by 100x
+// (91kcal/100g silently became 0.91kcal) before this was ever caught,
+// since nothing downstream sanity-checks the result against a plausible
+// range. Anchoring the match to a number immediately followed by "g"/
+// "gram(s)" finds the actual weight regardless of what other bare
+// numbers (a count, a multipack size) appear earlier in the string.
 // This app only ever deals in solid packaged snacks (not drinks measured
 // in ml), so treating that number as grams is a safe assumption here.
-function parseServingGrams(servingSize, productQuantity) {
-  const fromServing = servingSize ? toNumber(String(servingSize).match(/[\d.]+/)?.[0]) : null;
+export function parseServingGrams(servingSize, productQuantity) {
+  const gramMatch = servingSize ? String(servingSize).match(/(\d+(?:\.\d+)?)\s*(?:g|grams?)\b/i) : null;
+  const fromServing = gramMatch ? toNumber(gramMatch[1]) : null;
   if (fromServing) return fromServing;
   return toNumber(productQuantity);
 }
@@ -71,7 +82,7 @@ function parseServingGrams(servingSize, productQuantity) {
 // of what unit the contributor originally entered (confirmed against a
 // real product's live API response), so no unit-detection is needed
 // here, just a straight per-100g -> per-pack scale-up.
-function extractNutrientsForHabitCheck(product) {
+export function extractNutrientsForHabitCheck(product) {
   const n = product?.nutriments;
   if (!n) return null;
 
