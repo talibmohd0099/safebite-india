@@ -33,6 +33,13 @@ export const STRINGS = {
     healthEffectsLabel: 'Health effects',
     gotIt: 'Got it',
 
+    shouldIEatIt: 'Should I eat it?',
+    eatAnswerYes: 'Yes',
+    eatAnswerMostly: 'Mostly, yes',
+    eatAnswerOccasionally: 'Occasionally',
+    eatAnswerRarely: 'Rarely',
+    eatAnswerAvoid: 'Avoid',
+
     scoreModalWhatInfluenced: 'What influenced your score?',
     scoreModalWhatInfluencedSubtitle: 'These are the main factors that influenced your score.',
     scoreModalWhyFlagged: 'Why is it flagged?',
@@ -155,6 +162,13 @@ export const STRINGS = {
     scoreBreakdownWhatDoesThisMean: 'इसका मतलब क्या है?',
     healthEffectsLabel: 'सेहत पर असर',
     gotIt: 'समझ गया',
+
+    shouldIEatIt: 'क्या मुझे यह खाना चाहिए?',
+    eatAnswerYes: 'हां',
+    eatAnswerMostly: 'ज़्यादातर, हां',
+    eatAnswerOccasionally: 'कभी-कभी',
+    eatAnswerRarely: 'बहुत कम',
+    eatAnswerAvoid: 'न खाएं',
 
     scoreModalWhatInfluenced: 'आपके स्कोर पर किसका असर पड़ा?',
     scoreModalWhatInfluencedSubtitle: 'ये वो मुख्य वजहें हैं जिनसे आपके स्कोर पर असर पड़ा।',

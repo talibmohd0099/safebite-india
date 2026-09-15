@@ -45,6 +45,20 @@ const TIER_RANK = { Harmful: 0, Concerning: 1, 'Highly processed': 2 };
 // list).
 const MAIN_FACTORS_LIMIT = 4;
 
+// Short, direct answer to "should I eat this?" shown next to the fork
+// icon in the score hero -- deliberately a different word than the big
+// verdict label above it (e.g. "Moderate" + "Occasionally", not
+// "Moderate" twice). Keyed by the same verdict labels as SCORE_TIERS
+// in utils/storage.js / VERDICT_TIERS in scoringEngine.js, so it can
+// never disagree with the score colour shown right next to it.
+const EAT_ANSWER_KEY = {
+  'Very Healthy': 'eatAnswerYes',
+  Good: 'eatAnswerMostly',
+  Moderate: 'eatAnswerOccasionally',
+  Poor: 'eatAnswerRarely',
+  'Very Poor': 'eatAnswerAvoid',
+};
+
 function SectionHeader({ children, action }) {
   return (
     <div className="flex items-end justify-between px-5 pb-1.5 pt-7">
@@ -253,6 +267,8 @@ export default function Result() {
 
   const score = result.overallScore || 0;
   const scoreColors = getScoreColor(score);
+  const verdictLabel = result.verdict || scoreColors.label;
+  const eatAnswer = t(EAT_ANSWER_KEY[verdictLabel] || 'eatAnswerOccasionally');
   const ingredients = result.ingredients || [];
 
   // Stats, dots and the filter all read from one severity scale, so the
@@ -399,17 +415,17 @@ export default function Result() {
       </div>
 
       {/* Score hero -- the single most important thing on this page, so
-          it gets the biggest visual weight: an enlarged score circle, the
-          plain-English recommendation right underneath it (moved up from
-          its own separate section further down the page -- no need to
-          scroll to find out "should I eat this?"), and a link into the
-          real, ingredient-by-ingredient reason for this exact number. */}
+          it gets the biggest visual weight: an enlarged score circle,
+          then "should I eat it?" answered directly underneath (instead
+          of just repeating the verdict as a sentence), and a link into
+          the real, ingredient-by-ingredient reason for this exact
+          number. */}
       <div className="mx-4 rounded-[20px] p-5" style={{ background: 'var(--bg-card)' }}>
         <div className="flex items-center gap-5">
           <ScoreCircle score={score} size="xl" />
           <div className="min-w-0">
             <p className="text-[24px] font-bold tracking-tight leading-tight" style={{ color: scoreColors.color }}>
-              {result.verdict || scoreColors.label}
+              {verdictLabel}
             </p>
             <p className="text-[15px] mt-0.5" style={{ color: 'var(--label-2)' }}>
               {ingredients.length === 0
@@ -418,25 +434,11 @@ export default function Result() {
                   ? t('nothingFlagged', { count: ingredients.length })
                   : t('someFlagged', { flagged: flaggedCount, total: ingredients.length })}
             </p>
-            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
-              {ingredients.length > 0 && (
-                <button
-                  onClick={() => setShowScoreModal(true)}
-                  className="tap-scale text-[15px] font-semibold"
-                  style={{ color: 'var(--tint)' }}
-                >
-                  {t('whyScoreLink', { score })}
-                </button>
-              )}
-              <Link to="/about#how-score-works" className="text-[13px]" style={{ color: 'var(--label-3)' }}>
-                {t('howCalculated')}
-              </Link>
-            </div>
             {result.ingredientsText && (
               <button
                 onClick={handleRefresh}
                 disabled={refreshing}
-                className="tap-scale block text-[13px] mt-1.5"
+                className="tap-scale block text-[13px] mt-2"
                 style={{ color: 'var(--label-3)', opacity: refreshing ? 0.6 : 1 }}
               >
                 {refreshing ? t('refreshing') : t('refreshAnalysis')}
@@ -448,12 +450,41 @@ export default function Result() {
           </div>
         </div>
 
+        {/* "Should I eat it?" -- the plain-English recommendation,
+            reframed as a direct answer instead of a floating sentence.
+            Same score-tier colour as the circle above, never a second,
+            independent colour scale. */}
         {displayRecommendation && (
           <div className="flex gap-2.5 items-start mt-4 pt-4" style={{ borderTop: '1px solid var(--separator)' }}>
-            <span className="text-[16px] leading-none mt-0.5 flex-shrink-0">💡</span>
-            <p className="text-[14px] leading-relaxed font-medium" style={{ color: 'var(--label-1)' }}>
-              {displayRecommendation}
-            </p>
+            <span className="text-[18px] leading-none mt-0.5 flex-shrink-0">🍽️</span>
+            <div className="min-w-0">
+              <p className="flex items-center gap-1.5">
+                <span className="text-[13.5px] font-semibold" style={{ color: 'var(--label-2)' }}>
+                  {t('shouldIEatIt')}
+                </span>
+                <span className="text-[15px] font-bold" style={{ color: scoreColors.color }}>
+                  {eatAnswer}
+                </span>
+              </p>
+              <p className="text-[13.5px] leading-relaxed mt-0.5" style={{ color: 'var(--label-1)' }}>
+                {displayRecommendation}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {ingredients.length > 0 && (
+          <div className={`flex flex-wrap gap-x-3 gap-y-1 mt-3 ${displayRecommendation ? 'pl-[27px]' : ''}`}>
+            <button
+              onClick={() => setShowScoreModal(true)}
+              className="tap-scale text-[13.5px] font-semibold"
+              style={{ color: 'var(--tint)' }}
+            >
+              {t('whyScoreLink', { score })}
+            </button>
+            <Link to="/about#how-score-works" className="text-[13px]" style={{ color: 'var(--label-3)' }}>
+              {t('howCalculated')}
+            </Link>
           </div>
         )}
       </div>
