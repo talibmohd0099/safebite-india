@@ -32,12 +32,26 @@ function parseAmount(raw) {
   return { value: toNumber(match[1]), unit: match[2].toLowerCase() };
 }
 
-// Real, already-scraped nutrition-panel numbers for the "if this became
-// a daily habit" feature (dailyHabitCheck.js) -- never estimated. No
-// pack-size attribute is captured by the scraper today, so this is
-// always framed as "per 100g" -- the one figure FSSAI mandates every
-// Indian label state, so it's always a safe, honest assumption here
-// even without knowing the pack's actual net weight.
+// "Energy" is the one nutrition field that isn't a plain mg/g amount --
+// Blinkit's own label format is "<n> kcal" (unlike the mg/g fields
+// above). Not independently confirmed against a live scraped row the
+// way the others are (parseAmount's comment), since seeding is
+// currently paused -- if this ever silently returns null on real data,
+// check the actual scraped string format first.
+function parseKcal(raw) {
+  const match = raw && String(raw).match(/([\d.]+)\s*kcal/i);
+  return match ? toNumber(match[1]) : null;
+}
+
+// Real, already-scraped nutrition-panel numbers -- never estimated.
+// Originally built only for the "if this became a daily habit" feature
+// (dailyHabitCheck.js); also now the primary signal for Personal
+// FoodGuard's nutrition-priority matching (personalAssessment.js)
+// whenever it's available. No pack-size attribute is captured by the
+// scraper today, so this is always framed as "per 100g" -- the one
+// figure FSSAI mandates every Indian label state, so it's always a
+// safe, honest assumption here even without knowing the pack's actual
+// net weight.
 export function extractNutrientsForHabitCheck(nutrition) {
   if (!nutrition || Object.keys(nutrition).length === 0) return null;
 
@@ -48,12 +62,16 @@ export function extractNutrientsForHabitCheck(nutrition) {
   const addedSugarG = toG(parseAmount(nutrition['Added Sugar']) || parseAmount(nutrition['Total Sugar']));
   const saturatedFatG = toG(parseAmount(nutrition['Saturated Fat']));
   const transFatG = toG(parseAmount(nutrition['Trans Fat']));
+  const caloriesKcal = parseKcal(nutrition['Energy']);
+  const proteinG = toG(parseAmount(nutrition['Protein']));
 
   const nutrients = {};
   if (typeof sodiumMg === 'number') nutrients.sodiumMg = sodiumMg;
   if (typeof addedSugarG === 'number') nutrients.addedSugarG = addedSugarG;
   if (typeof saturatedFatG === 'number') nutrients.saturatedFatG = saturatedFatG;
   if (typeof transFatG === 'number') nutrients.transFatG = transFatG;
+  if (typeof caloriesKcal === 'number') nutrients.caloriesKcal = caloriesKcal;
+  if (typeof proteinG === 'number') nutrients.proteinG = proteinG;
 
   if (Object.keys(nutrients).length === 0) return null;
   // No pack-size attribute is captured by the scraper today, so

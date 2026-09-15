@@ -60,13 +60,17 @@ function parseServingGrams(servingSize, productQuantity) {
   return toNumber(productQuantity);
 }
 
-// Real, already-published nutrition-panel numbers for the "if this
-// became a daily habit" feature (dailyHabitCheck.js) -- never estimated,
+// Real, already-published nutrition-panel numbers -- never estimated,
 // so this returns null the moment the data genuinely isn't there rather
-// than guessing. OFF stores sodium/sugar/fat in GRAMS per 100g
-// regardless of what unit the contributor originally entered (confirmed
-// against a real product's live API response), so no unit-detection is
-// needed here, just a straight per-100g -> per-pack scale-up.
+// than guessing. Originally built only for the "if this became a daily
+// habit" feature (dailyHabitCheck.js); also now the primary signal for
+// Personal FoodGuard's nutrition-priority matching (personalAssessment.js)
+// whenever it's available, since a real number is always better than
+// inferring from an ingredient's category/status tag. OFF stores
+// sodium/sugar/fat/energy/protein in GRAMS (or kcal) per 100g regardless
+// of what unit the contributor originally entered (confirmed against a
+// real product's live API response), so no unit-detection is needed
+// here, just a straight per-100g -> per-pack scale-up.
 function extractNutrientsForHabitCheck(product) {
   const n = product?.nutriments;
   if (!n) return null;
@@ -81,12 +85,16 @@ function extractNutrientsForHabitCheck(product) {
   const addedSugarG = typeof n['added-sugars_100g'] === 'number' ? n['added-sugars_100g'] : n.sugars_100g;
   const saturatedFatG = n['saturated-fat_100g'];
   const transFatG = n['trans-fat_100g'];
+  const caloriesKcal = n['energy-kcal_100g'];
+  const proteinG = n.proteins_100g;
 
   const nutrients = {};
   if (typeof sodiumG === 'number') nutrients.sodiumMg = sodiumG * 1000 * scale;
   if (typeof addedSugarG === 'number') nutrients.addedSugarG = addedSugarG * scale;
   if (typeof saturatedFatG === 'number') nutrients.saturatedFatG = saturatedFatG * scale;
   if (typeof transFatG === 'number') nutrients.transFatG = transFatG * scale;
+  if (typeof caloriesKcal === 'number') nutrients.caloriesKcal = caloriesKcal * scale;
+  if (typeof proteinG === 'number') nutrients.proteinG = proteinG * scale;
 
   if (Object.keys(nutrients).length === 0) return null;
   return { nutrients, servingGrams: packGrams ? Math.round(packGrams) : null };

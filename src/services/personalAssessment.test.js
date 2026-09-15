@@ -60,31 +60,63 @@ test('higherProtein flags the absence of a real protein source, not the presence
   assert.equal(calculatePersonalAssessment(withProtein, profile).hasNoConcerns, true);
 });
 
-test('a real nutrition-panel signal (dailyHabitCheck) adds a concern when it matches a selected priority', () => {
+test('a real sodium number (Open Food Facts/Blinkit) wins over the ingredient-tag heuristic', () => {
+  // 700mg is 35% of the 2000mg WHO daily limit -- above the 30% bar.
   const report = {
     overallScore: 70,
     ingredients: [ing({ name: 'Water' })], // no ingredient-level signal on its own
-    dailyHabitCheck: { nutrientKey: 'sodiumMg', percent: 45 },
+    realNutrients: { sodiumMg: 700 },
   };
   const profile = { priorities: ['lowerSodium'] };
   const result = calculatePersonalAssessment(report, profile);
   assert.deepEqual(result.matchedConcerns, [{ priorityKey: 'lowerSodium' }]);
 });
 
-test('the same concern is never counted twice when both the ingredient signal and dailyHabitCheck agree', () => {
+test('a real sodium number below the "worth mentioning" bar does not flag a concern, even if an ingredient looks concerning', () => {
+  // 200mg is only 10% of the daily limit -- below the 30% bar. The real
+  // number is trusted over the ingredient tag once it's present.
   const report = {
     overallScore: 70,
     ingredients: [ing({ name: 'Salt', status: 'concerning' })],
-    dailyHabitCheck: { nutrientKey: 'sodiumMg', percent: 45 },
+    realNutrients: { sodiumMg: 200 },
   };
   const profile = { priorities: ['lowerSodium'] };
   const result = calculatePersonalAssessment(report, profile);
-  assert.equal(result.matchedConcerns.length, 1);
+  assert.equal(result.hasNoConcerns, true);
 });
 
-test('lowerCalories never fabricates a concern -- no reliable per-ingredient signal exists', () => {
+test('real calorie data (previously nonexistent) now makes lowerCalories actually work', () => {
+  // 900 kcal is 45% of the 2000 kcal reference -- above the 30% bar.
+  const withRealData = {
+    overallScore: 70,
+    ingredients: [ing({ name: 'Water' })],
+    realNutrients: { caloriesKcal: 900 },
+  };
+  const profile = { priorities: ['lowerCalories'] };
+  assert.deepEqual(calculatePersonalAssessment(withRealData, profile).matchedConcerns, [{ priorityKey: 'lowerCalories' }]);
+});
+
+test('lowerCalories still never fabricates a concern when no real calorie data exists at all', () => {
   const report = { overallScore: 70, ingredients: [ing({ name: 'Sugar', category: 'sweetener', status: 'concerning' })] };
   const profile = { priorities: ['lowerCalories'] };
+  assert.equal(calculatePersonalAssessment(report, profile).hasNoConcerns, true);
+});
+
+test('real protein data flags a genuinely low-protein product, overriding a false-positive ingredient tag', () => {
+  // 2g is 4% of the 50g reference -- well under the 30% bar, a real low-protein reading.
+  const report = {
+    overallScore: 70,
+    ingredients: [ing({ name: 'Soy Protein', category: 'protein', status: 'safe' })], // would otherwise read as "has protein"
+    realNutrients: { proteinG: 2 },
+  };
+  const profile = { priorities: ['higherProtein'] };
+  assert.deepEqual(calculatePersonalAssessment(report, profile).matchedConcerns, [{ priorityKey: 'higherProtein' }]);
+});
+
+test('real protein data confirms a genuinely protein-rich product has no concern', () => {
+  // 20g is 40% of the 50g reference -- above the 30% bar, a real "has enough protein" reading.
+  const report = { overallScore: 70, ingredients: [ing({ name: 'Water' })], realNutrients: { proteinG: 20 } };
+  const profile = { priorities: ['higherProtein'] };
   assert.equal(calculatePersonalAssessment(report, profile).hasNoConcerns, true);
 });
 

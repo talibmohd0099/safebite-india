@@ -17,7 +17,7 @@
 // for %RDA figures. https://www.who.int/news-room/fact-sheets/detail/sodium
 // and https://www.who.int/news-room/fact-sheets/detail/sugars-intake
 // and https://www.who.int/news-room/fact-sheets/detail/fats-and-fatty-acids
-const NUTRIENT_LIMITS = [
+export const NUTRIENT_LIMITS = [
   { key: 'sodiumMg', unit: 'mg', limit: 2000, label: 'sodium' },
   { key: 'addedSugarG', unit: 'g', limit: 50, label: 'added sugar' },
   { key: 'saturatedFatG', unit: 'g', limit: 22, label: 'saturated fat' },

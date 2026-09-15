@@ -72,6 +72,7 @@ export const STRINGS = {
     concernProtein: 'Low protein',
     concernProcessed: 'Highly processed ingredients',
     concernAdditives: 'Several additives',
+    concernCalories: 'High in calories',
     concernWholeFood: 'Few whole-food ingredients',
 
     personalScoreCaption: 'General',
@@ -268,6 +269,7 @@ export const STRINGS = {
     concernProtein: 'कम प्रोटीन',
     concernProcessed: 'ज़्यादा प्रोसेस्ड सामग्री',
     concernAdditives: 'कई एडिटिव्स',
+    concernCalories: 'ज़्यादा कैलोरी',
     concernWholeFood: 'साबुत सामग्री कम',
 
     personalScoreCaption: 'सामान्य',

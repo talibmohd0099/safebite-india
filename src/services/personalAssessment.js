@@ -14,6 +14,30 @@
 // priorities. See PERSONAL_TIER_LABELS below.
 
 import { getIngredientSeverity } from '../utils/storage.js';
+import { NUTRIENT_LIMITS } from './dailyHabitCheck.js';
+
+const LIMIT_BY_KEY = Object.fromEntries(NUTRIENT_LIMITS.map((n) => [n.key, n.limit]));
+
+// Not part of dailyHabitCheck.js's WHO-sourced limits (calories/protein
+// were never part of that feature) -- reasonable general reference
+// points (~2000 kcal/day for an adult on a standard reference diet,
+// matching the "2000-kcal reference diet" already cited in
+// dailyHabitCheck.js; ~50g/day protein, a commonly-cited ICMR/WHO-style
+// adult reference), used the same way: a real per-100g-or-per-pack
+// number, checked as a percentage of a full day's worth. Unlike the
+// four WHO-sourced limits, these two are this file's own judgment
+// call, not independently vetted elsewhere in this codebase.
+const CALORIE_REFERENCE_KCAL = 2000;
+const PROTEIN_REFERENCE_G = 50;
+
+// Same "is this actually worth mentioning" bar dailyHabitCheck.js uses
+// -- below this, one packaged product's share of a full day's limit
+// isn't a meaningful signal on its own.
+const REAL_DATA_THRESHOLD_PERCENT = 30;
+
+function percentOfLimit(amount, limit) {
+  return typeof amount === 'number' && typeof limit === 'number' ? (amount / limit) * 100 : null;
+}
 
 // The full set of selectable nutrition priorities, and their i18n keys
 // -- shared between the Family profile editor (src/pages/Family.jsx)
@@ -45,34 +69,57 @@ export const PRIORITY_CONCERN_KEY = {
   higherProtein: 'concernProtein',
   lessProcessed: 'concernProcessed',
   fewerAdditives: 'concernAdditives',
+  lowerCalories: 'concernCalories',
   moreWholeFood: 'concernWholeFood',
 };
 
 // Each check answers one question: "does this product have a real,
 // already-detected characteristic that conflicts with this priority?"
-// All of them reuse ingredient fields buildReport() already computed
-// (status/category/penalty/insCode/name) -- no new classification
-// invented, no per-ingredient number ever exposed to the UI.
+// Takes (ingredients, realNutrients) -- realNutrients is buildReport()'s
+// report.realNutrients when Open Food Facts or Blinkit actually had
+// real label numbers for this exact product (see analyzeText.js), or
+// undefined otherwise. A real number is always checked FIRST and wins
+// when present, since it's an actual measurement rather than an
+// inference from one ingredient's category/status tag; the ingredient-
+// tag heuristic is the fallback for the (currently more common) case
+// of a text/photo scan with no barcode behind it. No per-ingredient or
+// per-nutrient number is ever exposed to the UI either way.
 const PRIORITY_CHECKS = {
-  lowerSugar: (ingredients) =>
-    ingredients.some((i) => i.category === 'sweetener' && i.status !== 'safe'),
+  lowerSugar: (ingredients, real) => {
+    const pct = percentOfLimit(real?.addedSugarG, LIMIT_BY_KEY.addedSugarG);
+    if (pct != null) return pct >= REAL_DATA_THRESHOLD_PERCENT;
+    return ingredients.some((i) => i.category === 'sweetener' && i.status !== 'safe');
+  },
 
-  lowerSodium: (ingredients) =>
-    ingredients.some(
-      (i) => i.status !== 'safe' && /\b(salt|sodium)\b/i.test(i.name || ''),
-    ),
+  lowerSodium: (ingredients, real) => {
+    const pct = percentOfLimit(real?.sodiumMg, LIMIT_BY_KEY.sodiumMg);
+    if (pct != null) return pct >= REAL_DATA_THRESHOLD_PERCENT;
+    return ingredients.some((i) => i.status !== 'safe' && /\b(salt|sodium)\b/i.test(i.name || ''));
+  },
 
-  lowerSatFat: (ingredients) =>
-    ingredients.some((i) => (i.category === 'fat' || i.category === 'oil') && i.status !== 'safe'),
+  lowerSatFat: (ingredients, real) => {
+    const pct = percentOfLimit(real?.saturatedFatG, LIMIT_BY_KEY.saturatedFatG);
+    if (pct != null) return pct >= REAL_DATA_THRESHOLD_PERCENT;
+    return ingredients.some((i) => (i.category === 'fat' || i.category === 'oil') && i.status !== 'safe');
+  },
 
-  // Absence, not presence -- a product with no real protein source at
-  // all is what conflicts with this goal, not any one bad ingredient.
-  higherProtein: (ingredients) => !ingredients.some((i) => i.category === 'protein' && i.status === 'safe'),
+  higherProtein: (ingredients, real) => {
+    // Inverted from the others -- the concern here is a LOW share of a
+    // full day's protein reference, not a high one.
+    if (typeof real?.proteinG === 'number') {
+      return (real.proteinG / PROTEIN_REFERENCE_G) * 100 < REAL_DATA_THRESHOLD_PERCENT;
+    }
+    // Absence, not presence -- a product with no real protein source at
+    // all is what conflicts with this goal, not any one bad ingredient.
+    return !ingredients.some((i) => i.category === 'protein' && i.status === 'safe');
+  },
 
   // Reuses the exact same "Highly processed" tier already shown
   // elsewhere in the app (getIngredientSeverity) -- deliberately not a
   // separate classification, so this can never disagree with what the
-  // Ingredients tab already says about the same product.
+  // Ingredients tab already says about the same product. No real-data
+  // equivalent exists for "how processed is this", so this has only
+  // ever had the one signal.
   lessProcessed: (ingredients) => ingredients.some((i) => getIngredientSeverity(i).label === 'Highly processed'),
 
   // A real INS/E code is the one thing an additive can be identified by
@@ -80,11 +127,14 @@ const PRIORITY_CHECKS = {
   // 2 or more is treated as notably additive-heavy.
   fewerAdditives: (ingredients) => ingredients.filter((i) => i.insCode).length >= 2,
 
-  // No reliable per-ingredient calorie signal exists yet (buildReport()
-  // doesn't carry one) -- rather than guess, this priority never
-  // triggers a concern in V1. Honest "we don't know" beats a fabricated
-  // answer, same principle applied throughout this app's scoring.
-  lowerCalories: () => false,
+  // Only ever triggers when a real calorie number exists (Open Food
+  // Facts or Blinkit) -- rather than guess without one, this priority
+  // stays silent. Honest "we don't know" beats a fabricated answer,
+  // same principle applied throughout this app's scoring.
+  lowerCalories: (ingredients, real) => {
+    const pct = percentOfLimit(real?.caloriesKcal, CALORIE_REFERENCE_KCAL);
+    return pct != null && pct >= REAL_DATA_THRESHOLD_PERCENT;
+  },
 
   // Same detectable signal as lessProcessed for now -- a product heavy
   // on refined/processed ingredients is also light on whole-food ones.
@@ -129,9 +179,12 @@ export function getPersonalEatAnswerKey(score) {
 
 /**
  * @param {object} report - buildReport()'s output (must have `ingredients`
- *   and `overallScore`); a report's `dailyHabitCheck`, if present, is used
- *   as a secondary confirmation signal only -- most text/photo scans won't
- *   have real nutrition-panel numbers, so this is never required.
+ *   and `overallScore`); `report.realNutrients`, when present (a barcode-
+ *   or Blinkit-sourced product Open Food Facts/Blinkit actually had real
+ *   label numbers for -- see analyzeText.js), is checked as the PRIMARY
+ *   signal for lowerSugar/lowerSodium/lowerSatFat/higherProtein/
+ *   lowerCalories. Most text/photo scans won't have it, so every one of
+ *   those checks still falls back to the ingredient-tag heuristic.
  * @param {object} profile - a family profile with a `priorities` array of
  *   PRIORITY_CHECKS keys.
  * @returns {{ personalScore: number, tier: {label, color, bg},
@@ -139,22 +192,12 @@ export function getPersonalEatAnswerKey(score) {
  */
 export function calculatePersonalAssessment(report, profile) {
   const ingredients = report?.ingredients || [];
+  const realNutrients = report?.realNutrients;
   const priorities = profile?.priorities || [];
 
   const matchedConcerns = priorities
-    .filter((key) => PRIORITY_CHECKS[key]?.(ingredients))
+    .filter((key) => PRIORITY_CHECKS[key]?.(ingredients, realNutrients))
     .map((priorityKey) => ({ priorityKey }));
-
-  // A real nutrition-panel signal that lines up with a selected priority
-  // (but wasn't already caught above) adds one more concern -- e.g. a
-  // barcode-sourced product whose sodium is genuinely >=30% of the daily
-  // limit, for someone who selected "lower sodium".
-  const habit = report?.dailyHabitCheck;
-  const HABIT_TO_PRIORITY = { sodiumMg: 'lowerSodium', addedSugarG: 'lowerSugar', saturatedFatG: 'lowerSatFat' };
-  if (habit && priorities.includes(HABIT_TO_PRIORITY[habit.nutrientKey])) {
-    const already = matchedConcerns.some((c) => c.priorityKey === HABIT_TO_PRIORITY[habit.nutrientKey]);
-    if (!already) matchedConcerns.push({ priorityKey: HABIT_TO_PRIORITY[habit.nutrientKey] });
-  }
 
   const universalScore = typeof report?.overallScore === 'number' ? report.overallScore : 0;
   // Never exceeds the universal score -- a personal lens can only narrow

@@ -98,6 +98,18 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
   const report = buildReport(ingredients, { productName, brand, imageUrl });
   report.allergens = allergens;
 
+  // Real, already-published nutrition-panel numbers (Open Food Facts or
+  // Blinkit -- see their extractNutrientsForHabitCheck), persisted
+  // as-is so Personal FoodGuard's priority matching (personalAssessment.js)
+  // can reuse them later, not just at the moment of this one analysis.
+  // Kept regardless of isCondimentOrSeasoning below -- that only changes
+  // whether the "daily habit" FRAMING makes sense for a masala eaten a
+  // pinch at a time, not whether the underlying real numbers are valid.
+  if (nutrientsInfo?.nutrients) {
+    report.realNutrients = nutrientsInfo.nutrients;
+    report.realNutrientsServingGrams = nutrientsInfo.servingGrams ?? null;
+  }
+
   // Single-ingredient lookups don't need "product" text at all -- only
   // worth the extra call for a real multi-ingredient product.
   if (parsed.length > 1) {
