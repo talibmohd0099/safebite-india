@@ -38,6 +38,22 @@ const HABIT_NUTRIENT_LABEL_KEY = {
   transFatG: 'nutrientTransFatG',
 };
 
+// The plain reference table (real numbers, never estimated -- see
+// report.realNutrients in analyzeText.js), as opposed to the "Quick
+// health check" section below it, which is a derived "if you ate this
+// every day" projection built from the same numbers. Reuses
+// HABIT_NUTRIENT_LABEL_KEY's labels for the four nutrients that
+// section already names, so this table and that one never disagree on
+// what to call the same nutrient.
+const NUTRITION_TABLE_ROWS = [
+  { key: 'caloriesKcal', labelKey: 'nutrientCaloriesKcal', unit: ' kcal' },
+  { key: 'proteinG', labelKey: 'nutrientProteinG', unit: 'g' },
+  { key: 'sodiumMg', labelKey: HABIT_NUTRIENT_LABEL_KEY.sodiumMg, unit: 'mg' },
+  { key: 'addedSugarG', labelKey: HABIT_NUTRIENT_LABEL_KEY.addedSugarG, unit: 'g' },
+  { key: 'saturatedFatG', labelKey: HABIT_NUTRIENT_LABEL_KEY.saturatedFatG, unit: 'g' },
+  { key: 'transFatG', labelKey: HABIT_NUTRIENT_LABEL_KEY.transFatG, unit: 'g' },
+];
+
 // Ranks the "Why did this score X" modal's factors worst-tier-first,
 // then by real penalty within a tier -- "Fine" is deliberately excluded
 // entirely (see MAIN_FACTORS_LIMIT below): that question is "why isn't
@@ -794,6 +810,37 @@ export default function Result() {
               <ListCard title={t('goodThings')} dotColor="var(--v-good)" items={displayPositives} />
             )}
           </div>
+        </>
+      )}
+
+      {/* Real nutrition-panel numbers (Open Food Facts / Blinkit only,
+          never estimated -- see report.realNutrients in analyzeText.js).
+          Plain reference values, distinct from "Quick health check"
+          right below it, which turns the SAME numbers into an "if you
+          ate this every day" projection -- this section is just what the
+          label actually says. */}
+      {view === 'overview' && result.realNutrients && (
+        <>
+          <SectionHeader>{t('sectionNutrition')}</SectionHeader>
+          <Group>
+            <div className="px-4 py-3.5">
+              <p className="text-[12px] mb-3" style={{ color: 'var(--label-3)' }}>
+                {result.realNutrientsServingGrams
+                  ? t('nutritionPerServing', { grams: result.realNutrientsServingGrams })
+                  : t('nutritionPer100g')}
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                {NUTRITION_TABLE_ROWS.filter((row) => typeof result.realNutrients[row.key] === 'number').map((row) => (
+                  <div key={row.key}>
+                    <p className="text-[11px] capitalize" style={{ color: 'var(--label-3)' }}>{t(row.labelKey)}</p>
+                    <p className="text-[16px] font-bold" style={{ color: 'var(--label-1)' }}>
+                      {Math.round(result.realNutrients[row.key] * 10) / 10}{row.unit}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Group>
         </>
       )}
 

@@ -124,6 +124,12 @@ export const STRINGS = {
     readMore: 'Read more',
     readLess: 'Show less',
 
+    sectionNutrition: 'Nutrition',
+    nutritionPerServing: 'Per {grams}g serving',
+    nutritionPer100g: 'Per 100g',
+    nutrientCaloriesKcal: 'calories',
+    nutrientProteinG: 'protein',
+
     quickHealthCheck: 'Quick health check',
     habitBarCaption: '{percent}% of your daily {nutrient} limit, in {servingText}.',
     habitSeeMore: 'See what daily eating adds up to',
@@ -321,6 +327,12 @@ export const STRINGS = {
 
     readMore: 'और पढ़ें',
     readLess: 'कम दिखाएं',
+
+    sectionNutrition: 'न्यूट्रिशन',
+    nutritionPerServing: '{grams}ग्राम सर्विंग में',
+    nutritionPer100g: '100 ग्राम में',
+    nutrientCaloriesKcal: 'कैलोरी',
+    nutrientProteinG: 'प्रोटीन',
 
     quickHealthCheck: 'जल्दी हेल्थ चेक',
     habitBarCaption: '{servingText} में आपकी दिन की {nutrient} लिमिट का {percent}%।',
