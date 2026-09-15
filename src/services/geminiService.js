@@ -266,6 +266,25 @@ Return exactly one array element per ingredient given, in the same order.`;
  * only runs for ingredients we've never seen before — once saved, they're
  * served from the database for free forever.
  */
+// A cross-check on the model's OWN "recognized" boolean, not a
+// replacement for it -- an LLM's free-text explanation and its
+// structured field can disagree even in the same response. Confirmed
+// against a real scanned product (Storia Coffee Shake): asked to
+// research "Quot" (a fragment of a leaked "&quot;" HTML entity, itself
+// a separate bug), Gemini correctly wrote "This is a typographical
+// error or formatting artifact, not an ingredient" in its own "reason"
+// field -- while still leaving "recognized" as true, which let the
+// product score a false 100/100 "Very Healthy" off one fabricated
+// ingredient. Rather than trust a single boolean the prompt asks for,
+// also check whether the model's own explanation contradicts it.
+const SELF_DISQUALIFYING_RE =
+  /\b(not a (real )?(food|ingredient|edible substance|food substance)\b|not an? (ingredient|edible substance)\b|typo(graphical)? error|formatting artifact|ocr (error|artifact)|transcription error|isn'?t a (real )?(food|ingredient)|doesn'?t (appear|seem) to be a (food|real ingredient)|random word|gibberish)/i;
+
+export function looksSelfDisqualifying(record) {
+  const text = [record?.reason, record?.whatIsIt, record?.healthEffects].filter(Boolean).join(' ');
+  return SELF_DISQUALIFYING_RE.test(text);
+}
+
 export async function researchIngredients(items) {
   if (GEMINI_API_KEYS.length === 0) {
     throw new Error('Gemini API key not found. Please add VITE_GEMINI_API_KEY to your .env file.');
@@ -298,7 +317,13 @@ export async function researchIngredients(items) {
   if (!text) throw new Error('Empty response from Gemini');
 
   const parsed = extractJson(text, finishReason, 'array');
-  return Array.isArray(parsed) ? parsed : [];
+  if (!Array.isArray(parsed)) return [];
+
+  return parsed.map((record) =>
+    record && record.recognized !== false && looksSelfDisqualifying(record)
+      ? { ...record, recognized: false }
+      : record,
+  );
 }
 
 /**

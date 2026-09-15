@@ -186,6 +186,40 @@ test('does not split a descriptive name that happens to end in "Flavour" or "Col
   assert.ok(result.some((i) => i.displayName.toLowerCase().includes('caramel colour')));
 });
 
+test('does not fabricate a fake "Quot" ingredient from a leaked &quot; entity', () => {
+  // Regression test for a real scanned product (Storia Coffee Shake
+  // 180ml): the extracted text wasn't an ingredients list at all -- it
+  // was the NUTRITION FACTS panel, with an unescaped "&quot;" leaked in
+  // right before a marketing line. splitTopLevel treats a bare "&" as a
+  // top-level "X, Y & Z" separator, so it tore "&quot;" into "&" (flush),
+  // then "quot" landed as its own clean-looking token that passed every
+  // "is this a real ingredient name" check -- Gemini then dutifully
+  // researched "Quot" and even correctly wrote "this is a typographical
+  // error, not a food substance" in its own explanation, but the product
+  // still scored a false 100/100 "Very Healthy" off that one fabricated
+  // "ingredient". None of this text is a real ingredients list, so the
+  // correct outcome is zero ingredients (which the caller in
+  // analyzeText.js turns into an honest "couldn't read this" error,
+  // instead of a confident wrong score).
+  const label =
+    'SERVE SIZE: 100 ml PER 100 ml %RDA (Approx) (Per Serve) 93 4.6 Energy(kcal) ' +
+    'Total Fat (g) 3.2 4.7 Saturated Fat(g) 2 9 Trans Fat(g) 0 0 Total Carbohydrates(g) ' +
+    '14.3 Total Sugars(g) 8.5 Added Sugar(g) 6 12 Protein(g) 3.3 1.8 Calcium(mg) 6 60 4.5 ' +
+    'Sodium(mg) &quot;COFFEE IS A RICH SOURCE OF DISEASE-FIGHT RDA calculated as per';
+
+  const result = parseIngredients(label);
+  assert.equal(result.length, 0, 'a nutrition-facts panel must not be read as an ingredients list');
+});
+
+test('still splits a legitimate top-level "X, Y & Z" list ending', () => {
+  // Guards the actual, legitimate use of "&" as a separator -- decoding
+  // HTML entities must not disable it.
+  const result = parseIngredients('Sugar, Salt & Citric Acid');
+  for (const name of ['Sugar', 'Salt', 'Citric Acid']) {
+    assert.ok(byName(result, name), `${name} should still be extracted`);
+  }
+});
+
 test('extracts a "Contains" allergen declaration separately even with markdown emphasis underscores', () => {
   // Same real product: its allergen line came through as "Contains
   // _Wheat_ and _nut_. May contains _Milk_, _Mustard_, _Oats_ and

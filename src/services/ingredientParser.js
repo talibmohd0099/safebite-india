@@ -155,13 +155,31 @@ const CATEGORY_LABEL_WORDS =
 const MISSING_COMMA_AFTER_BRACKET_RE =
   new RegExp(`(?<=[)\\]}]\\s{0,3})\\b(${CATEGORY_LABEL_WORDS})\\b\\s*(?=[(\\[])`, 'gi');
 
+// HTML entities that leak into OCR'd/AI-extracted label text unescaped
+// -- e.g. a real scanned product (Storia Coffee Shake) came through as
+// '...Sodium(mg) &quot;COFFEE IS A RICH SOURCE...'. Left alone, "&quot;"
+// is worse than harmless noise: splitTopLevel treats a bare "&" as a
+// top-level "X, Y & Z" separator, so it tears "&quot;" into "&" (flush)
+// then "quot" then ";" (flush) -- handing back a clean-looking, isolated
+// "quot" token that passes every "does this look like an ingredient
+// name" check and gets sent to AI research as if it were real. Decoding
+// these back to their literal character first (") means there's no bare
+// "&" left to mis-split on, and the resulting punctuation gets stripped
+// like any other by the normal cleanup below.
+const HTML_ENTITIES = { quot: '"', apos: "'", amp: '&', lt: '<', gt: '>', nbsp: ' ' };
+function decodeHtmlEntities(text) {
+  return text
+    .replace(/&(quot|apos|amp|lt|gt|nbsp);/gi, (_, name) => HTML_ENTITIES[name.toLowerCase()])
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)));
+}
+
 /**
- * Repairs the two specific OCR/label-transcription defects above --
- * both no-ops (regex simply won't match) on well-formed text, so this is
- * safe to run unconditionally before any real parsing happens.
+ * Repairs the label-transcription defects above -- all no-ops (nothing
+ * to match) on well-formed text, so this is safe to run unconditionally
+ * before any real parsing happens.
  */
 function repairRunOnCategories(text) {
-  return text
+  return decodeHtmlEntities(text)
     .replace(MISSING_CODE_LIST_CLOSER_RE, '($1), ')
     .replace(MISSING_COMMA_AFTER_BRACKET_RE, ', $1');
 }
