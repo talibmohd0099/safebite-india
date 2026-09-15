@@ -1,6 +1,8 @@
 // src/components/IngredientCard.jsx
-// One row in the ingredients list: a colour-tinted category icon, name,
-// one-line reason, expanding in place to the full detail.
+// One row in the ingredients list: a neutral category icon, name, and a
+// colour-coded severity pill (the single place severity is shown, so it
+// never fights the icon for attention), expanding in place to the full
+// detail.
 import { useState } from 'react';
 import { getIngredientSeverity } from '../utils/storage';
 import { categoryIcon } from '../utils/categoryIcon';
@@ -26,7 +28,7 @@ function Badge({ label, value }) {
   );
 }
 
-export default function IngredientCard({ ingredient, style }) {
+export default function IngredientCard({ ingredient, severityLabel, style }) {
   const [expanded, setExpanded] = useState(false);
   const severity = getIngredientSeverity(ingredient);
   const researchUrl = `https://www.google.com/search?q=${encodeURIComponent(`${ingredient.name} food ingredient health effects`)}`;
@@ -39,20 +41,22 @@ export default function IngredientCard({ ingredient, style }) {
       >
         <span
           className="w-9 h-9 rounded-[10px] flex-shrink-0 flex items-center justify-center text-[17px]"
-          style={{ background: severity.bg }}
+          style={{ background: 'var(--fill)' }}
         >
           {categoryIcon(ingredient.category)}
         </span>
 
         <span className="flex-1 min-w-0">
-          <span className="block text-[17px] leading-snug tracking-[-0.01em]" style={{ color: 'var(--label-1)' }}>
+          <span className="block text-[17px] leading-snug tracking-[-0.01em] truncate" style={{ color: 'var(--label-1)' }}>
             {ingredient.name}
           </span>
-          {ingredient.reason && !expanded && (
-            <span className="block text-[13px] truncate mt-0.5" style={{ color: 'var(--label-2)' }}>
-              {ingredient.reason}
-            </span>
-          )}
+        </span>
+
+        <span
+          className="flex-shrink-0 text-[11.5px] font-semibold px-2.5 py-1 rounded-full"
+          style={{ background: severity.bg, color: severity.color }}
+        >
+          {severityLabel || severity.label}
         </span>
 
         <svg
@@ -67,13 +71,6 @@ export default function IngredientCard({ ingredient, style }) {
 
       {expanded && (
         <div className="item-in px-4 pb-4 pl-[64px] space-y-3">
-          <span
-            className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full"
-            style={{ background: severity.bg, color: severity.color }}
-          >
-            {severity.label}
-          </span>
-
           {ingredient.reason && (
             <p className="text-[15px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
               {ingredient.reason}

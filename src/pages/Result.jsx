@@ -284,6 +284,12 @@ export default function Result() {
   const flaggedCount = ingredients.filter((i) => ['Harmful', 'Concerning'].includes(severityOf(i))).length;
   const filteredIngredients = filter === 'all' ? ingredients : ingredients.filter((i) => severityOf(i) === filter);
 
+  // The Ingredients tab's "All" list, worst tier first -- every card
+  // shows its own severity pill now (see IngredientCard), so a plain
+  // sorted list reads just as clearly as the old grouped sections did,
+  // without repeating a header per tier.
+  const sortedIngredients = tiers.flatMap((tier) => ingredients.filter((i) => severityOf(i) === tier.key));
+
   const savedDate = new Date(result.savedAt).toLocaleDateString('en-IN', {
     day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
@@ -708,59 +714,55 @@ export default function Result() {
       {/* Ingredients */}
       {view === 'ingredients' && (
         <>
-          <SectionHeader
-            action={filter !== 'all' && (
-              <button onClick={() => setFilter('all')} className="text-[13px]" style={{ color: 'var(--tint)' }}>
-                {t('showAll')}
-              </button>
-            )}
-          >
-            {filter === 'all'
-              ? t('allIngredientsCount', { count: ingredients.length })
-              : t('filteredCount', {
-                  count: filteredIngredients.length,
-                  label: (tiers.find((tier) => tier.key === filter)?.label || '').toLowerCase(),
-                })}
-          </SectionHeader>
+          {/* Filter chips -- "All" plus every severity tier that actually
+              has members, each carrying its own count. Replaces the old
+              per-tier header sections: severity is now shown on every
+              row's own pill (see IngredientCard), so these chips only
+              need to filter, not also explain the grouping below. */}
+          <div className="flex gap-2 overflow-x-auto px-4 pt-4 pb-1" style={{ scrollbarWidth: 'none' }}>
+            <button
+              onClick={() => setFilter('all')}
+              className="tap-scale flex-shrink-0 px-3 py-1.5 rounded-full text-[13px] font-semibold"
+              style={{
+                background: filter === 'all' ? 'var(--label-1)' : 'var(--fill)',
+                color: filter === 'all' ? 'var(--bg-card)' : 'var(--label-1)',
+              }}
+            >
+              {t('filterAll')} {ingredients.length}
+            </button>
+            {tiers.filter((tier) => tier.count > 0).map((tier) => {
+              const active = filter === tier.key;
+              return (
+                <button
+                  key={tier.key}
+                  onClick={() => setFilter(tier.key)}
+                  className="tap-scale flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold"
+                  style={{
+                    background: active ? tier.color : tier.bg,
+                    color: active ? '#fff' : tier.color,
+                  }}
+                >
+                  <span>{tier.icon}</span> {tier.label} {tier.count}
+                </button>
+              );
+            })}
+          </div>
+
           {filteredIngredients.length === 0 ? (
-            <Group>
+            <Group className="mt-3">
               <p className="px-4 py-4 text-[15px] text-center" style={{ color: 'var(--label-2)' }}>
                 {t('noneInCategory')}
               </p>
             </Group>
-          ) : filter === 'all' ? (
-            // Grouped by severity (worst first) rather than label order --
-            // easier to scan "what's actually wrong with this" at a glance.
-            // The filtered single-category view below keeps a flat list
-            // since every card in it already shares one severity.
-            tiers
-              .filter((tier) => tier.count > 0)
-              .map((tier) => (
-                <div key={tier.key}>
-                  <div className="flex items-center gap-2 px-5 pb-1.5 pt-5">
-                    <span
-                      className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
-                      style={{ background: tier.bg, color: tier.color }}
-                    >
-                      {tier.icon}
-                    </span>
-                    <span className="text-[13px] font-semibold" style={{ color: tier.color }}>
-                      {tier.label} · {tier.count}
-                    </span>
-                  </div>
-                  <Group>
-                    {ingredients
-                      .filter((ingredient) => severityOf(ingredient) === tier.key)
-                      .map((ingredient, i) => (
-                        <IngredientCard key={i} ingredient={ingredient} style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }} />
-                      ))}
-                  </Group>
-                </div>
-              ))
           ) : (
-            <Group>
-              {filteredIngredients.map((ingredient, i) => (
-                <IngredientCard key={i} ingredient={ingredient} style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }} />
+            <Group className="mt-3">
+              {(filter === 'all' ? sortedIngredients : filteredIngredients).map((ingredient, i) => (
+                <IngredientCard
+                  key={i}
+                  ingredient={ingredient}
+                  severityLabel={tiers.find((tier) => tier.key === severityOf(ingredient))?.label}
+                  style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }}
+                />
               ))}
             </Group>
           )}

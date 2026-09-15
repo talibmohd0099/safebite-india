@@ -85,9 +85,7 @@ export const STRINGS = {
     watchOutFor: 'Watch out for',
     goodThings: 'Good things',
 
-    allIngredientsCount: 'All {count} ingredients',
-    filteredCount: '{count} {label}',
-    showAll: 'Show all',
+    filterAll: 'All',
     noneInCategory: 'None in this category.',
 
     asReadFromLabel: 'As read from the label',
@@ -215,9 +213,7 @@ export const STRINGS = {
     watchOutFor: 'इनसे सावधान रहें',
     goodThings: 'अच्छी बातें',
 
-    allIngredientsCount: 'सभी {count} सामग्री',
-    filteredCount: '{count} {label}',
-    showAll: 'सभी दिखाएं',
+    filterAll: 'सभी',
     noneInCategory: 'इस कैटेगरी में कुछ नहीं है।',
 
     asReadFromLabel: 'लेबल पर जैसा लिखा है',
