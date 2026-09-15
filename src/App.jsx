@@ -17,6 +17,7 @@ import { LanguageProvider } from './contexts/LanguageContext';
 import Header from './components/Header';
 import BottomTabBar from './components/BottomTabBar';
 import SplashScreen from './components/SplashScreen';
+import Onboarding, { ONBOARDING_KEY } from './components/Onboarding';
 import Home from './pages/Home';
 import Result from './pages/Result';
 import History from './pages/History';
@@ -57,6 +58,13 @@ export default function App() {
   // a one-time "first ever visit" flag, so it doesn't need localStorage.
   const [showSplash, setShowSplash] = useState(true);
 
+  // Unlike the splash screen, this genuinely is a one-time "first ever
+  // visit" flag -- read once at startup so a returning user's very
+  // first render never shows onboarding, not even for a flash.
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    try { return !localStorage.getItem(ONBOARDING_KEY); } catch { return false; }
+  });
+
   return (
     <LanguageProvider>
       <HashRouter>
@@ -78,6 +86,7 @@ export default function App() {
           <BottomTabBar />
         </div>
         {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
+        {!showSplash && showOnboarding && <Onboarding onDone={() => setShowOnboarding(false)} />}
       </HashRouter>
     </LanguageProvider>
   );

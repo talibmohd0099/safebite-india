@@ -12,6 +12,19 @@
 
 export const STRINGS = {
   en: {
+    onboardingSkip: 'Skip',
+    onboardingNext: 'Next',
+    onboardingGetStarted: 'Get Started',
+    onboardingStep1Title: 'Welcome to FoodGuard India',
+    onboardingStep1Body: "International apps don't recognize Indian brands or understand FSSAI rules. FoodGuard India checks packaged food against real Indian standards and gives you an honest, plain-language health score.",
+    onboardingStep2Title: 'How your score works',
+    onboardingStep2Body: 'Every ingredient is checked against real health data. Your score starts at 100 and only drops for genuine concerns — never guesswork or marketing spin.',
+    onboardingStep3Title: 'Three ways to scan',
+    onboardingStep3Body: "Snap a photo of the ingredient label, scan the barcode, or paste the text — whichever's easiest for you.",
+    onboardingScanPhoto: 'Scan Photo',
+    onboardingBarcode: 'Barcode',
+    onboardingPaste: 'Paste',
+
     navScan: 'Scan',
     navHistory: 'History',
     navNews: 'News',
@@ -140,6 +153,19 @@ export const STRINGS = {
   },
 
   hi: {
+    onboardingSkip: 'स्किप करें',
+    onboardingNext: 'आगे',
+    onboardingGetStarted: 'शुरू करें',
+    onboardingStep1Title: 'FoodGuard India में आपका स्वागत है',
+    onboardingStep1Body: 'इंटरनेशनल ऐप्स भारतीय ब्रांड्स नहीं पहचानते और FSSAI के नियम नहीं समझते। FoodGuard India पैकेज्ड फूड को असली भारतीय मानकों पर परखता है और आपको आसान भाषा में एक ईमानदार हेल्थ स्कोर देता है।',
+    onboardingStep2Title: 'आपका स्कोर कैसे तय होता है',
+    onboardingStep2Body: 'हर सामग्री को असली हेल्थ डेटा के आधार पर परखा जाता है। आपका स्कोर 100 से शुरू होता है और सिर्फ असली चिंताओं की वजह से कम होता है — किसी अंदाज़े या मार्केटिंग की वजह से नहीं।',
+    onboardingStep3Title: 'स्कैन करने के तीन तरीके',
+    onboardingStep3Body: 'सामग्री लेबल की फोटो लें, बारकोड स्कैन करें, या टेक्स्ट पेस्ट करें — जो भी आपके लिए आसान हो।',
+    onboardingScanPhoto: 'फोटो स्कैन करें',
+    onboardingBarcode: 'बारकोड',
+    onboardingPaste: 'पेस्ट करें',
+
     navScan: 'स्कैन',
     navHistory: 'इतिहास',
     navNews: 'खबरें',
