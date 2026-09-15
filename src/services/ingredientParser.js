@@ -608,7 +608,15 @@ export function parseIngredients(labelText) {
   const processEntry = (rawEntry, groupId = null, inheritedPercentage = null) => {
     // A standalone footnote like "#(D-GLUCOSE, LEVULOSE)" explains an
     // ingredient listed above — it isn't an ingredient in its own right.
-    if (/^\s*[#*†‡^]/.test(rawEntry)) return;
+    // Only true when the marker has NOTHING but a bracket after it,
+    // though -- a real named entry can also carry one of these symbols
+    // as a leading disclosure mark rather than a footnote reference,
+    // e.g. "*Seasoning (Spices and condiments, Maltodextrin, ...)" (a
+    // real scanned Lays label). The old check matched any leading
+    // marker at all, so it silently dropped that entire group -- 8 real
+    // ingredients, including two flavour enhancers -- and scored the
+    // product as if it were just potato and oil.
+    if (/^\s*[#*†‡^]\s*[([{]/.test(rawEntry)) return;
 
     // Tidy up spacing labels often have inside brackets: "(MAIDA )" -> "(MAIDA)"
     const entry = rawEntry

@@ -11,6 +11,41 @@ function byName(ingredients, name) {
   return ingredients.find((i) => i.displayName === name);
 }
 
+test('does not drop a real named group just because it carries a leading disclosure mark', () => {
+  // Regression test for a real scanned product (Lays India's Magic
+  // Masala): "*Seasoning (Spices and condiments, Maltodextrin, ...)" --
+  // the leading "*" is a disclosure mark on a real ingredient group,
+  // not a footnote reference to something mentioned earlier (like the
+  // genuine "#(D-GLUCOSE, LEVULOSE)" case below). The old check treated
+  // ANY leading marker as a footnote and skipped the whole entry --
+  // silently dropping 8 real ingredients (including two flavour
+  // enhancers) and scoring the product as if it were just potato and
+  // oil (a false 93/100 "Very Healthy").
+  const label =
+    'Potato (83%), Edible Vegetable Oil, *Seasoning (Spices and condiments, Maltodextrin, ' +
+    'lodised Salt, Sugar, Flavour (Natural and Nature Identical Flavouring Substances), ' +
+    'Edible Vegetable Oil (Sunflower Oil, Palm Oil), Flavour Enhancers (627, 631)).';
+
+  const result = parseIngredients(label);
+  const names = result.map((i) => i.displayName);
+
+  assert.ok(names.includes('Potato'));
+  assert.ok(names.includes('Maltodextrin'));
+  assert.ok(names.includes('Sugar'));
+  assert.ok(names.includes('Sunflower Oil'));
+  assert.ok(names.includes('Palm Oil'));
+  assert.ok(result.some((i) => i.insCode === '627'));
+  assert.ok(result.some((i) => i.insCode === '631'));
+});
+
+test('still skips a genuine standalone footnote that is nothing but a marker and a bracket', () => {
+  // The case this whole check exists for -- "#(D-GLUCOSE, LEVULOSE)"
+  // defines "INVERT SUGAR SYRUP#" mentioned earlier, it isn't itself
+  // an ingredient. Must keep working after the fix above.
+  const result = parseIngredients('INVERT SUGAR SYRUP#, Citric Acid. #(D-GLUCOSE, LEVULOSE)');
+  assert.deepEqual(result.map((i) => i.displayName), ['Invert Sugar Syrup', 'Citric Acid']);
+});
+
 test('extracts ingredients nested inside a group that is followed by its own percentage bracket', () => {
   // Regression test for a real scanned label (Slurp Farm Millet Noodles):
   // "Supergrain blend (whole wheat (atta), jowar) (63%)" — the comma-
