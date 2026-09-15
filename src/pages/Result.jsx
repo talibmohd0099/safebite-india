@@ -632,44 +632,47 @@ export default function Result() {
             </p>
           </div>
 
-          <button
-            onClick={() => setShowWhyPersonal((v) => !v)}
-            className="tap-scale mt-3 pl-[27px] text-[13px] font-semibold"
-            style={{ color: 'var(--tint)' }}
-          >
-            {t('personalWhyDifferent', { name: activeProfile.nickname })}
-          </button>
+          {/* No concerns means the personal score IS the universal score
+              (see calculatePersonalAssessment -- 0 matched concerns
+              means 0 deducted) -- asking "why is it different?" when
+              it isn't is confusing, so this whole prompt only exists
+              when there's an actual difference to explain. */}
+          {!personalAssessment.hasNoConcerns && (
+            <>
+              <button
+                onClick={() => setShowWhyPersonal((v) => !v)}
+                className="tap-scale mt-3 pl-[27px] text-[13px] font-semibold"
+                style={{ color: 'var(--tint)' }}
+              >
+                {t('personalWhyDifferent', { name: activeProfile.nickname })}
+              </button>
 
-          {showWhyPersonal && (
-            <div className="mt-2 pl-[27px] space-y-1.5 item-in">
-              {personalAssessment.hasNoConcerns ? (
-                <p className="text-[13px] leading-relaxed" style={{ color: 'var(--label-2)' }}>
-                  {t('personalNoConcerns', { name: activeProfile.nickname })}
-                </p>
-              ) : (
-                personalAssessment.matchedConcerns.map((c) => (
-                  <div key={c.priorityKey} className="rounded-[12px] p-2.5" style={{ background: 'var(--fill)' }}>
-                    <p className="text-[13px] font-semibold" style={{ color: 'var(--v-poor)' }}>
-                      ⚠ {t(PRIORITY_CONCERN_KEY[c.priorityKey])}
+              {showWhyPersonal && (
+                <div className="mt-2 pl-[27px] space-y-1.5 item-in">
+                  {personalAssessment.matchedConcerns.map((c) => (
+                    <div key={c.priorityKey} className="rounded-[12px] p-2.5" style={{ background: 'var(--fill)' }}>
+                      <p className="text-[13px] font-semibold" style={{ color: 'var(--v-poor)' }}>
+                        ⚠ {t(PRIORITY_CONCERN_KEY[c.priorityKey])}
+                      </p>
+                      <p className="text-[12.5px] leading-relaxed mt-0.5" style={{ color: 'var(--label-2)' }}>
+                        {t('personalPriorityReason', {
+                          name: activeProfile.nickname,
+                          priority: t(PRIORITY_LABEL_KEY[c.priorityKey]).toLowerCase(),
+                        })}
+                      </p>
+                    </div>
+                  ))}
+                  <p className="text-[11.5px] leading-relaxed pt-1" style={{ color: 'var(--label-3)' }}>
+                    {t('personalExplainerNote', { name: activeProfile.nickname })}
+                  </p>
+                  {!result.realNutrients && (
+                    <p className="text-[11.5px] leading-relaxed" style={{ color: 'var(--label-3)' }}>
+                      {t('personalNoNutritionData')}
                     </p>
-                    <p className="text-[12.5px] leading-relaxed mt-0.5" style={{ color: 'var(--label-2)' }}>
-                      {t('personalPriorityReason', {
-                        name: activeProfile.nickname,
-                        priority: t(PRIORITY_LABEL_KEY[c.priorityKey]).toLowerCase(),
-                      })}
-                    </p>
-                  </div>
-                ))
+                  )}
+                </div>
               )}
-              <p className="text-[11.5px] leading-relaxed pt-1" style={{ color: 'var(--label-3)' }}>
-                {t('personalExplainerNote', { name: activeProfile.nickname })}
-              </p>
-              {!result.realNutrients && (
-                <p className="text-[11.5px] leading-relaxed" style={{ color: 'var(--label-3)' }}>
-                  {t('personalNoNutritionData')}
-                </p>
-              )}
-            </div>
+            </>
           )}
         </div>
       )}
