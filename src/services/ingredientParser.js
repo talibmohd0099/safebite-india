@@ -113,6 +113,59 @@ function normalizeCode(digits, sub, letter) {
   return code;
 }
 
+// A single missing closing bracket after an INS-code list doesn't just
+// mangle that one entry -- since splitTopLevel's bracket depth never
+// returns to zero for the rest of the string, every comma after it stops
+// splitting too, so EVERY later ingredient (however many) gets swallowed
+// into one giant blob that fails the "looks like an ingredient name"
+// check and is silently dropped whole. Confirmed against a real scanned
+// product (Maaza Refresh Mango Drink, barcode 8901764175022): "SUGAR
+// ACIDITY REGULATORS (330, 331(iii), STABILIZER (466), ANTIOXIDANT (300)
+// SWEETENER (960), COLOUR(110), MANGO FLAVOUR (...)." is missing the ")"
+// that should close "(330, 331(iii))" -- the label scored a false
+// "Very Healthy 99/100" because that one missing character also took
+// out an artificial sweetener AND a restricted synthetic colour (INS
+// 110, Sunset Yellow) with it, not just the acidity regulators. Repaired
+// by recognising "this bracket contains nothing but a code list, and is
+// directly followed by a comma + a fresh ALL-CAPS category word +
+// bracket" as a reliable sign the closer was dropped, and inserting it.
+const MISSING_CODE_LIST_CLOSER_RE =
+  /\((\d{3,4}(?:\s*\(\s*[ivx]+\s*\))?(?:\s*,\s*\d{3,4}(?:\s*\(\s*[ivx]+\s*\))?)*)\s*,\s*(?=[A-Z][A-Z\s]{2,}[\s(])/gi;
+
+// Regulatory/functional category words a label declares an additive
+// under -- unlike a descriptive compound name ("Mango Flavour", "Natural
+// Colour"), these are fixed FSSAI/Codex terms that are never themselves
+// preceded by an unrelated modifier word, so it's safe to assume
+// anything butting up against one with no delimiter is a separate,
+// missing-comma-away ingredient. Deliberately excludes COLOUR/COLOR and
+// FLAVOUR/FLAVOR/FLAVOURING -- those routinely follow a real descriptive
+// name ("Mango Flavour", "Caramel Colour") that must NOT be split off.
+const CATEGORY_LABEL_WORDS =
+  'ACIDITY REGULATORS?|ANTIOXIDANTS?|EMULSIFIERS?|PRESERVATIVES?|RAISING AGENTS?|' +
+  'STABILI[SZ]ERS?|SWEETENERS?|THICKENERS?|HUMECTANTS?|ANTI-CAKING AGENTS?|' +
+  'GELLING AGENTS?|GLAZING AGENTS?|BULKING AGENTS?|FIRMING AGENTS?|FOAMING AGENTS?|' +
+  'SEQUESTRANTS?|FLOUR TREATMENT AGENTS?';
+
+// Only fires right after a closing bracket -- "(300) SWEETENER (960)" is
+// a fresh declared category starting immediately after a previous one's
+// code closed, with no comma in between. That's a narrow, reliable
+// signal; a bare preceding WORD isn't (see CATEGORY_LABEL_WORDS above),
+// so a plain "SUGAR ACIDITY REGULATORS" run-on is deliberately left
+// alone rather than risk a wrong split.
+const MISSING_COMMA_AFTER_BRACKET_RE =
+  new RegExp(`(?<=[)\\]}]\\s{0,3})\\b(${CATEGORY_LABEL_WORDS})\\b\\s*(?=[(\\[])`, 'gi');
+
+/**
+ * Repairs the two specific OCR/label-transcription defects above --
+ * both no-ops (regex simply won't match) on well-formed text, so this is
+ * safe to run unconditionally before any real parsing happens.
+ */
+function repairRunOnCategories(text) {
+  return text
+    .replace(MISSING_CODE_LIST_CLOSER_RE, '($1), ')
+    .replace(MISSING_COMMA_AFTER_BRACKET_RE, ', $1');
+}
+
 /**
  * Split a label into top-level entries, respecting brackets so that
  * "INVERT SUGAR SYRUP (SUGAR, CITRIC ACID)" stays as one entry while
@@ -121,7 +174,8 @@ function normalizeCode(digits, sub, letter) {
  * Separators: commas, semicolons, newlines, bullets, sentence periods,
  * and a top-level " AND " / "&" (labels routinely end with "X, Y AND Z").
  */
-export function splitTopLevel(text) {
+export function splitTopLevel(rawText) {
+  const text = repairRunOnCategories(rawText);
   const parts = [];
   let depth = 0;
   let current = '';

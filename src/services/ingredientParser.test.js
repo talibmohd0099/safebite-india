@@ -134,6 +134,58 @@ test('does not lose a bracketed group whose closing sentence period sits before 
   }
 });
 
+test('recovers every ingredient after a single missing closing bracket, instead of dropping them all', () => {
+  // Regression test for a real scanned product (Maaza Refresh Mango
+  // Drink, barcode 8901764175022): the label text is missing the ")"
+  // that should close "(330, 331(iii))" -- "SUGAR ACIDITY REGULATORS
+  // (330, 331(iii), STABILIZER (466), ...". Because splitTopLevel's
+  // bracket depth never returns to zero after that point, every comma
+  // for the REST of the string stopped splitting too, so the whole tail
+  // (stabilizer, antioxidant, sweetener, colour, flavour) got swallowed
+  // into one blob and silently dropped -- the product scored a false
+  // "Very Healthy 99/100" because the artificial sweetener (960) and a
+  // restricted synthetic colour (110, Sunset Yellow) vanished along with
+  // it, not just the acidity regulators that were actually missing their
+  // bracket.
+  const label =
+    'WATER, MANGO PULP (11.3%), SUGAR ACIDITY REGULATORS (330, 331(iii), STABILIZER (466),\n' +
+    'ANTIOXIDANT (300) SWEETENER (960), COLOUR(110),\n' +
+    'MANGO FLAVOUR (NATURE-IDENTICAL & ARTIFICIAL FLAVOURING SUBSTANCES).';
+
+  const result = parseIngredients(label);
+
+  assert.ok(byName(result, 'Water'));
+  assert.ok(byName(result, 'Mango Pulp'));
+  const sweetener = result.find((i) => i.insCode === '960');
+  const colour = result.find((i) => i.insCode === '110');
+  assert.ok(sweetener, 'the artificial sweetener (INS 960) must survive the missing bracket');
+  assert.ok(colour, 'the restricted synthetic colour (INS 110) must survive the missing bracket');
+});
+
+test('splits two additive categories glued together with no comma between them', () => {
+  // "ANTIOXIDANT (300) SWEETENER (960)" is missing the comma between the
+  // two categories -- without recognising this, only the LAST bracket
+  // ("960") was kept and "(300)" was silently absorbed as unparsed text
+  // in front of it, losing the antioxidant as its own scoreable entry.
+  const result = parseIngredients('ANTIOXIDANT (300) SWEETENER (960)');
+  const antioxidant = result.find((i) => i.insCode === '300');
+  const sweetener = result.find((i) => i.insCode === '960');
+  assert.ok(antioxidant, 'Antioxidant (300) must be its own entry');
+  assert.ok(sweetener, 'Sweetener (960) must be its own entry');
+});
+
+test('does not split a descriptive name that happens to end in "Flavour" or "Colour"', () => {
+  // The category-word repair above must never fire on "Mango Flavour" or
+  // "Caramel Colour" -- these are real compound ingredient names, not a
+  // category label glued to an unrelated preceding word, and splitting
+  // them would fabricate a fake standalone "Flavour"/"Colour" ingredient.
+  const result = parseIngredients('MANGO FLAVOUR (NATURE-IDENTICAL), CARAMEL COLOUR (150D)');
+  assert.ok(!byName(result, 'Flavour'), 'must not split "Mango Flavour" into "Mango" + "Flavour"');
+  assert.ok(!byName(result, 'Colour'), 'must not split "Caramel Colour" into "Caramel" + "Colour"');
+  assert.ok(result.some((i) => i.displayName.toLowerCase().includes('mango flavour')));
+  assert.ok(result.some((i) => i.displayName.toLowerCase().includes('caramel colour')));
+});
+
 test('extracts a "Contains" allergen declaration separately even with markdown emphasis underscores', () => {
   // Same real product: its allergen line came through as "Contains
   // _Wheat_ and _nut_. May contains _Milk_, _Mustard_, _Oats_ and
