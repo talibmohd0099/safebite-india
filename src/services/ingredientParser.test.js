@@ -186,6 +186,33 @@ test('does not split a descriptive name that happens to end in "Flavour" or "Col
   assert.ok(result.some((i) => i.displayName.toLowerCase().includes('caramel colour')));
 });
 
+test('strips manufacturer/address boilerplate that names itself with a trigger word', () => {
+  const label =
+    'Ingredients: Wheat Flour, Sugar, Palm Oil, Salt, Raising Agent (503(ii)). Contains Wheat. ' +
+    'Mfd by: ABC Foods Pvt Ltd, Plot 45, Sector 10, Gurgaon, Haryana - 122001. ' +
+    'FSSAI Lic No. 12345678901234. ' +
+    'Customer Care: 1800-123-4567, care@abcfoods.com, www.abcfoods.com. ' +
+    'Best Before 6 months from Pkd on. Batch No. B123.';
+
+  const { ingredients, allergens } = parseLabel(label);
+  const names = ingredients.map((i) => i.displayName);
+
+  assert.deepEqual(names, ['Wheat Flour', 'Sugar', 'Palm Oil', 'Salt', 'Raising Agent (INS 503(ii))']);
+  assert.deepEqual(allergens, ['wheat']);
+});
+
+test('drops a manufacturer/address block that has no attribution verb in front of it', () => {
+  // Plenty of real labels just print the company name and address as a
+  // trailing run of comma-separated entries with nothing announcing
+  // what they are -- no "Mfd by" for the trigger-word check above to
+  // catch. "Private Limited" and the trailing 6-digit PIN code are each
+  // a strong enough signal on their own that everything from there to
+  // the end of the label is address, not more ingredients.
+  const label = 'Wheat Flour, Sugar, Palm Oil, Salt, XYZ Foods Private Limited, Plot 12, MIDC, Pune - 411019.';
+  const result = parseIngredients(label);
+  assert.deepEqual(result.map((i) => i.displayName), ['Wheat Flour', 'Sugar', 'Palm Oil', 'Salt']);
+});
+
 test('does not fabricate a fake "Quot" ingredient from a leaked &quot; entity', () => {
   // Regression test for a real scanned product (Storia Coffee Shake
   // 180ml): the extracted text wasn't an ingredients list at all -- it

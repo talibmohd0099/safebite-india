@@ -74,6 +74,30 @@ export function looksLikeIngredientName(name) {
   return fillerCount / words.length <= 0.34;
 }
 
+// A company name or address fragment, with no attribution verb ("Mfd
+// by") in front of it for stripBoilerplate to catch -- plenty of real
+// labels just print the manufacturer's name and address as a trailing
+// run of comma-separated entries with nothing announcing what they are.
+// No real food ingredient contains a company-registration suffix, an
+// industrial-estate marker, or ends in a 6-digit PIN code, so any one
+// of these is a safe, specific enough signal on its own.
+const ADDRESS_OR_COMPANY_RE =
+  /\b(?:pvt\.?\s*ltd\.?|private\s+limited|public\s+limited|\bltd\.?\b|\blimited\b|industries|enterprises|corporation|\bcorp\.?\b|midc|industrial\s+(?:area|estate)|\bplot\s*no\.?\b|\bsector\s*\d+\b)\b|\b\d{6}\b\s*\.?\s*$/i;
+
+/**
+ * True once a top-level entry looks like the START of the manufacturer/
+ * address block rather than an ingredient. Real labels always put this
+ * as one contiguous run at the very end, so once found, everything from
+ * that entry onward (not just this one entry) is dropped by the caller
+ * -- an address's own words ("Plot 12", "MIDC", "Pune - 411019") split
+ * into separate top-level entries the same way ingredients do, and only
+ * the FIRST of them is guaranteed to carry a strong enough signal to
+ * detect on its own.
+ */
+export function looksLikeAddressOrCompanyFragment(entry) {
+  return ADDRESS_OR_COMPANY_RE.test(entry);
+}
+
 // Footnote/reference markers labels use to link an ingredient to a
 // clarifying note, e.g. "INVERT SUGAR SYRUP# ... #(D-GLUCOSE, LEVULOSE)".
 const FOOTNOTE_MARKERS = /[#*†‡^]/g;
@@ -431,6 +455,50 @@ function buildLookupKeys(name, insCode) {
   return keys;
 }
 
+// Legally-mandated boilerplate every Indian packaged label carries
+// somewhere near the ingredients panel -- manufacturer/marketer
+// attribution, FSSAI licence number, registered office / customer care
+// address, and batch/date info. None of it is food, but a scanned or
+// photographed label routinely captures it in the same block of text as
+// the real ingredients, and a short piece of it (a city name, an INS-
+// code-shaped licence number, a plain word like "Care") can slip past
+// looksLikeIngredientName and get treated as a real ingredient. Matched
+// as a whole clause (trigger phrase through the next full stop) rather
+// than removed word-by-word, since an address's own internal commas
+// ("Plot 45, Sector 10, Gurgaon") must not be mistaken for separate
+// top-level ingredients if this ran after splitTopLevel instead of
+// before it.
+const BOILERPLATE_TRIGGER =
+  '(?:mfd\\.?\\s*(?:by|for)?|manufactured\\s*(?:by|for)?|mkt\\.?d\\.?\\s*(?:by|for)?|marketed\\s*(?:by|for)?|' +
+  'pkd\\.?\\s*(?:by|for|on)?|packed\\s*(?:by|for|on)?|packaged\\s*(?:by|for)?|bottled\\s*(?:by|for)?|' +
+  'distributed\\s*(?:by|for)?|imported\\s*(?:by|for)?|fssai\\.?\\s*(?:lic\\.?|licen[cs]e|reg\\.?|registration)\\.?\\s*(?:no\\.?)?|' +
+  'lic\\.?\\s*no\\.?|regd\\.?\\s*office|registered\\s*office|customer\\s*care|consumer\\s*care|' +
+  'for\\s*(?:any\\s*)?(?:queries|complaints|feedback|suggestions)|toll[- ]?free|helpline|' +
+  'best\\s*before|use\\s*by|batch\\s*no\\.?|mfg\\.?\\s*(?:date|dt)?\\.?|exp\\.?\\s*(?:date|dt)?\\.?)';
+
+// Standalone patterns removed regardless of a nearby trigger word -- an
+// email, a URL, or a 10-digit Indian mobile number is never legitimate
+// ingredient content on its own.
+const CONTACT_DETAIL_RES = [
+  /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g,          // email
+  /\b(?:https?:\/\/|www\.)\S+/gi,           // URL
+  /\b(?:\+?91[-\s]?)?[6-9]\d{9}\b/g,        // Indian mobile number
+  /\b1800[-\s]?\d{2,3}[-\s]?\d{4}\b/g,      // toll-free number
+];
+
+/**
+ * Strips manufacturer/address/legal boilerplate (see BOILERPLATE_TRIGGER
+ * above) out of a label, the same way extractAllergens pulls out
+ * "CONTAINS: ..." -- returns the remaining text with those clauses gone.
+ */
+function stripBoilerplate(text) {
+  let remaining = text;
+  for (const re of CONTACT_DETAIL_RES) remaining = remaining.replace(re, ' ');
+
+  const re = new RegExp(`\\b${BOILERPLATE_TRIGGER}\\b\\s*:?\\s*(?:(?!\\b${BOILERPLATE_TRIGGER}\\b)[^.\\n\\r])*`, 'gi');
+  return remaining.replace(re, ' ');
+}
+
 /**
  * Pull "CONTAINS: WHEAT, MILK" style allergen declarations out of the
  * label, returning them separately so they aren't parsed as ingredients.
@@ -495,7 +563,8 @@ function stripMarkdownEmphasis(text) {
  */
 export function parseLabel(labelText) {
   if (!labelText || !labelText.trim()) return { ingredients: [], allergens: [] };
-  const { remaining, allergens } = extractAllergens(stripMarkdownEmphasis(labelText));
+  const withoutBoilerplate = stripBoilerplate(stripMarkdownEmphasis(labelText));
+  const { remaining, allergens } = extractAllergens(withoutBoilerplate);
   return { ingredients: parseIngredients(remaining), allergens };
 }
 
@@ -697,6 +766,11 @@ export function parseIngredients(labelText) {
   };
 
   for (const rawEntry of splitTopLevel(labelText)) {
+    // The manufacturer/address block is always a contiguous run at the
+    // very end -- the moment one entry looks like the start of it, every
+    // entry after it is with near-certainty more of the same, not a new
+    // ingredient that just happens to follow an address in the label.
+    if (looksLikeAddressOrCompanyFragment(rawEntry)) break;
     processEntry(rawEntry);
   }
 
