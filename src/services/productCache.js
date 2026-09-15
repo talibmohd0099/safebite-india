@@ -380,6 +380,44 @@ export async function deleteReport(lookupKey) {
 }
 
 /**
+ * Mirrors report.realNutrients (see analyzeText.js) into its own
+ * queryable table (see supabase/product_nutrition_schema.sql) whenever
+ * it's present -- the app itself still reads report.realNutrients
+ * directly at runtime (personalAssessment.js never queries this
+ * table), this is purely so the same real numbers are visible/browsable
+ * in Supabase's dashboard instead of buried inside a jsonb column.
+ * Best-effort, same as saveReport below: never blocks the user's report.
+ */
+async function upsertProductNutrition(lookupKey, productName, report) {
+  const n = report?.realNutrients;
+  if (!n) return;
+
+  try {
+    await supabase.from('product_nutrition').upsert(
+      {
+        lookup_key: lookupKey,
+        product_name: productName || null,
+        sodium_mg: n.sodiumMg ?? null,
+        added_sugar_g: n.addedSugarG ?? null,
+        saturated_fat_g: n.saturatedFatG ?? null,
+        trans_fat_g: n.transFatG ?? null,
+        calories_kcal: n.caloriesKcal ?? null,
+        protein_g: n.proteinG ?? null,
+        serving_grams: report.realNutrientsServingGrams ?? null,
+        // Only ever populated from one of these two real sources (see
+        // analyzeText.js) -- text/photo scans never reach this function
+        // at all, since they never have realNutrients to begin with.
+        source: lookupKey?.startsWith('barcode:') ? 'openfoodfacts' : 'blinkit',
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'lookup_key' },
+    );
+  } catch {
+    // This table is a bonus visibility layer, not a requirement.
+  }
+}
+
+/**
  * Save a freshly-generated AI report to the shared cache so the next
  * person (or the same person, next time) skips the AI call entirely.
  * Safe to call even if Supabase isn't configured — it just no-ops.
@@ -401,4 +439,6 @@ export async function saveReport({ lookupKey, source, productName, ingredientsTe
   } catch {
     // Caching is a bonus, not a requirement — never block the user's report on this.
   }
+
+  await upsertProductNutrition(lookupKey, productName, report);
 }
