@@ -96,86 +96,6 @@ function computeScore(ingredients) {
   return score;
 }
 
-// A truthful "why did this score X" breakdown -- there is no "Processing"
-// or "Sodium" bucket anywhere in this formula (sodium/sugar aren't
-// scoring inputs at all, see dailyHabitCheck.js for that, entirely
-// separate), so the only honest breakdown is by the ingredient that
-// actually cost the points. Shares totalPenaltyOf/the same rounding
-// order with computeScore above so `rawScore` here is guaranteed to
-// match its pre-cap intermediate exactly, not just approximately --
-// otherwise a ±1 rounding drift between the two could make `wasCapped`
-// fire (or miss) right at a cap boundary.
-//
-// Rounding each ingredient's contribution independently (Math.round on
-// each, then summing) does NOT reliably reproduce the real total -- with
-// enough ingredients each rounding up "a little", the visible line items
-// can add up to several points more or less than the actual score change
-// (found on a real seeded product: 14 ingredients individually rounded
-// summed to 42, implying a raw score of 58, while the real rounded-once
-// score was 61 -- a 3-point gap a user doing the math themselves would
-// have caught immediately). Largest-remainder rounding fixes this: floor
-// every contribution, then hand out the few leftover whole points to
-// whichever ingredients had the largest fractional part, so the
-// displayed items always sum to exactly the shown score change.
-export function buildScoreBreakdown(ingredients, finalScore) {
-  const totalPenalty = totalPenaltyOf(ingredients);
-  const rawScore = Math.max(0, Math.min(100, Math.round(100 - totalPenalty)));
-  const targetPoints = 100 - rawScore; // what the displayed items must sum to, exactly
-
-  const contributions = ingredients
-    .map((i, idx) => ({
-      idx,
-      name: i.name,
-      reason: i.reason || null,
-      healthEffects: i.healthEffects || null,
-      category: i.category || null,
-      exact: (i.penalty || 0) * quantityWeight(i),
-    }))
-    .filter((c) => c.exact > 0)
-    .map((c) => ({ ...c, floor: Math.floor(c.exact), frac: c.exact - Math.floor(c.exact) }));
-
-  const flooredTotal = contributions.reduce((sum, c) => sum + c.floor, 0);
-  const leftoverPoints = targetPoints - flooredTotal; // always >= 0 (floor(x) <= x for every term)
-  const bumpIdx = new Set(
-    [...contributions]
-      .sort((a, b) => b.frac - a.frac)
-      .slice(0, leftoverPoints)
-      .map((c) => c.idx)
-  );
-
-  // reason/healthEffects/category -- the ingredient's own
-  // already-researched data (same fields IngredientCard shows), so
-  // showing more detail per row costs nothing extra: no new AI call,
-  // just data already on hand. Deliberately NOT status/severity --
-  // every row here already costs real points by construction, so it's
-  // coloured by how big that deduction is (see deductionSeverity in
-  // Result.jsx), not by the ingredient's overall safety tier, which
-  // could otherwise show a "safe"-status ingredient in the same green
-  // used everywhere else for "no concern at all" right next to its own
-  // negative point count.
-  const items = contributions
-    .map((c) => ({
-      name: c.name,
-      reason: c.reason,
-      healthEffects: c.healthEffects,
-      category: c.category,
-      points: c.floor + (bumpIdx.has(c.idx) ? 1 : 0),
-    }))
-    .filter((item) => item.points > 0)
-    .sort((a, b) => b.points - a.points);
-
-  const hasHarmful = ingredients.some((i) => i.status === 'harmful');
-  const wasCapped = rawScore !== finalScore;
-
-  return {
-    items,
-    rawScore,
-    finalScore,
-    wasCapped,
-    capReason: wasCapped ? (hasHarmful ? 'harmful' : 'concerning') : null,
-  };
-}
-
 // The fallback recommendations, used when the AI-written per-product one
 // (see generateProductInsights) isn't available. Exported as a set so a
 // bulk re-score can tell "this row still has the generic line, safe to
@@ -254,7 +174,6 @@ export function buildReport(ingredients, { productName, brand, imageUrl } = {}) 
     positives,
     recommendation: recommendationFor(score),
     hasEstimatedQuantities,
-    scoreBreakdown: buildScoreBreakdown(ingredients, score),
   };
 }
 

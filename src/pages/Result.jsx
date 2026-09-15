@@ -7,7 +7,6 @@ import { updateProductName, getCachedReport, getSaferAlternatives, deleteReport,
 import { analyzeText } from '../services/analyzeText';
 import { lookupBarcode } from '../services/openFoodFacts';
 import { getRelatedNews } from '../services/newsRepo';
-import { buildScoreBreakdown } from '../services/scoringEngine';
 import { categoryIcon } from '../utils/categoryIcon';
 import { useLanguage } from '../contexts/LanguageContext';
 import ScoreCircle from '../components/ScoreCircle';
@@ -32,20 +31,15 @@ const HABIT_NUTRIENT_LABEL_KEY = {
   transFatG: 'nutrientTransFatG',
 };
 
-// Colours a score-breakdown row by how big ITS deduction is relative to
-// the largest one in the list -- not by the ingredient's overall safety
-// status (getIngredientSeverity). Every row in this list already costs
-// real points by construction (buildScoreBreakdown filters out anything
-// with 0), so a "safe"-status ingredient that still lost a few points
-// (e.g. wheat gluten, edible starch) would otherwise render in the same
-// green used everywhere else in the app for "no concern at all" --
-// directly contradicting the negative number sitting right next to it.
-function deductionSeverity(points, maxPoints) {
-  const ratio = maxPoints > 0 ? points / maxPoints : 0;
-  if (ratio >= 0.66) return { color: 'var(--v-very-poor)', bg: 'var(--v-very-poor-bg)' };
-  if (ratio >= 0.33) return { color: 'var(--v-poor)', bg: 'var(--v-poor-bg)' };
-  return { color: 'var(--v-moderate)', bg: 'var(--v-moderate-bg)' };
-}
+// Which i18n string (see src/i18n/strings.js) explains what each real
+// severity tier means, for the "Why did this score X" modal's grouped
+// ingredient buckets.
+const TIER_DESCRIPTION_KEY = {
+  Harmful: 'tierDescHarmful',
+  Concerning: 'tierDescConcerning',
+  'Highly processed': 'tierDescProcessed',
+  Fine: 'tierDescFine',
+};
 
 function SectionHeader({ children, action }) {
   return (
@@ -130,7 +124,6 @@ export default function Result() {
   const [relatedNews, setRelatedNews] = useState([]);
   const [showHabitModal, setShowHabitModal] = useState(false);
   const [showScoreModal, setShowScoreModal] = useState(false);
-  const [showAllBreakdownItems, setShowAllBreakdownItems] = useState(false);
   const [expandedBreakdownRows, setExpandedBreakdownRows] = useState(() => new Set());
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -312,11 +305,13 @@ export default function Result() {
     };
   })();
 
-  // Pure ingredient math, no AI/network call -- computed on the fly for
-  // any report saved before this feature existed (result.scoreBreakdown
-  // missing) so "Why {score}?" works immediately on every already-cached
-  // product, not just ones that happen to get refreshed.
-  const scoreBreakdown = result.scoreBreakdown || (ingredients.length > 0 ? buildScoreBreakdown(ingredients, score) : null);
+  // For the "Why did this score X?" modal -- every real ingredient,
+  // grouped by the exact same severity tiers already used for the
+  // Breakdown tiles and the Ingredients tab above (no separate/invented
+  // categorisation), skipping any tier with nothing in it.
+  const scoreModalTiers = tiers
+    .map((tier) => ({ ...tier, members: ingredients.filter((ing) => severityOf(ing) === tier.key) }))
+    .filter((tier) => tier.members.length > 0);
 
   return (
     <div className="page-in max-w-[560px] mx-auto pb-24" style={{ background: 'var(--bg-grouped)' }}>
@@ -881,31 +876,27 @@ export default function Result() {
         </button>
       </div>
 
-      {/* Real, ingredient-by-ingredient reason for this exact score --
-          opened by "Why {score}?" in the score hero, above. No invented
-          categories (no "Processing", no "Sodium" bucket) -- this
-          formula only ever subtracts by ingredient, so that's the only
-          honest way to explain it. When a harmful/concerning ingredient
-          forced a cap (see scoringEngine.js's squeezeToCap), that's
-          shown as a plain adjustment note, not folded into a fake line
-          item that would make the numbers not add up. Positive factors
-          are shown with an explicit "0" -- honest, since this formula
-          has no additive mechanism at all, rather than either hiding
-          them or inventing a fake "+N" bonus. */}
-      {showScoreModal && scoreBreakdown && (() => {
-        const breakdown = scoreBreakdown;
-        const maxPoints = Math.max(1, ...breakdown.items.map((i) => i.points));
-        const visibleItems = showAllBreakdownItems ? breakdown.items : breakdown.items.slice(0, 5);
-        const totalLost = breakdown.items.reduce((sum, i) => sum + i.points, 0);
-        const capAdjustment = breakdown.wasCapped ? breakdown.finalScore - breakdown.rawScore : 0;
-        const toggleRow = (idx) => {
+      {/* "Why did this score X?" -- ingredients grouped by the same real
+          severity tiers used everywhere else in this app (Breakdown
+          tiles, Ingredients tab). Deliberately no per-ingredient point
+          values and no mention of the harmful/concerning score cap
+          (scoringEngine.js's squeezeToCap) -- the scoring system itself
+          is unchanged, this is purely how it's explained. */}
+      {showScoreModal && (() => {
+        const toggleRow = (key) => {
           setExpandedBreakdownRows((prev) => {
             const next = new Set(prev);
-            if (next.has(idx)) next.delete(idx);
-            else next.add(idx);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
             return next;
           });
         };
+
+        const STEPS = [
+          { icon: '📋', bg: 'var(--tint-bg)', titleKey: 'scoreModalStep1Title', captionKey: 'scoreModalStep1Caption' },
+          { icon: '⚖️', bg: 'var(--v-moderate-bg)', titleKey: 'scoreModalStep2Title', captionKey: 'scoreModalStep2Caption' },
+          { icon: '⭐', bg: 'var(--v-good-bg)', titleKey: 'scoreModalStep3Title', captionKey: 'scoreModalStep3Caption' },
+        ];
 
         return createPortal(
           <div
@@ -926,216 +917,156 @@ export default function Result() {
                 ×
               </button>
 
-              <p className="text-[19px] font-bold pr-8 mb-3" style={{ color: 'var(--label-1)' }}>
+              <p className="text-[19px] font-bold pr-8 mb-2" style={{ color: 'var(--label-1)' }}>
                 {t('scoreBreakdownTitle', { score })}
               </p>
+              <p className="text-[13px] leading-relaxed mb-4" style={{ color: 'var(--label-2)' }}>
+                {t('scoreModalIntro')}
+              </p>
 
-              {/* Intro + a small "how to read this" tip side by side. */}
-              <div className="flex items-start gap-3 mb-4">
-                <p className="flex-1 text-[13px] leading-relaxed" style={{ color: 'var(--label-2)' }}>
-                  {t('scoreBreakdownIntro')}
-                </p>
-                <div className="flex-shrink-0 w-[104px] rounded-[14px] p-2.5 text-center" style={{ background: 'var(--v-good-bg)' }}>
-                  <span className="text-[18px]">💡</span>
-                  <p className="text-[10.5px] leading-snug mt-1" style={{ color: 'var(--v-good)' }}>
-                    {t('scoreBreakdownLowerMeansMore')}
-                  </p>
-                </div>
-              </div>
-
-              {/* Score circle + verdict pill on the left, a running
-                  ledger (started at / deductions / positives / cap
-                  adjustment if any / final) on the right -- a quick
-                  visual gist before the detailed table below. Every
-                  number here is real and adds up exactly; the cap
-                  adjustment line only appears when one was actually
-                  applied, so 100 + every line here always equals the
-                  final score shown at the bottom. */}
-              <div className="flex items-start gap-5 mb-4">
+              {/* Score circle + verdict pill on the left, the same AI
+                  recommendation already shown in the score hero on the
+                  right -- reused, not new text. */}
+              <div className="flex items-center gap-4 mb-4">
                 <ScoreCircle score={score} size="large" showLabel />
-                <div className="flex-1 min-w-0 pt-1">
-                  <div className="flex items-center justify-between py-1">
-                    <span className="text-[13px]" style={{ color: 'var(--label-2)' }}>{t('scoreBreakdownStartedAt')}</span>
-                    <span className="text-[15px] font-bold tabular-nums" style={{ color: 'var(--label-1)' }}>100</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1">
-                    <span className="text-[13px]" style={{ color: 'var(--label-2)' }}>{t('scoreBreakdownTotalDeduction')}</span>
-                    <span className="text-[15px] font-bold tabular-nums" style={{ color: 'var(--v-poor)' }}>−{totalLost}</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1">
-                    <span className="text-[13px]" style={{ color: 'var(--label-2)' }}>{t('scoreBreakdownPositiveFactorsStat')}</span>
-                    <span className="text-[15px] font-bold tabular-nums" style={{ color: 'var(--v-good)' }}>0</span>
-                  </div>
-                  {breakdown.wasCapped && (
-                    <div className="flex items-center justify-between py-1">
-                      <span className="text-[13px]" style={{ color: 'var(--label-2)' }}>{t('scoreBreakdownCapAdjustment')}</span>
-                      <span className="text-[15px] font-bold tabular-nums" style={{ color: 'var(--v-poor)' }}>{capAdjustment}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between pt-2 mt-1" style={{ borderTop: '1px solid var(--separator)' }}>
-                    <span className="text-[14px] font-bold" style={{ color: 'var(--label-1)' }}>{t('scoreBreakdownFinal')}</span>
-                    <span className="text-[17px] font-bold tabular-nums" style={{ color: scoreColors.color }}>{score}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Plain-English meaning -- reuses the same AI
-                  recommendation already shown in the score hero, just
-                  surfaced again right where the user is asking "why". */}
-              {displayRecommendation && (
-                <div className="rounded-[14px] p-3.5 flex gap-2.5 items-start mb-4" style={{ background: scoreColors.bg }}>
-                  <span className="text-[16px] leading-none mt-0.5 flex-shrink-0">ℹ️</span>
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-bold mb-0.5" style={{ color: scoreColors.color }}>
+                {displayRecommendation && (
+                  <div className="flex-1 min-w-0 rounded-[14px] p-3" style={{ background: scoreColors.bg }}>
+                    <p className="text-[12.5px] font-bold mb-0.5" style={{ color: scoreColors.color }}>
                       {t('scoreBreakdownWhatDoesThisMean')}
                     </p>
-                    <p className="text-[13px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
+                    <p className="text-[12.5px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
                       {displayRecommendation}
                     </p>
                   </div>
-                </div>
-              )}
-
-              <div className="flex items-end justify-between mb-2">
-                <span className="text-[15px] font-bold" style={{ color: 'var(--label-1)' }}>{t('scoreBreakdownMainDeductions')}</span>
-                <span className="text-[12px]" style={{ color: 'var(--label-3)' }}>
-                  {showAllBreakdownItems
-                    ? t('scoreBreakdownShowingAll', { total: breakdown.items.length })
-                    : t('scoreBreakdownShowingTop', { shown: visibleItems.length, total: breakdown.items.length })}
-                </span>
+                )}
               </div>
 
-              {/* Each row is tappable when the ingredient has a stored
-                  reason/health-effects (same fields IngredientCard
-                  shows), for progressive disclosure at no extra cost --
-                  no new AI call, just data already on hand. */}
-              <div className="space-y-2 mb-3">
-                {visibleItems.map((item, i) => {
-                  const expanded = expandedBreakdownRows.has(i);
-                  const severity = deductionSeverity(item.points, maxPoints);
-                  const hasDetail = Boolean(item.reason || item.healthEffects);
-                  return (
-                    <div key={i} className="rounded-[14px] p-3" style={{ background: 'var(--fill)' }}>
-                      <button
-                        onClick={() => hasDetail && toggleRow(i)}
-                        className="w-full flex items-center gap-3 text-left"
-                        disabled={!hasDetail}
+              <p className="text-[15px] font-bold" style={{ color: 'var(--label-1)' }}>
+                {t('scoreModalWhatInfluenced')}
+              </p>
+              <p className="text-[12px] mb-3" style={{ color: 'var(--label-3)' }}>
+                {t('scoreModalWhatInfluencedSubtitle')}
+              </p>
+
+              {/* One colour-tinted card per tier that actually has
+                  members -- each ingredient inside is tappable when it
+                  has a stored reason/health-effects (same fields
+                  IngredientCard shows), for progressive disclosure at
+                  no extra cost: no new AI call, just data on hand. */}
+              <div className="space-y-3 mb-4">
+                {scoreModalTiers.map((tier) => (
+                  <div key={tier.key} className="rounded-[16px] p-3" style={{ background: tier.bg }}>
+                    <div className="flex items-start gap-2.5 mb-2.5">
+                      <span
+                        className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-[14px] font-bold"
+                        style={{ background: 'var(--bg-card)', color: tier.color }}
                       >
-                        <span
-                          className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-[16px]"
-                          style={{ background: severity.bg }}
-                        >
-                          {categoryIcon(item.category)}
-                        </span>
-                        <span className="flex-1 min-w-0">
-                          <span className="block text-[14px] font-semibold truncate" style={{ color: 'var(--label-1)' }}>
-                            {item.name}
-                          </span>
-                          {item.reason && (
-                            <span className="block text-[12px] truncate mt-0.5" style={{ color: 'var(--label-2)' }}>
-                              {item.reason}
-                            </span>
-                          )}
-                        </span>
-                        <span className="text-[15px] font-bold tabular-nums flex-shrink-0" style={{ color: severity.color }}>
-                          −{item.points}
-                        </span>
-                        {hasDetail && (
-                          <svg
-                            viewBox="0 0 8 13"
-                            fill="none"
-                            className={`w-2 h-3 flex-shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`}
-                            style={{ color: 'var(--label-3)' }}
-                          >
-                            <path d="M1.5 1.5L6.5 6.5l-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        )}
-                      </button>
-                      <div className="h-1.5 rounded-full overflow-hidden mt-2 ml-[48px]" style={{ background: 'var(--bg-card)' }}>
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${(item.points / maxPoints) * 100}%`, background: severity.color }}
-                        />
+                        {tier.icon}
+                      </span>
+                      <div className="min-w-0 pt-0.5">
+                        <p className="text-[13.5px] font-bold" style={{ color: tier.color }}>{tier.label}</p>
+                        <p className="text-[11.5px] leading-snug" style={{ color: 'var(--label-2)' }}>
+                          {t(TIER_DESCRIPTION_KEY[tier.key])}
+                        </p>
                       </div>
-                      {expanded && (
-                        <div className="ml-[48px] mt-2 space-y-1.5">
-                          {item.reason && (
-                            <p className="text-[13px] leading-relaxed" style={{ color: 'var(--label-2)' }}>{item.reason}</p>
-                          )}
-                          {item.healthEffects && (
-                            <div>
-                              <p className="text-[11px] font-semibold" style={{ color: 'var(--label-3)' }}>{t('healthEffectsLabel')}</p>
-                              <p className="text-[13px] leading-relaxed" style={{ color: 'var(--label-2)' }}>{item.healthEffects}</p>
-                            </div>
-                          )}
-                        </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      {tier.members.map((ing, i) => {
+                        const rowKey = `${tier.key}-${i}`;
+                        const expanded = expandedBreakdownRows.has(rowKey);
+                        const hasDetail = Boolean(ing.reason || ing.healthEffects);
+                        return (
+                          <div key={rowKey} className="rounded-[12px] p-2.5" style={{ background: 'var(--bg-card)' }}>
+                            <button
+                              onClick={() => hasDetail && toggleRow(rowKey)}
+                              className="w-full flex items-center gap-2.5 text-left"
+                              disabled={!hasDetail}
+                            >
+                              <span
+                                className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-[14px]"
+                                style={{ background: tier.bg }}
+                              >
+                                {categoryIcon(ing.category)}
+                              </span>
+                              <span className="flex-1 min-w-0">
+                                <span className="block text-[13.5px] font-semibold truncate" style={{ color: 'var(--label-1)' }}>
+                                  {ing.name}
+                                </span>
+                                {ing.reason && (
+                                  <span className="block text-[11.5px] truncate mt-0.5" style={{ color: 'var(--label-2)' }}>
+                                    {ing.reason}
+                                  </span>
+                                )}
+                              </span>
+                              {hasDetail && (
+                                <svg
+                                  viewBox="0 0 8 13"
+                                  fill="none"
+                                  className={`w-2 h-3 flex-shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`}
+                                  style={{ color: 'var(--label-3)' }}
+                                >
+                                  <path d="M1.5 1.5L6.5 6.5l-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              )}
+                            </button>
+                            {expanded && (
+                              <div className="pl-[42px] mt-1.5 space-y-1.5">
+                                {ing.reason && (
+                                  <p className="text-[12.5px] leading-relaxed" style={{ color: 'var(--label-2)' }}>{ing.reason}</p>
+                                )}
+                                {ing.healthEffects && (
+                                  <div>
+                                    <p className="text-[10.5px] font-semibold" style={{ color: 'var(--label-3)' }}>{t('healthEffectsLabel')}</p>
+                                    <p className="text-[12.5px] leading-relaxed" style={{ color: 'var(--label-2)' }}>{ing.healthEffects}</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Generic, truthful 3-step mental model -- no numbers, no
+                  mention of a cap, just "here's roughly how this works". */}
+              <div className="rounded-[16px] p-4 mb-4" style={{ background: 'var(--fill)' }}>
+                <p className="text-[14px] font-bold mb-1" style={{ color: 'var(--label-1)' }}>
+                  {t('scoreModalHowItWorks')}
+                </p>
+                <p className="text-[12px] leading-relaxed mb-3" style={{ color: 'var(--label-2)' }}>
+                  {t('scoreModalHowItWorksIntro')}
+                </p>
+                <div className="flex items-start justify-between gap-1">
+                  {STEPS.map((step, i) => (
+                    <div key={step.titleKey} className="flex items-center flex-1 min-w-0">
+                      <div className="flex flex-col items-center text-center min-w-0">
+                        <span
+                          className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-[16px] mb-1.5"
+                          style={{ background: step.bg }}
+                        >
+                          {step.icon}
+                        </span>
+                        <p className="text-[11px] font-bold leading-snug" style={{ color: 'var(--label-1)' }}>{t(step.titleKey)}</p>
+                        <p className="text-[10px] leading-snug mt-0.5" style={{ color: 'var(--label-3)' }}>{t(step.captionKey)}</p>
+                      </div>
+                      {i < STEPS.length - 1 && (
+                        <span className="text-[14px] flex-shrink-0 px-0.5" style={{ color: 'var(--label-3)' }}>→</span>
                       )}
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
 
-              {breakdown.items.length > 5 && (
-                <button
-                  onClick={() => setShowAllBreakdownItems((v) => !v)}
-                  className="tap-scale w-full flex items-center justify-center gap-1.5 py-3 rounded-[12px] text-[14px] font-semibold mb-4"
-                  style={{ background: 'var(--fill)', color: 'var(--label-1)' }}
-                >
-                  {showAllBreakdownItems ? t('scoreBreakdownShowLess') : t('scoreBreakdownShowAll', { count: breakdown.items.length })}
-                  <svg
-                    viewBox="0 0 13 8"
-                    fill="none"
-                    className={`w-3 h-2 transition-transform ${showAllBreakdownItems ? 'rotate-180' : ''}`}
-                    style={{ color: 'var(--label-2)' }}
-                  >
-                    <path d="M1.5 1.5l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              )}
-
-              {breakdown.wasCapped && (
-                <div className="rounded-[14px] px-3.5 py-3 mb-4" style={{ background: 'var(--v-poor-bg)' }}>
-                  <p className="text-[13px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
-                    {t(breakdown.capReason === 'harmful' ? 'scoreBreakdownCappedHarmful' : 'scoreBreakdownCappedConcerning', {
-                      rawScore: breakdown.rawScore,
-                      finalScore: breakdown.finalScore,
-                    })}
-                  </p>
-                </div>
-              )}
-
-              {/* Positive factors -- reuses the same list already shown
-                  in "At a glance", each with an explicit "0": honest,
-                  since this formula never actually adds points for
-                  anything, rather than either omitting them (which
-                  would make it look like only bad things matter) or
-                  inventing a fake "+N" bonus. */}
-              {displayPositives?.length > 0 && (
-                <>
-                  <div className="flex items-end justify-between mb-2">
-                    <span className="text-[15px] font-bold" style={{ color: 'var(--label-1)' }}>{t('scoreBreakdownPositiveFactorsHeader')}</span>
-                    <span className="text-[12px]" style={{ color: 'var(--label-3)' }}>{t('scoreBreakdownNoPointsAdded')}</span>
-                  </div>
-                  <div className="space-y-2 mb-4">
-                    {displayPositives.map((p, i) => (
-                      <div key={i} className="rounded-[14px] p-3 flex items-center gap-3" style={{ background: 'var(--v-good-bg)' }}>
-                        <span
-                          className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[13px] font-bold"
-                          style={{ background: 'var(--bg-card)', color: 'var(--v-good)' }}
-                        >
-                          ✓
-                        </span>
-                        <span className="flex-1 min-w-0 text-[14px]" style={{ color: 'var(--label-1)' }}>{p}</span>
-                        <span className="text-[14px] font-bold tabular-nums flex-shrink-0" style={{ color: 'var(--v-good)' }}>0</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              <p className="text-[12px] leading-relaxed" style={{ color: 'var(--label-3)' }}>
-                {t('scoreBreakdownFooterNote')}
-              </p>
+              <button
+                onClick={() => setShowScoreModal(false)}
+                className="tap-scale w-full py-3 rounded-[12px] text-[15px] font-semibold text-white"
+                style={{ background: 'var(--tint)' }}
+              >
+                {t('gotIt')}
+              </button>
             </div>
           </div>,
           document.body
