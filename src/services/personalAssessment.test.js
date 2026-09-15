@@ -51,13 +51,67 @@ test('reuses the existing "Highly processed" ingredient tier for lessProcessed, 
   assert.deepEqual(result.matchedConcerns, [{ priorityKey: 'lessProcessed' }]);
 });
 
-test('higherProtein flags the absence of a real protein source, not the presence of a bad one', () => {
+test('higherProtein flags the absence of a real protein source as a NOTE, never a score-affecting concern', () => {
   const noProtein = { overallScore: 80, ingredients: [ing({ name: 'Sugar', category: 'sweetener' })] };
   const withProtein = { overallScore: 80, ingredients: [ing({ name: 'Soy Protein', category: 'protein', status: 'safe' })] };
   const profile = { priorities: ['higherProtein'] };
 
-  assert.deepEqual(calculatePersonalAssessment(noProtein, profile).matchedConcerns, [{ priorityKey: 'higherProtein' }]);
-  assert.equal(calculatePersonalAssessment(withProtein, profile).hasNoConcerns, true);
+  const noProteinResult = calculatePersonalAssessment(noProtein, profile);
+  assert.deepEqual(noProteinResult.notes, [{ priorityKey: 'higherProtein' }]);
+  assert.deepEqual(noProteinResult.matchedConcerns, []);
+  assert.equal(noProteinResult.personalScore, 80); // unchanged -- notes never deduct
+  assert.equal(noProteinResult.hasNoConcerns, true); // no score-affecting concern
+  assert.equal(noProteinResult.hasNothingToShow, false); // but there IS a note worth showing
+
+  assert.equal(calculatePersonalAssessment(withProtein, profile).hasNothingToShow, true);
+});
+
+test('a genuinely fine whole-wheat chapathi does not get penalized or warned for "low protein"', () => {
+  // Regression test for a real scanned product: a 45g chapathi with
+  // 3.78g real protein used to fail the old "30% of a 50g/day
+  // reference" bar (needed 15g) and get flagged "Low protein" with a
+  // personal-score penalty -- the same bar a glass of milk or a boiled
+  // egg would also fail. Chapathi is a plain carb staple; not being a
+  // major protein source isn't a flaw in the food.
+  const report = {
+    overallScore: 90,
+    ingredients: [ing({ name: 'Whole Wheat Flour', category: 'grain', status: 'safe' })],
+    realNutrients: { proteinG: 3.78 },
+  };
+  const profile = { priorities: ['higherProtein'] };
+  const result = calculatePersonalAssessment(report, profile);
+  assert.equal(result.personalScore, 90); // no penalty at all
+  assert.deepEqual(result.matchedConcerns, []);
+  assert.deepEqual(result.notes, [{ priorityKey: 'higherProtein' }]); // informational only
+});
+
+test('real protein data at or above the notable-contribution cutoff produces no note at all', () => {
+  // A boiled egg / glass of milk shaped case -- ~6-8g protein is a real
+  // contribution, even though it's nowhere near 15g (the old, too-high bar).
+  const report = { overallScore: 88, ingredients: [ing({ name: 'Milk', category: 'protein', status: 'safe' })], realNutrients: { proteinG: 8 } };
+  const profile = { priorities: ['higherProtein'] };
+  assert.equal(calculatePersonalAssessment(report, profile).hasNothingToShow, true);
+});
+
+test('moreWholeFood is also a note-only priority, never a score deduction', () => {
+  const report = { overallScore: 75, ingredients: [ing({ name: 'Refined Flour', status: 'safe', penalty: 12 })] };
+  const profile = { priorities: ['moreWholeFood'] };
+  const result = calculatePersonalAssessment(report, profile);
+  assert.equal(result.personalScore, 75);
+  assert.deepEqual(result.notes, [{ priorityKey: 'moreWholeFood' }]);
+});
+
+test('a real avoid-type concern and a seek-more note can coexist -- only the concern affects score', () => {
+  const report = {
+    overallScore: 70,
+    ingredients: [ing({ name: 'Salt', category: 'seasoning', status: 'concerning' })],
+    realNutrients: { proteinG: 1 },
+  };
+  const profile = { priorities: ['lowerSodium', 'higherProtein'] };
+  const result = calculatePersonalAssessment(report, profile);
+  assert.deepEqual(result.matchedConcerns, [{ priorityKey: 'lowerSodium' }]);
+  assert.deepEqual(result.notes, [{ priorityKey: 'higherProtein' }]);
+  assert.equal(result.personalScore, 62); // only the one concern deducted (70 - 8)
 });
 
 test('a real sodium number (Open Food Facts/Blinkit) wins over the ingredient-tag heuristic', () => {
@@ -102,22 +156,22 @@ test('lowerCalories still never fabricates a concern when no real calorie data e
   assert.equal(calculatePersonalAssessment(report, profile).hasNoConcerns, true);
 });
 
-test('real protein data flags a genuinely low-protein product, overriding a false-positive ingredient tag', () => {
-  // 2g is 4% of the 50g reference -- well under the 30% bar, a real low-protein reading.
+test('real protein data (2g, below the 5g notable-contribution cutoff) overrides a false-positive ingredient tag with a note, not a concern', () => {
   const report = {
     overallScore: 70,
     ingredients: [ing({ name: 'Soy Protein', category: 'protein', status: 'safe' })], // would otherwise read as "has protein"
     realNutrients: { proteinG: 2 },
   };
   const profile = { priorities: ['higherProtein'] };
-  assert.deepEqual(calculatePersonalAssessment(report, profile).matchedConcerns, [{ priorityKey: 'higherProtein' }]);
+  const result = calculatePersonalAssessment(report, profile);
+  assert.deepEqual(result.notes, [{ priorityKey: 'higherProtein' }]);
+  assert.equal(result.personalScore, 70); // never deducted
 });
 
-test('real protein data confirms a genuinely protein-rich product has no concern', () => {
-  // 20g is 40% of the 50g reference -- above the 30% bar, a real "has enough protein" reading.
+test('real protein data (20g) confirms a genuinely protein-rich product has nothing to show at all', () => {
   const report = { overallScore: 70, ingredients: [ing({ name: 'Water' })], realNutrients: { proteinG: 20 } };
   const profile = { priorities: ['higherProtein'] };
-  assert.equal(calculatePersonalAssessment(report, profile).hasNoConcerns, true);
+  assert.equal(calculatePersonalAssessment(report, profile).hasNothingToShow, true);
 });
 
 test('personal score tier colors reuse the same 85/65/45/25 breakpoints as the universal score', () => {

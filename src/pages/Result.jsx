@@ -15,6 +15,7 @@ import {
   getPersonalEatAnswerKey,
   PRIORITY_LABEL_KEY,
   PRIORITY_CONCERN_KEY,
+  PRIORITY_NOTE_KEY,
 } from '../services/personalAssessment';
 import ScoreCircle from '../components/ScoreCircle';
 import IngredientCard from '../components/IngredientCard';
@@ -632,19 +633,26 @@ export default function Result() {
             </p>
           </div>
 
-          {/* No concerns means the personal score IS the universal score
-              (see calculatePersonalAssessment -- 0 matched concerns
-              means 0 deducted) -- asking "why is it different?" when
-              it isn't is confusing, so this whole prompt only exists
-              when there's an actual difference to explain. */}
-          {!personalAssessment.hasNoConcerns && (
+          {/* Nothing to show means the personal score IS the universal
+              score AND there's no informational note either (see
+              calculatePersonalAssessment) -- asking "why is it
+              different?" when it isn't is confusing, so this whole
+              prompt only exists when there's an actual concern or note
+              worth surfacing. A concern (avoid-type priority, e.g. too
+              much sodium) lowers the score; a note (seek-more-type
+              priority, e.g. not a big protein source) never does --
+              it's just useful context, not a flaw in the food. */}
+          {!personalAssessment.hasNothingToShow && (
             <>
               <button
                 onClick={() => setShowWhyPersonal((v) => !v)}
                 className="tap-scale mt-3 pl-[27px] text-[13px] font-semibold"
                 style={{ color: 'var(--tint)' }}
               >
-                {t('personalWhyDifferent', { name: activeProfile.nickname })}
+                {t(
+                  personalAssessment.matchedConcerns.length > 0 ? 'personalWhyDifferent' : 'personalMoreAboutFit',
+                  { name: activeProfile.nickname }
+                )}
               </button>
 
               {showWhyPersonal && (
@@ -658,6 +666,19 @@ export default function Result() {
                         {t('personalPriorityReason', {
                           name: activeProfile.nickname,
                           priority: t(PRIORITY_LABEL_KEY[c.priorityKey]).toLowerCase(),
+                        })}
+                      </p>
+                    </div>
+                  ))}
+                  {personalAssessment.notes.map((n) => (
+                    <div key={n.priorityKey} className="rounded-[12px] p-2.5" style={{ background: 'var(--fill)' }}>
+                      <p className="text-[13px] font-semibold" style={{ color: 'var(--label-2)' }}>
+                        💡 {t(PRIORITY_NOTE_KEY[n.priorityKey])}
+                      </p>
+                      <p className="text-[12.5px] leading-relaxed mt-0.5" style={{ color: 'var(--label-3)' }}>
+                        {t('personalPriorityNoteReason', {
+                          name: activeProfile.nickname,
+                          priority: t(PRIORITY_LABEL_KEY[n.priorityKey]).toLowerCase(),
                         })}
                       </p>
                     </div>
