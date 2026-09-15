@@ -648,6 +648,11 @@ export default function Result() {
               <p className="text-[11.5px] leading-relaxed pt-1" style={{ color: 'var(--label-3)' }}>
                 {t('personalExplainerNote', { name: activeProfile.nickname })}
               </p>
+              {!result.realNutrients && (
+                <p className="text-[11.5px] leading-relaxed" style={{ color: 'var(--label-3)' }}>
+                  {t('personalNoNutritionData')}
+                </p>
+              )}
             </div>
           )}
         </div>

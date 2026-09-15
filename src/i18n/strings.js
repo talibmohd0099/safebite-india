@@ -83,6 +83,7 @@ export const STRINGS = {
     personalNoConcerns: "No major concerns for {name}'s selected priorities.",
     personalPriorityReason: '{name} has selected {priority} as a priority.',
     personalExplainerNote: "The product itself hasn't changed — this reflects how well it fits {name}'s selected priorities.",
+    personalNoNutritionData: "This product's real nutrition-panel numbers aren't available, so this is based on ingredient information instead.",
     personalMakeItPersonalTitle: 'Make FoodGuard more personal',
     personalMakeItPersonalBody: 'Create a profile to see how this fits you or your family.',
 
@@ -280,6 +281,7 @@ export const STRINGS = {
     personalNoConcerns: '{name} की चुनी गई प्राथमिकताओं के लिए कोई बड़ी चिंता नहीं।',
     personalPriorityReason: '{name} ने {priority} को प्राथमिकता के रूप में चुना है।',
     personalExplainerNote: 'प्रोडक्ट खुद नहीं बदला — यह बताता है कि यह {name} की चुनी गई प्राथमिकताओं पर कितना फिट है।',
+    personalNoNutritionData: 'इस प्रोडक्ट के असली न्यूट्रिशन पैनल के आंकड़े उपलब्ध नहीं हैं, इसलिए यह सामग्री की जानकारी पर आधारित है।',
     personalMakeItPersonalTitle: 'FoodGuard को अपने हिसाब से बनाएं',
     personalMakeItPersonalBody: 'एक प्रोफाइल बनाएं और देखें कि यह आप या आपके परिवार के लिए कैसा है।',
 
