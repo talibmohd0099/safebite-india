@@ -31,15 +31,19 @@ const HABIT_NUTRIENT_LABEL_KEY = {
   transFatG: 'nutrientTransFatG',
 };
 
-// Which i18n string (see src/i18n/strings.js) explains what each real
-// severity tier means, for the "Why did this score X" modal's grouped
-// ingredient buckets.
-const TIER_DESCRIPTION_KEY = {
-  Harmful: 'tierDescHarmful',
-  Concerning: 'tierDescConcerning',
-  'Highly processed': 'tierDescProcessed',
-  Fine: 'tierDescFine',
-};
+// Ranks the "Why did this score X" modal's factors worst-tier-first,
+// then by real penalty within a tier -- "Fine" is deliberately excluded
+// entirely (see MAIN_FACTORS_LIMIT below): that question is "why isn't
+// this higher", and a fine ingredient never lowered it. "Good things"
+// on the main result page already covers what's fine about a product.
+const TIER_RANK = { Harmful: 0, Concerning: 1, 'Highly processed': 2 };
+
+// Only the first few, worst-first -- everything past this is one tap
+// away behind "+N other factors" instead of always on screen. Keeps
+// this a quick "why" explainer instead of turning into a second
+// Ingredients tab (which already exists for anyone who wants the full
+// list).
+const MAIN_FACTORS_LIMIT = 4;
 
 function SectionHeader({ children, action }) {
   return (
@@ -124,6 +128,7 @@ export default function Result() {
   const [relatedNews, setRelatedNews] = useState([]);
   const [showHabitModal, setShowHabitModal] = useState(false);
   const [showScoreModal, setShowScoreModal] = useState(false);
+  const [showAllFactors, setShowAllFactors] = useState(false);
   const [expandedBreakdownRows, setExpandedBreakdownRows] = useState(() => new Set());
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -305,13 +310,16 @@ export default function Result() {
     };
   })();
 
-  // For the "Why did this score X?" modal -- every real ingredient,
-  // grouped by the exact same severity tiers already used for the
-  // Breakdown tiles and the Ingredients tab above (no separate/invented
-  // categorisation), skipping any tier with nothing in it.
-  const scoreModalTiers = tiers
-    .map((tier) => ({ ...tier, members: ingredients.filter((ing) => severityOf(ing) === tier.key) }))
-    .filter((tier) => tier.members.length > 0);
+  // For the "Why did this score X?" modal -- every ingredient that
+  // actually pulled the score down (Harmful/Concerning/Highly processed;
+  // "Fine" excluded entirely, see MAIN_FACTORS_LIMIT above), worst tier
+  // first and then by real penalty within a tier. Uses the exact same
+  // tier definitions as the Breakdown tiles and Ingredients tab -- no
+  // separate/invented categorisation.
+  const mainFactors = ingredients
+    .filter((ing) => severityOf(ing) !== 'Fine')
+    .map((ing) => ({ ingredient: ing, tier: tiers.find((t) => t.key === severityOf(ing)) }))
+    .sort((a, b) => (TIER_RANK[a.tier.key] - TIER_RANK[b.tier.key]) || ((b.ingredient.penalty || 0) - (a.ingredient.penalty || 0)));
 
   return (
     <div className="page-in max-w-[560px] mx-auto pb-24" style={{ background: 'var(--bg-grouped)' }}>
@@ -876,12 +884,15 @@ export default function Result() {
         </button>
       </div>
 
-      {/* "Why did this score X?" -- ingredients grouped by the same real
-          severity tiers used everywhere else in this app (Breakdown
-          tiles, Ingredients tab). Deliberately no per-ingredient point
-          values and no mention of the harmful/concerning score cap
-          (scoringEngine.js's squeezeToCap) -- the scoring system itself
-          is unchanged, this is purely how it's explained. */}
+      {/* "Why did this score X?" -- a quick explainer, not a second
+          Ingredients tab: just the top few things that actually pulled
+          the score down (worst tier first), each one tap from more
+          detail, plus a one-glance "how scoring works" visual. No
+          per-ingredient point values and no mention of the
+          harmful/concerning score cap (scoringEngine.js's squeezeToCap)
+          -- the scoring system itself is unchanged, this is purely how
+          it's explained. "Fine" ingredients are deliberately absent:
+          this popup answers "why isn't it higher", not "what's okay". */}
       {showScoreModal && (() => {
         const toggleRow = (key) => {
           setExpandedBreakdownRows((prev) => {
@@ -893,10 +904,13 @@ export default function Result() {
         };
 
         const STEPS = [
-          { icon: '📋', bg: 'var(--tint-bg)', titleKey: 'scoreModalStep1Title', captionKey: 'scoreModalStep1Caption' },
-          { icon: '⚖️', bg: 'var(--v-moderate-bg)', titleKey: 'scoreModalStep2Title', captionKey: 'scoreModalStep2Caption' },
-          { icon: '⭐', bg: 'var(--v-good-bg)', titleKey: 'scoreModalStep3Title', captionKey: 'scoreModalStep3Caption' },
+          { icon: '🧪', bg: 'var(--tint-bg)', titleKey: 'scoreModalStep1Title' },
+          { icon: '⚙️', bg: 'var(--v-moderate-bg)', titleKey: 'scoreModalStep2Title' },
+          { icon: '⭐', bg: 'var(--v-good-bg)', titleKey: 'scoreModalStep3Title' },
         ];
+
+        const visibleFactors = showAllFactors ? mainFactors : mainFactors.slice(0, MAIN_FACTORS_LIMIT);
+        const hiddenCount = mainFactors.length - visibleFactors.length;
 
         return createPortal(
           <div
@@ -917,16 +931,14 @@ export default function Result() {
                 ×
               </button>
 
-              <p className="text-[19px] font-bold pr-8 mb-2" style={{ color: 'var(--label-1)' }}>
+              <p className="text-[19px] font-bold pr-8 mb-3" style={{ color: 'var(--label-1)' }}>
                 {t('scoreBreakdownTitle', { score })}
-              </p>
-              <p className="text-[13px] leading-relaxed mb-4" style={{ color: 'var(--label-2)' }}>
-                {t('scoreModalIntro')}
               </p>
 
               {/* Score circle + verdict pill on the left, the same AI
                   recommendation already shown in the score hero on the
-                  right -- reused, not new text. */}
+                  right -- reused, not new text. Answers "what does this
+                  score mean?" */}
               <div className="flex items-center gap-4 mb-4">
                 <ScoreCircle score={score} size="large" showLabel />
                 {displayRecommendation && (
@@ -948,116 +960,127 @@ export default function Result() {
                 {t('scoreModalWhatInfluencedSubtitle')}
               </p>
 
-              {/* One colour-tinted card per tier that actually has
-                  members -- each ingredient inside is tappable when it
-                  has a stored reason/health-effects (same fields
-                  IngredientCard shows), for progressive disclosure at
-                  no extra cost: no new AI call, just data on hand. */}
-              <div className="space-y-3 mb-4">
-                {scoreModalTiers.map((tier) => (
-                  <div key={tier.key} className="rounded-[16px] p-3" style={{ background: tier.bg }}>
-                    <div className="flex items-start gap-2.5 mb-2.5">
-                      <span
-                        className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-[14px] font-bold"
-                        style={{ background: 'var(--bg-card)', color: tier.color }}
-                      >
-                        {tier.icon}
-                      </span>
-                      <div className="min-w-0 pt-0.5">
-                        <p className="text-[13.5px] font-bold" style={{ color: tier.color }}>{tier.label}</p>
-                        <p className="text-[11.5px] leading-snug" style={{ color: 'var(--label-2)' }}>
-                          {t(TIER_DESCRIPTION_KEY[tier.key])}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      {tier.members.map((ing, i) => {
-                        const rowKey = `${tier.key}-${i}`;
-                        const expanded = expandedBreakdownRows.has(rowKey);
-                        const hasDetail = Boolean(ing.reason || ing.healthEffects);
-                        return (
-                          <div key={rowKey} className="rounded-[12px] p-2.5" style={{ background: 'var(--bg-card)' }}>
-                            <button
-                              onClick={() => hasDetail && toggleRow(rowKey)}
-                              className="w-full flex items-center gap-2.5 text-left"
-                              disabled={!hasDetail}
-                            >
-                              <span
-                                className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-[14px]"
-                                style={{ background: tier.bg }}
-                              >
-                                {categoryIcon(ing.category)}
+              {/* A flat, ranked list -- worst tier first -- instead of
+                  one big card per tier. Each row carries its own small
+                  tier badge, so "Harmful"/"Concerning"/"Highly processed"
+                  are still visible without needing a full section per
+                  tier. Capped at MAIN_FACTORS_LIMIT with a "+N other
+                  factors" reveal so this stays a quick explainer. */}
+              {mainFactors.length === 0 ? (
+                <div className="rounded-[14px] p-3 mb-4" style={{ background: 'var(--v-good-bg)' }}>
+                  <p className="text-[12.5px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
+                    {t('scoreModalNoFactors')}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1.5 mb-2">
+                  {visibleFactors.map((factor, i) => {
+                    const ing = factor.ingredient;
+                    const tier = factor.tier;
+                    const rowKey = `main-${i}`;
+                    const expanded = expandedBreakdownRows.has(rowKey);
+                    const hasDetail = Boolean(ing.reason || ing.healthEffects);
+                    return (
+                      <div key={rowKey} className="rounded-[12px] p-2.5" style={{ background: 'var(--fill)' }}>
+                        <button
+                          onClick={() => hasDetail && toggleRow(rowKey)}
+                          className="w-full flex items-center gap-2.5 text-left"
+                          disabled={!hasDetail}
+                        >
+                          <span
+                            className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-[14px]"
+                            style={{ background: tier.bg }}
+                          >
+                            {categoryIcon(ing.category)}
+                          </span>
+                          <span className="flex-1 min-w-0">
+                            <span className="block text-[13.5px] font-semibold truncate" style={{ color: 'var(--label-1)' }}>
+                              {ing.name}
+                            </span>
+                            <span className="flex items-baseline gap-1 min-w-0">
+                              <span className="text-[10.5px] font-bold flex-shrink-0" style={{ color: tier.color }}>
+                                {tier.label}
                               </span>
-                              <span className="flex-1 min-w-0">
-                                <span className="block text-[13.5px] font-semibold truncate" style={{ color: 'var(--label-1)' }}>
-                                  {ing.name}
+                              {ing.reason && (
+                                <span className="text-[11.5px] truncate" style={{ color: 'var(--label-2)' }}>
+                                  · {ing.reason}
                                 </span>
-                                {ing.reason && (
-                                  <span className="block text-[11.5px] truncate mt-0.5" style={{ color: 'var(--label-2)' }}>
-                                    {ing.reason}
-                                  </span>
-                                )}
-                              </span>
-                              {hasDetail && (
-                                <svg
-                                  viewBox="0 0 8 13"
-                                  fill="none"
-                                  className={`w-2 h-3 flex-shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`}
-                                  style={{ color: 'var(--label-3)' }}
-                                >
-                                  <path d="M1.5 1.5L6.5 6.5l-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
                               )}
-                            </button>
-                            {expanded && (
-                              <div className="pl-[42px] mt-1.5 space-y-1.5">
-                                {ing.reason && (
-                                  <p className="text-[12.5px] leading-relaxed" style={{ color: 'var(--label-2)' }}>{ing.reason}</p>
-                                )}
-                                {ing.healthEffects && (
-                                  <div>
-                                    <p className="text-[10.5px] font-semibold" style={{ color: 'var(--label-3)' }}>{t('healthEffectsLabel')}</p>
-                                    <p className="text-[12.5px] leading-relaxed" style={{ color: 'var(--label-2)' }}>{ing.healthEffects}</p>
-                                  </div>
-                                )}
+                            </span>
+                          </span>
+                          {hasDetail && (
+                            <svg
+                              viewBox="0 0 8 13"
+                              fill="none"
+                              className={`w-2 h-3 flex-shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`}
+                              style={{ color: 'var(--label-3)' }}
+                            >
+                              <path d="M1.5 1.5L6.5 6.5l-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                        </button>
+                        {expanded && (
+                          <div className="pl-[42px] mt-1.5 space-y-1.5">
+                            {ing.reason && (
+                              <div>
+                                <p className="text-[10.5px] font-semibold" style={{ color: 'var(--label-3)' }}>{t('scoreModalWhyFlagged')}</p>
+                                <p className="text-[12.5px] leading-relaxed" style={{ color: 'var(--label-2)' }}>{ing.reason}</p>
+                              </div>
+                            )}
+                            {ing.healthEffects && (
+                              <div>
+                                <p className="text-[10.5px] font-semibold" style={{ color: 'var(--label-3)' }}>{t('healthEffectsLabel')}</p>
+                                <p className="text-[12.5px] leading-relaxed" style={{ color: 'var(--label-2)' }}>{ing.healthEffects}</p>
                               </div>
                             )}
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
-              {/* Generic, truthful 3-step mental model -- no numbers, no
-                  mention of a cap, just "here's roughly how this works". */}
-              <div className="rounded-[16px] p-4 mb-4" style={{ background: 'var(--fill)' }}>
-                <p className="text-[14px] font-bold mb-1" style={{ color: 'var(--label-1)' }}>
+              {hiddenCount > 0 && (
+                <button
+                  onClick={() => setShowAllFactors(true)}
+                  className="tap-scale w-full text-center py-2 mb-4 text-[12.5px] font-semibold"
+                  style={{ color: 'var(--tint)' }}
+                >
+                  {t('scoreModalOtherFactors', { count: hiddenCount })}
+                </button>
+              )}
+              {mainFactors.length > 0 && hiddenCount === 0 && <div className="mb-4" />}
+
+              {/* Tiny, generic, truthful mental model -- no numbers, no
+                  mention of a cap, just one icon row plus one sentence. */}
+              <div className="rounded-[16px] p-3 mb-4" style={{ background: 'var(--fill)' }}>
+                <p className="text-[13px] font-bold mb-2 text-center" style={{ color: 'var(--label-1)' }}>
                   {t('scoreModalHowItWorks')}
                 </p>
-                <p className="text-[12px] leading-relaxed mb-3" style={{ color: 'var(--label-2)' }}>
-                  {t('scoreModalHowItWorksIntro')}
-                </p>
-                <div className="flex items-start justify-between gap-1">
+                <div className="flex items-center justify-center gap-1.5 mb-2">
                   {STEPS.map((step, i) => (
-                    <div key={step.titleKey} className="flex items-center flex-1 min-w-0">
-                      <div className="flex flex-col items-center text-center min-w-0">
+                    <div key={step.titleKey} className="flex items-center">
+                      <div className="flex flex-col items-center">
                         <span
-                          className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-[16px] mb-1.5"
+                          className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-[14px] mb-1"
                           style={{ background: step.bg }}
                         >
                           {step.icon}
                         </span>
-                        <p className="text-[11px] font-bold leading-snug" style={{ color: 'var(--label-1)' }}>{t(step.titleKey)}</p>
-                        <p className="text-[10px] leading-snug mt-0.5" style={{ color: 'var(--label-3)' }}>{t(step.captionKey)}</p>
+                        <p className="text-[9.5px] font-semibold leading-snug whitespace-nowrap" style={{ color: 'var(--label-2)' }}>
+                          {t(step.titleKey)}
+                        </p>
                       </div>
                       {i < STEPS.length - 1 && (
-                        <span className="text-[14px] flex-shrink-0 px-0.5" style={{ color: 'var(--label-3)' }}>→</span>
+                        <span className="text-[13px] flex-shrink-0 px-1 pb-3" style={{ color: 'var(--label-3)' }}>→</span>
                       )}
                     </div>
                   ))}
                 </div>
+                <p className="text-[11.5px] leading-relaxed text-center" style={{ color: 'var(--label-2)' }}>
+                  {t('scoreModalHowItWorksIntro')}
+                </p>
               </div>
 
               <button
