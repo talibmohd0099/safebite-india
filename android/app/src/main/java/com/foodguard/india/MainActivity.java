@@ -1,4 +1,4 @@
-package com.safebite.india;
+package com.foodguard.india;
 
 import com.getcapacitor.BridgeActivity;
 

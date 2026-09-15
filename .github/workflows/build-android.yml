@@ -69,6 +69,6 @@ jobs:
         run: |
           gh release delete latest-apk --yes --cleanup-tag || true
           gh release create latest-apk android/app/build/outputs/apk/debug/app-debug.apk \
-            --title "SafeBite India -- latest Android build" \
+            --title "FoodGuard India -- latest Android build" \
             --notes "Automatically built from the current main branch. This is a debug build for installing on your own phone (not from the Play Store), so Android will warn about an unverified app -- that's expected. On your phone: download app-debug.apk below, open it, and allow \"install from unknown sources\" if asked." \
             --latest

@@ -21,7 +21,7 @@ export default function About() {
         <div className="w-16 h-16 bg-green-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">
           🛡️
         </div>
-        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">About SafeBite India</h1>
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">About FoodGuard India</h1>
         <p className="text-slate-500 dark:text-slate-400 text-sm">
           Food label transparency for every Indian consumer
         </p>
@@ -33,7 +33,7 @@ export default function About() {
         <p className="text-sm text-green-700 dark:text-green-400 leading-relaxed">
           International apps like Yuka are built for Europe and America. They don't recognize Indian brands, 
           don't understand FSSAI regulations, and flag ingredients that are actually fine under Indian standards — 
-          while missing ones that aren't. SafeBite fixes that.
+          while missing ones that aren't. FoodGuard fixes that.
         </p>
       </div>
 
@@ -45,12 +45,12 @@ export default function About() {
             {
               step: '1',
               title: 'You upload, paste, or scan a barcode',
-              desc: 'Take a photo of the ingredient label, paste the ingredient text, or enter a barcode. SafeBite accepts all three.'
+              desc: 'Take a photo of the ingredient label, paste the ingredient text, or enter a barcode. FoodGuard accepts all three.'
             },
             {
               step: '2',
               title: 'Every ingredient is looked up',
-              desc: "Each ingredient is checked against SafeBite's own growing database first — built from the official FSSAI additive regulations plus every ingredient ever researched before. Known ones are instant."
+              desc: "Each ingredient is checked against FoodGuard's own growing database first — built from the official FSSAI additive regulations plus every ingredient ever researched before. Known ones are instant."
             },
             {
               step: '3',
@@ -120,7 +120,7 @@ export default function About() {
         </div>
 
         <p className="text-xs text-slate-400 dark:text-slate-500 mt-4 leading-relaxed">
-          Honest note: this is SafeBite's own transparent formula, not a government or scientific standard — there isn't one universal agreed formula for this anywhere (Nutri-Score, NOVA, and Yuka all score differently from each other, too). We'd rather show you the exact math than hide behind a black box.
+          Honest note: this is FoodGuard's own transparent formula, not a government or scientific standard — there isn't one universal agreed formula for this anywhere (Nutri-Score, NOVA, and Yuka all score differently from each other, too). We'd rather show you the exact math than hide behind a black box.
         </p>
       </div>
 
@@ -169,7 +169,7 @@ export default function About() {
 
       {/* Disclaimer */}
       <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-4 mb-6 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-        <strong>⚠️ Disclaimer:</strong> SafeBite is an independent, AI-powered informational tool and is not affiliated with FSSAI or any government body. Scores are for general awareness only. Always consult a healthcare professional for personal dietary advice. AI analysis may occasionally make errors.
+        <strong>⚠️ Disclaimer:</strong> FoodGuard is an independent, AI-powered informational tool and is not affiliated with FSSAI or any government body. Scores are for general awareness only. Always consult a healthcare professional for personal dietary advice. AI analysis may occasionally make errors.
       </div>
 
       <button

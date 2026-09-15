@@ -45,7 +45,7 @@ export const STRINGS = {
     scoreModalWhyFlagged: 'Why is it flagged?',
     scoreModalNoFactors: 'No major concerns pulled this score down — this looks like a clean ingredient list.',
     scoreModalOtherFactors: '+ {count} other factors',
-    scoreModalHowItWorks: 'How SafeBite scores food',
+    scoreModalHowItWorks: 'How FoodGuard scores food',
     scoreModalHowItWorksIntro: 'Starts at 100, then adjusts for meaningful ingredient and product-level concerns.',
     scoreModalStep1Title: 'Ingredients',
     scoreModalStep2Title: 'Product profile',
@@ -99,7 +99,7 @@ export const STRINGS = {
     factLabel: 'Fact: ',
 
     crossChecked: 'Cross-checked against FSSAI and EU/EFSA standards · AI-analyzed',
-    disclaimer: 'SafeBite is an informational tool, not medical advice. Always consult a healthcare professional for dietary guidance.',
+    disclaimer: 'FoodGuard is an informational tool, not medical advice. Always consult a healthcare professional for dietary guidance.',
     scanAnother: 'Scan another food',
 
     // "If this became a daily habit" -- a rule-based projection against
@@ -173,7 +173,7 @@ export const STRINGS = {
     scoreModalWhyFlagged: 'यह फ्लैग क्यों हुआ?',
     scoreModalNoFactors: 'किसी चीज़ ने स्कोर को नीचे नहीं खींचा — यह एक साफ-सुथरी सामग्री लिस्ट है।',
     scoreModalOtherFactors: '+ {count} और वजहें',
-    scoreModalHowItWorks: 'SafeBite स्कोर कैसे तय करता है',
+    scoreModalHowItWorks: 'FoodGuard स्कोर कैसे तय करता है',
     scoreModalHowItWorksIntro: 'स्कोर 100 से शुरू होता है, फिर सामग्री और प्रोडक्ट से जुड़ी असली चिंताओं के हिसाब से एडजस्ट होता है।',
     scoreModalStep1Title: 'सामग्री',
     scoreModalStep2Title: 'प्रोडक्ट प्रोफाइल',
@@ -227,7 +227,7 @@ export const STRINGS = {
     factLabel: 'सच्चाई: ',
 
     crossChecked: 'FSSAI और EU/EFSA स्टैंडर्ड से जांचा गया · AI से विश्लेषित',
-    disclaimer: 'SafeBite एक जानकारी देने वाला टूल है, मेडिकल सलाह नहीं। खानपान से जुड़ी सलाह के लिए हमेशा किसी हेल्थकेयर प्रोफेशनल से सलाह लें।',
+    disclaimer: 'FoodGuard एक जानकारी देने वाला टूल है, मेडिकल सलाह नहीं। खानपान से जुड़ी सलाह के लिए हमेशा किसी हेल्थकेयर प्रोफेशनल से सलाह लें।',
     scanAnother: 'एक और चीज़ स्कैन करें',
 
     habitTitle: '🕐 अगर यह रोज़ की आदत बन जाए...',

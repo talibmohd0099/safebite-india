@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.safebite.india"
+    namespace = "com.foodguard.india"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.safebite.india"
+        applicationId "com.foodguard.india"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

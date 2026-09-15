@@ -64,7 +64,7 @@ export default function SplashScreen({ onDone }) {
 
       <div className={`mt-5 text-center ${reducedMotion ? '' : 'splash-text-in'}`}>
         <p className="text-white text-2xl font-extrabold tracking-tight">
-          SafeBite <span className="text-lime-300">India</span>
+          FoodGuard <span className="text-lime-300">India</span>
         </p>
         <p className="text-white/80 text-[13px] font-medium mt-1">Scan. Know. Eat Smarter.</p>
       </div>

@@ -54,7 +54,7 @@ const OFF_PAGE_SIZE = 20;
 // never flaky.
 const OFF_DISCOVERY_URL = 'https://search.openfoodfacts.org/search';
 const OFF_DETAIL_URL = 'https://world.openfoodfacts.org/api/v2/product';
-const OFF_USER_AGENT = 'SafeBiteIndia-SeedJob/1.0 (+background product seeder)';
+const OFF_USER_AGENT = 'FoodGuardIndia-SeedJob/1.0 (+background product seeder)';
 const REQUEST_GAP_MS = 500; // be polite between categories
 const OFF_DETAIL_GAP_MS = 300; // polite spacing between per-product detail fetches
 const OFF_DISCOVERY_RETRIES = 6; // discovery has shown real, if occasional, instability

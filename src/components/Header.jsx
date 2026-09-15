@@ -50,7 +50,7 @@ export default function Header() {
           {/* One line, not stacked -- "India" reads as an accent on the
               wordmark, not a second row competing for its own line. */}
           <span className="flex items-baseline gap-1.5">
-            <span className="font-bold text-slate-800 dark:text-slate-100 text-[15px] leading-none">SafeBite</span>
+            <span className="font-bold text-slate-800 dark:text-slate-100 text-[15px] leading-none">FoodGuard</span>
             <span className="text-[11px] font-bold text-green-600 dark:text-green-400 leading-none uppercase tracking-wide">India</span>
           </span>
         </Link>
