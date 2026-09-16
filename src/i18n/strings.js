@@ -145,6 +145,7 @@ export const STRINGS = {
     estimatedQtyNote: "This label doesn't state an exact percentage for every ingredient, so part of this score is a reasonable estimate rather than the product's exact measured composition.",
 
     saferAlternatives: 'Safer alternatives in this category',
+    betterOptionsFor: 'Better options for {name}',
 
     tabOverview: 'Overview',
     tabIngredients: 'Ingredients ({count})',

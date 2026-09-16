@@ -4,7 +4,7 @@
 import { Link } from 'react-router-dom';
 import headerIcon from '../assets/header-icon.png';
 import { useTheme } from '../hooks/useTheme';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useLanguage, HINDI_ENABLED } from '../contexts/LanguageContext';
 
 const THEME_SEQUENCE = { light: 'dark', dark: 'system', system: 'light' };
 const THEME_ICON = { light: '☀️', dark: '🌙', system: '🌓' };
@@ -55,7 +55,7 @@ export default function Header() {
           </span>
         </Link>
         <div className="flex items-center gap-2">
-          <LanguageToggle />
+          {HINDI_ENABLED && <LanguageToggle />}
           <ThemeToggle />
         </div>
       </div>

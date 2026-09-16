@@ -10,8 +10,18 @@ import { STRINGS, interpolate } from '../i18n/strings';
 const STORAGE_KEY = 'safebite-language';
 const LanguageContext = createContext(null);
 
+// Hindi is switched off app-wide for now: the app is still growing new
+// screens every week, and translating each one as it lands means every
+// new feature carries a second, half-checked language with it. One full
+// Hindi pass happens once the feature set settles. Flip this to true to
+// bring the language toggle back -- nothing else needs changing, and
+// everyone's stored language preference is left untouched below, so it
+// comes back exactly as they left it.
+export const HINDI_ENABLED = false;
+
 export function LanguageProvider({ children }) {
   const [language, setLanguageState] = useState(() => {
+    if (!HINDI_ENABLED) return 'en';
     try {
       return localStorage.getItem(STORAGE_KEY) || 'en';
     } catch {
@@ -20,6 +30,10 @@ export function LanguageProvider({ children }) {
   });
 
   useEffect(() => {
+    // While Hindi is off, don't overwrite a stored 'hi' preference with
+    // the forced 'en' -- that would quietly erase the choice someone
+    // already made and can't currently see.
+    if (!HINDI_ENABLED) return;
     try {
       localStorage.setItem(STORAGE_KEY, language);
     } catch {

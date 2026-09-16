@@ -15,14 +15,6 @@ import BarcodeScanner, { isBarcodeScanSupported } from '../components/BarcodeSca
 import ScanBadge from '../components/ScanBadge';
 import { useFamily } from '../contexts/FamilyContext';
 
-// Personal FoodGuard Stage 3 (Home profile switcher) -- built, but kept
-// hidden for now. Home.jsx doesn't route any of its text through the
-// i18n system yet (unlike Result.jsx/Family.jsx), and the plan is to do
-// one full Hindi pass across the whole app once it's feature-complete,
-// rather than ship this one piece bilingual and the rest not. Flip this
-// to true once that pass happens -- no other code change needed.
-const HOME_PROFILE_SWITCHER_ENABLED = false;
-
 function BarcodeIcon() {
   return (
     <svg viewBox="0 0 24 24" className="w-4 h-4">
@@ -528,14 +520,12 @@ export default function Home() {
             </div>
           )}
 
-          {/* Personal FoodGuard Stage 3 -- pick who you're checking food
-              for BEFORE scanning, instead of only after landing on the
+          {/* Personal FoodGuard -- pick who you're checking food for
+              BEFORE scanning, instead of only after landing on the
               Result page. Just remembers the choice (setActiveProfile);
-              it doesn't show a per-profile score here since there's no
-              scanned product yet to score. Hidden behind
-              HOME_PROFILE_SWITCHER_ENABLED for now -- see the comment
-              at the top of this file. */}
-          {HOME_PROFILE_SWITCHER_ENABLED && searchQuery.trim().length === 0 && profiles.length > 0 && (
+              it deliberately shows no per-profile score here, since
+              there's no scanned product yet to score against. */}
+          {searchQuery.trim().length === 0 && profiles.length > 0 && (
             <div className="mb-5">
               <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">Who are you checking food for?</p>
               <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>

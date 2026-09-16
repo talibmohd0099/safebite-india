@@ -269,6 +269,12 @@ export async function getSaferAlternatives({ productName, lookupKey, limit = 3 }
       imageUrl: row.report?.imageUrl || null,
       score: typeof row.report?.overallScore === 'number' ? row.report.overallScore : null,
       verdict: row.report?.verdict || null,
+      // Passed through so the caller can re-rank these by a specific
+      // person's priorities (see personalAssessment.js) without a second
+      // query -- the full report JSON is already being fetched above, so
+      // carrying two more of its fields costs nothing extra.
+      ingredients: row.report?.ingredients || [],
+      realNutrients: row.report?.realNutrients || null,
     }))
     .filter((p) => typeof p.score === 'number' && p.score >= SAFE_SCORE_THRESHOLD)
     .sort((a, b) => b.score - a.score)

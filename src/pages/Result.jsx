@@ -69,6 +69,15 @@ const TIER_RANK = { Harmful: 0, Concerning: 1, 'Highly processed': 2 };
 // list).
 const MAIN_FACTORS_LIMIT = 4;
 
+// How many alternatives are shown, and how many candidates are fetched
+// to choose them from. Ranking by a specific person's priorities can
+// only surface a genuinely better-suited product if there are more
+// candidates than slots -- with a pool the same size as the row, a
+// personal ranking could only reshuffle the same three products the
+// general score already picked.
+const ALTERNATIVES_SHOWN = 3;
+const ALTERNATIVES_POOL_SIZE = 12;
+
 // Short, direct answer to "should I eat this?" shown next to the fork
 // icon in the score hero -- deliberately a different word than the big
 // verdict label above it (e.g. "Moderate" + "Occasionally", not
@@ -192,7 +201,7 @@ export default function Result() {
       return;
     }
     let cancelled = false;
-    getSaferAlternatives({ productName: result.productName, lookupKey: result.lookupKey }).then((alts) => {
+    getSaferAlternatives({ productName: result.productName, lookupKey: result.lookupKey, limit: ALTERNATIVES_POOL_SIZE }).then((alts) => {
       if (!cancelled) setAlternatives(alts);
     });
     return () => { cancelled = true; };
@@ -314,6 +323,27 @@ export default function Result() {
     setActiveProfile(profileId);
     setShowWhyPersonal(false);
   };
+
+  // Alternatives, ranked for whoever's being checked for. Without a
+  // profile this is just the general-score order the catalog already
+  // returned. With one, each candidate is re-scored against that
+  // person's priorities and the row is rebuilt from the top of THAT
+  // order -- and the badge on each card switches to the personal score
+  // too, since a row sorted by one number while displaying another
+  // just looks broken.
+  const rankedAlternatives = activeProfile
+    ? alternatives
+        .map((item) => ({
+          item,
+          personalScore: calculatePersonalAssessment(
+            { overallScore: item.score, ingredients: item.ingredients, realNutrients: item.realNutrients },
+            activeProfile
+          ).personalScore,
+        }))
+        .sort((a, b) => b.personalScore - a.personalScore)
+        .slice(0, ALTERNATIVES_SHOWN)
+        .map(({ item, personalScore }) => ({ ...item, score: personalScore }))
+    : alternatives.slice(0, ALTERNATIVES_SHOWN);
 
   // Stats, dots and the filter all read from one severity scale, so the
   // counts can never disagree with the colours shown next to each row.
@@ -919,11 +949,15 @@ export default function Result() {
           match Category.jsx browses by, filtered to a "Good"-or-better
           score, so every suggestion here is a real, already-verified
           product rather than something a model guessed at. */}
-      {view === 'overview' && alternatives.length > 0 && (
+      {view === 'overview' && rankedAlternatives.length > 0 && (
         <>
-          <SectionHeader>{t('saferAlternatives')}</SectionHeader>
+          <SectionHeader>
+            {activeProfile
+              ? t('betterOptionsFor', { name: activeProfile.nickname })
+              : t('saferAlternatives')}
+          </SectionHeader>
           <div className="flex gap-3 overflow-x-auto px-4 pb-1" style={{ scrollbarWidth: 'none' }}>
-            {alternatives.map((item) => (
+            {rankedAlternatives.map((item) => (
               <ProductStripCard key={item.lookupKey} item={item} onClick={() => openAlternative(item)} />
             ))}
           </div>
