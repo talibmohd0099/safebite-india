@@ -13,6 +13,15 @@ import { CATEGORIES } from '../data/categories';
 import { getTodaysTip } from '../data/didYouKnowTips';
 import BarcodeScanner, { isBarcodeScanSupported } from '../components/BarcodeScanner';
 import ScanBadge from '../components/ScanBadge';
+import { useFamily } from '../contexts/FamilyContext';
+
+// Personal FoodGuard Stage 3 (Home profile switcher) -- built, but kept
+// hidden for now. Home.jsx doesn't route any of its text through the
+// i18n system yet (unlike Result.jsx/Family.jsx), and the plan is to do
+// one full Hindi pass across the whole app once it's feature-complete,
+// rather than ship this one piece bilingual and the rest not. Flip this
+// to true once that pass happens -- no other code change needed.
+const HOME_PROFILE_SWITCHER_ENABLED = false;
 
 function BarcodeIcon() {
   return (
@@ -53,6 +62,7 @@ export default function Home() {
   const searchInputRef = useRef(null);
   const navigate = useNavigate();
   const todaysTip = getTodaysTip(dayOfYearSeed());
+  const { profiles, activeProfileId, setActiveProfile } = useFamily();
 
   // Real usage/catalog data for the home screen's discovery sections --
   // each loaded once, not worth the type-ahead effect's debounce/
@@ -515,6 +525,44 @@ export default function Home() {
                 <span className="text-sm">📄</span>
                 <span className="text-xs font-semibold">Paste</span>
               </button>
+            </div>
+          )}
+
+          {/* Personal FoodGuard Stage 3 -- pick who you're checking food
+              for BEFORE scanning, instead of only after landing on the
+              Result page. Just remembers the choice (setActiveProfile);
+              it doesn't show a per-profile score here since there's no
+              scanned product yet to score. Hidden behind
+              HOME_PROFILE_SWITCHER_ENABLED for now -- see the comment
+              at the top of this file. */}
+          {HOME_PROFILE_SWITCHER_ENABLED && searchQuery.trim().length === 0 && profiles.length > 0 && (
+            <div className="mb-5">
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">Who are you checking food for?</p>
+              <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+                {profiles.map((p) => {
+                  const active = p.id === activeProfileId;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => setActiveProfile(active ? null : p.id)}
+                      className={`tap-scale flex-shrink-0 flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+                        active
+                          ? 'bg-green-600 text-white'
+                          : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      <span
+                        className={`w-6 h-6 rounded-full flex items-center justify-center text-sm flex-shrink-0 ${
+                          active ? 'bg-white/25' : 'bg-slate-100 dark:bg-slate-700'
+                        }`}
+                      >
+                        {p.avatarEmoji}
+                      </span>
+                      {p.nickname}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 
