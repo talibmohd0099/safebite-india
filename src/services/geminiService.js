@@ -526,11 +526,32 @@ export async function repairLabelPunctuation(rawText) {
 // not asking Gemini to write in the app's voice from a description,
 // but showing it. "Do not repeat these" doubles as the few-shot
 // examples that set tone/specificity.
-const DAILY_FACT_PROMPT = `You write one "Did you know?" fact for FoodGuard India, an Indian packaged-food ingredient scanner. It must be:
-- Specifically about INDIAN food regulation, labeling, ingredients, or nutrition (FSSAI rules, Indian-specific practices) -- not generic global nutrition trivia.
-- Something you are genuinely confident is factually correct. If you aren't sure a specific number or regulation is exactly right, write a more general but still accurate fact instead of guessing at specifics -- a wrong fact is worse than a less exciting true one.
-- Plain and non-alarmist -- explain what a rule or label means, don't imply anyone is hiding something if they're simply following a real, disclosed rule.
-- Never a medical claim ("causes cancer", "is dangerous") -- describe regulation/labeling/composition, not health outcomes.
+//
+// The topic allowlist/banlist below exists because of a real failure:
+// the very first live generation confidently described the FSSAI
+// veg/non-veg mark as "a green square logo" with "a brown triangle"
+// for non-veg -- it's actually a green (or brown) DOT inside a square
+// OUTLINE, not a colored square or a triangle. "Only answer if you're
+// confident" did nothing, because it WAS confident, just wrong.
+// Visual/appearance details (shape, color, position of a symbol) are
+// exactly the kind of specific claim that's easy to state fluently and
+// wrong, so they're banned outright rather than left to "be careful."
+const DAILY_FACT_PROMPT = `You write one "Did you know?" fact for FoodGuard India, an Indian packaged-food ingredient scanner.
+
+ONLY write about these topic categories -- pick one:
+1. Ingredient list STRUCTURE/ORDER rules (e.g. descending order by weight).
+2. Naming/definition differences (INS vs E numbers, "maida" vs whole wheat, "added sugar" vs "total sugar", "natural" vs "nature-identical" flavour).
+3. What a claim on a label does or doesn't legally guarantee (e.g. "no added sugar" doesn't mean sugar-free) -- WITHOUT citing a specific number/threshold unless it is extremely well-established and simple (e.g. "heaviest ingredient first").
+4. Which specific named substances are banned/restricted in India but legal elsewhere, or vice versa (name the substance, not a numeric limit).
+5. What a mandatory disclosure category exists and why (e.g. allergen declarations, FSSAI license numbers) -- WITHOUT describing what it looks like.
+
+NEVER do any of these, even if you feel confident:
+- Describe the APPEARANCE of any symbol, logo, mark, or icon -- its shape, color, or position. If the fact is about a mark's existence, say only that a mark exists and what it's FOR, never what it looks like.
+- State a specific percentage, gram, or mg threshold unless it is one already well-known and simple (do not invent or recall a precise regulatory number for something visual, chemical, or procedural that you have not seen stated many times).
+- Make a medical claim ("causes cancer", "is dangerous") -- describe regulation/labeling/composition, not health outcomes.
+- Imply a company is hiding something by following a real, disclosed rule.
+
+If you cannot think of a fact that is both interesting AND fits topic categories 1-5 above with total confidence, write a simpler, more conservative fact within those categories rather than reaching for something more specific.
 
 Examples of the right tone and specificity (do not repeat these or their exact topic):
 - "FSSAI requires ingredients to be listed by weight, heaviest first -- so whatever's listed first is genuinely the biggest part of the product."
@@ -538,7 +559,7 @@ Examples of the right tone and specificity (do not repeat these or their exact t
 - "Maida (refined wheat flour) isn't a banned or illegal ingredient -- it's just been stripped of the bran and germ, which is where most of the fibre and nutrients were."
 
 Return ONLY a JSON object, no markdown, in this exact shape:
-{"shortFact": "one sentence, under 200 characters, same voice as the examples", "detail": "3-5 sentences giving more context or nuance than the short fact -- not just restating it, still India-specific and factually careful"}`;
+{"shortFact": "one sentence, under 200 characters, same voice as the examples", "detail": "3-5 sentences giving more context or nuance than the short fact -- not just restating it, still following every rule above"}`;
 
 /**
  * Generates today's homepage "Did you know?" fact -- see
@@ -551,6 +572,16 @@ Return ONLY a JSON object, no markdown, in this exact shape:
  * @param {string[]} avoidTopics - recent facts' short_fact text, so the
  *   same topic doesn't repeat day after day.
  */
+// A deterministic backstop, not just a prompt instruction -- the prompt
+// alone already told Gemini not to describe a symbol's appearance, and
+// it did anyway on the very first real run ("a green square logo...a
+// brown triangle"). Rejects any fact whose wording combines a shape/
+// symbol word with a color word near each other, regardless of how the
+// prompt is worded, so a future prompt regression can't silently
+// reopen the exact failure this was built to close.
+const APPEARANCE_CLAIM_RE =
+  /\b(square|triangle|circle|dot|logo|icon|symbol|badge|stamp)\b[^.]{0,40}\b(green|brown|red|maroon|yellow|colou?r(?:ed)?)\b|\b(green|brown|red|maroon|yellow|colou?r(?:ed)?)\b[^.]{0,40}\b(square|triangle|circle|dot|logo|icon|symbol|badge|stamp)\b/i;
+
 export async function generateDailyFact(avoidTopics = []) {
   if (GEMINI_API_KEYS.length === 0) return null;
 
@@ -579,6 +610,11 @@ export async function generateDailyFact(avoidTopics = []) {
     const shortFact = typeof parsed?.shortFact === 'string' ? parsed.shortFact.trim() : null;
     const detail = typeof parsed?.detail === 'string' ? parsed.detail.trim() : null;
     if (!shortFact || !detail) return null;
+
+    if (APPEARANCE_CLAIM_RE.test(shortFact) || APPEARANCE_CLAIM_RE.test(detail)) {
+      console.warn('Rejected a generated fact for describing a symbol\'s appearance:', shortFact);
+      return null;
+    }
 
     return { shortFact, detail };
   } catch {
