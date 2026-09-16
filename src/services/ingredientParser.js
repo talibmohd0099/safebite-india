@@ -268,6 +268,21 @@ export function splitTopLevel(rawText) {
         continue;
       }
       if (text.slice(i).toLowerCase().startsWith(' and ')) {
+        // "Spices and Condiments" is one fixed FSSAI category name, not
+        // a trailing "X, Y AND Z" list conjunction -- splitting it in
+        // half here left "condiments (...)" as its own entry with a
+        // dangling, never-closed bracket (the real ingredient list
+        // inside it), which then silently dropped everything inside.
+        // Confirmed against a real scanned product (Lay's Potato Chips,
+        // barcode 8901491101844) -- lost sugar, salt, citric acid and
+        // more this way.
+        const before = current.trim().toLowerCase();
+        const after = text.slice(i + 5).toLowerCase();
+        if (before.endsWith('spices') && after.startsWith('condiments')) {
+          current += text.slice(i, i + 5);
+          i += 4;
+          continue;
+        }
         flush();
         i += 4;
         continue;
@@ -334,6 +349,18 @@ function findLastBracketGroup(raw) {
       }
     }
   }
+
+  // The label's own final bracket is missing its closer -- a real
+  // transcription/OCR defect (the print gets cut off, a scan misses
+  // the last character), not malformed input worth rejecting. Treat
+  // "still open when the string ends" as closing right there, the
+  // same as if the missing ")" were actually present -- this is always
+  // the LAST group in the string (nothing comes after it), so it wins
+  // over any earlier complete one `best` may already hold.
+  if (depth > 0 && start !== -1) {
+    best = { start, end: raw.length, inner: raw.slice(start + 1) };
+  }
+
   return best;
 }
 
@@ -365,6 +392,15 @@ function findAllTopLevelBrackets(raw) {
       }
     }
   }
+
+  // Same trailing-missing-closer recovery as findLastBracketGroup above
+  // -- the label's last group never closes, so treat it as closing
+  // right at the end of the string instead of dropping everything
+  // inside it.
+  if (depth > 0 && start !== -1) {
+    groups.push({ start, end: raw.length, inner: raw.slice(start + 1) });
+  }
+
   return groups;
 }
 
@@ -751,6 +787,11 @@ export function parseIngredients(labelText) {
       // in a malformed label -- are just noise by this point; anything
       // meaningful they wrapped has already been extracted above.
       .replace(/[(){}[\]]/g, ' ')
+      // A leading "and/or"/"and"/"or" is a conjunction fragment left
+      // over from splitting "X, Y and/or Z" at the comma, not part of
+      // the ingredient's own name -- "and/or canola oil" otherwise
+      // fails to match the database's plain "canola oil" entry at all.
+      .replace(/^(?:and\/or|and|or)\s+/i, '')
       .replace(/^[\s\-–:.,]+|[\s\-–:.,]+$/g, '')
       .replace(/\s+/g, ' ')
       .trim();

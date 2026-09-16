@@ -301,3 +301,55 @@ test('extracts a "Contains" allergen declaration separately even with markdown e
     assert.ok(!byName(ingredients, fake), `"${fake}" must not appear as a fake ingredient`);
   }
 });
+
+test('does not split the fixed category name "Spices and Condiments" at its own "and"', () => {
+  // Regression test for a real scanned product (Lay's Potato Chips,
+  // barcode 8901491101844): "spices and condiments (onion powder,
+  // chilli powder, ..., natural flavors (e160b)" -- the label's own
+  // final bracket is missing its closer. The generic " and " splitter
+  // (meant for trailing "X, Y AND Z" lists) was treating "Spices and
+  // Condiments" as two separate top-level entries, leaving "condiments
+  // (...)" holding the real, now-orphaned ingredient list with a
+  // dangling bracket that then silently dropped everything inside it --
+  // 16 real ingredients gone, including sugar, salt and citric acid.
+  const label =
+    'potato, edible vegetable oil (sunflower oil, corn oil, and/or canola oil), spices and ' +
+    'condiments (onion powder, chilli powder, dry mango powder, coriander powder, ginger ' +
+    'powder, garlic powder, black pepper powder, turmeric powder, cumin powder, salt, ' +
+    'black salt, sugar, tomato powder, citric acid, tartaric acid, natural flavors (e160b)';
+
+  const result = parseIngredients(label);
+  const names = result.map((i) => i.displayName);
+
+  assert.ok(!names.includes('Spices'), 'must not split off a bare "Spices" fragment');
+  for (const name of ['Onion Powder', 'Salt', 'Sugar', 'Citric Acid', 'Tartaric Acid']) {
+    assert.ok(names.includes(name), `${name} should still be extracted`);
+  }
+  assert.ok(result.some((i) => i.insCode === '160b'), 'Natural Flavors (e160b) should resolve to INS 160b');
+});
+
+test('a trailing bracket with no closer at all recovers everything inside it instead of dropping the whole entry', () => {
+  // A shorter, more direct case than the "Spices and Condiments" one
+  // above -- a single named group whose closing ")" is simply never
+  // there (the physical label got cut off / OCR missed it), with
+  // nothing else in the string after it.
+  const label = 'Rice, Seasoning (Sugar, Salt, Citric Acid';
+  const result = parseIngredients(label);
+  const names = result.map((i) => i.displayName);
+  assert.ok(names.includes('Rice'));
+  assert.ok(names.includes('Sugar'));
+  assert.ok(names.includes('Salt'));
+  assert.ok(names.includes('Citric Acid'));
+  assert.ok(!names.includes('Seasoning'), 'the generic wrapper name should not itself become an ingredient');
+});
+
+test('strips a leftover "and/or" conjunction fragment instead of leaving it stuck to the ingredient name', () => {
+  // "sunflower oil, corn oil, and/or canola oil" -- splitting on the
+  // comma before "and/or" left "and/or canola oil" as the ingredient's
+  // own name, which then failed to match the database's plain "canola
+  // oil" entry at all.
+  const result = parseIngredients('Edible Vegetable Oil (Sunflower Oil, Corn Oil, and/or Canola Oil)');
+  const names = result.map((i) => i.displayName);
+  assert.ok(names.includes('Canola Oil'));
+  assert.ok(!names.includes('And/or Canola Oil'));
+});

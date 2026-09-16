@@ -81,18 +81,33 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
   // A real product's ingredient list is virtually never MOSTLY things
   // Gemini can't recognize as food at all -- a real but obscure regional
   // ingredient still comes back recognized (see the prompt in
-  // geminiService.js), so a majority unrecognized means the source text
-  // almost certainly wasn't a real ingredients list to begin with. Found
-  // via a real seeded product (Taj Mahal tea) whose "ingredients" were
-  // things like "Rusbea Verified Environment" and "Org 00 8 901030
-  // 658778" -- a certification blurb and a barcode, scraped from the
-  // wrong field -- which each individually resolved as harmless (nothing
-  // to penalize), so the product scored a false 100/100. Scoring text
-  // like that as if it were a clean product would be actively misleading.
+  // geminiService.js), so at least half unrecognized means the source
+  // text almost certainly wasn't a real ingredients list to begin with.
+  // Found via a real seeded product (Taj Mahal tea) whose "ingredients"
+  // were things like "Rusbea Verified Environment" and "Org 00 8
+  // 901030 658778" -- a certification blurb and a barcode, scraped from
+  // the wrong field -- which each individually resolved as harmless
+  // (nothing to penalize), so the product scored a false 100/100.
+  // Scoring text like that as if it were a clean product would be
+  // actively misleading.
+  //
+  // Uses >= rather than a strict majority (> 0.5) -- a real scanned
+  // product (Fortune brand Refined Sunflower Oil, barcode
+  // 8906035030239) had a photographed label with no real ingredients
+  // panel at all, just front-of-pack marketing copy ("Freedom to eat,
+  // Freedom to enjoy..."). That parsed down to exactly two fragments:
+  // one Gemini correctly flagged as a marketing phrase (recognized:
+  // false), the other a garbled "E Freedom Refined Sunflower Oil
+  // Freedom To Eat" that Gemini charitably matched to real sunflower
+  // oil (recognized: true) by pattern-matching the one legitimate
+  // phrase buried inside the noise. A strict "> 0.5" let that exact
+  // 50/50 split through, scoring the product 95/100 on a fabricated
+  // ingredient. With so few total fragments, a tied split is already
+  // too unreliable a sample to trust either way.
   const unrecognized = ingredients.filter((i) => i.recognized === false);
-  if (parsed.length > 1 && unrecognized.length / ingredients.length > 0.5) {
+  if (parsed.length > 1 && unrecognized.length / ingredients.length >= 0.5) {
     const examples = unrecognized.slice(0, 3).map((i) => `"${i.name}"`).join(', ');
-    throw new Error(`This doesn't look like a real ingredients list — most of what was found (${examples}) isn't a recognized food ingredient. Please check the text and try again.`);
+    throw new Error(`This doesn't look like a real ingredients list — a large share of what was found (${examples}) isn't a recognized food ingredient. Please check the text and try again.`);
   }
 
   const report = buildReport(ingredients, { productName, brand, imageUrl });
