@@ -29,6 +29,43 @@ export const NUTRIENT_LIMITS = [
 // isn't a meaningful daily-habit risk on its own.
 const MIN_PERCENT_TO_SHOW = 30;
 
+// Foods measured out in spoonfuls, not servings. Every number this file
+// works with is per 100g (or per pack), so "68% of your daily saturated
+// fat" is a fair thing to say about a chocolate bar and a nonsense thing
+// to say about cooking oil -- nobody eats 100g of mustard oil, and
+// butter at 218% of a day's saturated fat per 100g is a statement about
+// the unit, not about anyone's actual butter habit.
+//
+// This is the same judgment the isCondimentOrSeasoning check already
+// makes at the call site in analyzeText.js -- but that one is set by
+// Gemini per product and is simply absent on the hundreds of rows whose
+// reports predate it (a real chaat masala among them, caught scoring
+// 94 -> 61 on a sodium reading nobody would ever eat in one sitting).
+// A deterministic name check costs nothing and can't silently go
+// missing.
+const SMALL_PORTION_RE =
+  /\b(oils?|ghee|butter|papads?|pappads?|pickles?|achar|vinegar|salt|baking powder|yeast|essence|masala|spice mix|seasoning)\b/i;
+
+// ...unless the name also says it's an ordinary food that merely
+// CONTAINS or is FLAVOURED with one of those. "Masala oats" is a
+// breakfast bowl, "masala noodles" is a meal, "butter biscuit" is a
+// biscuit -- all eaten in real portions, all correctly subject to the
+// daily-limit framing.
+const ORDINARY_PORTION_RE =
+  /\b(oats?|noodles?|pasta|vermicelli|biscuits?|cookies?|chips|crisps|namkeen|bhujia|chakli|cakes?|crackers?|snacks?|mixture|popcorn|sev|wafers?|bars?|drinks?|juice|shake|granola|cereal|bread)\b/i;
+
+/**
+ * True for a product whose nutrition numbers shouldn't be read against
+ * a full day's limit at all, because nobody consumes it by the 100g.
+ * Used to skip both the "daily habit" projection and the score cap that
+ * reads it (see applyRealNutrientCap in scoringEngine.js).
+ */
+export function isSmallPortionFood(productName) {
+  const name = productName || '';
+  if (ORDINARY_PORTION_RE.test(name)) return false;
+  return SMALL_PORTION_RE.test(name);
+}
+
 /**
  * @param {object} nutrients - real, already-known amounts scaled to
  *   whatever `servingGrams` describes (never estimated): { sodiumMg,

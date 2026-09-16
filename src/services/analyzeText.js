@@ -5,14 +5,14 @@
 // score it with plain rules. No whole-product AI call needed once
 // ingredients are known.
 
-import { parseLabel, isBracketBalanced } from './ingredientParser.js';
+import { parseLabel, isBracketBalanced, looksLikeNutritionPanel } from './ingredientParser.js';
 import { resolveIngredients } from './ingredientLibrary.js';
 import { buildReport, applyRealNutrientCap } from './scoringEngine.js';
 import { generateProductInsights, repairLabelPunctuation } from './geminiService.js';
 import { translateReportToHindi } from './translateService.js';
 import { applyOffPercentEstimates } from './openFoodFacts.js';
 import { estimateQuantities } from './quantityEstimator.js';
-import { buildDailyHabitCheck } from './dailyHabitCheck.js';
+import { buildDailyHabitCheck, isSmallPortionFood } from './dailyHabitCheck.js';
 
 /**
  * Analyze raw ingredients text end to end.
@@ -47,6 +47,16 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
 
   if (parsed.length === 0) {
     throw new Error("Couldn't find any recognizable ingredients in that text. Please check and try again.");
+  }
+
+  // Checked here, before resolveIngredients -- a photographed nutrition
+  // panel is cheap to spot from the parsed names alone, and catching it
+  // now avoids paying Gemini to research "Energy" and "Carbohydrate" as
+  // if they were ingredients. See looksLikeNutritionPanel for the real
+  // scan this came from and why the "mostly unrecognized" guard below
+  // can't catch it.
+  if (looksLikeNutritionPanel(parsed)) {
+    throw new Error('That looks like the nutrition panel rather than the ingredients list. Please capture the list that starts with "Ingredients".');
   }
 
   // When we have Open Food Facts' structured per-ingredient breakdown
@@ -151,7 +161,7 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
     // isCondimentOrSeasoning already changes how the score itself reads
     // means a "here's what a daily habit of this looks like" framing
     // would be actively misleading for one, so it's skipped entirely.
-    if (nutrientsInfo && !report.isCondimentOrSeasoning) {
+    if (nutrientsInfo && !report.isCondimentOrSeasoning && !isSmallPortionFood(report.productName)) {
       const habitCheck = buildDailyHabitCheck(nutrientsInfo.nutrients, nutrientsInfo.servingGrams);
       if (habitCheck) {
         report.dailyHabitCheck = habitCheck;

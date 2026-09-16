@@ -55,6 +55,48 @@ const ENGLISH_FILLER_WORDS = new Set([
   'want', 'need', 'know', 'think', 'like', 'just', 'really', 'very',
 ]);
 
+// Macro/nutrient CATEGORY names -- the row labels down the left of a
+// nutrition panel. None of these is ever an ingredient in its own right
+// on a real label: a product contains "Refined Palm Oil", never
+// "Saturated Fat"; "Whey Protein Concentrate", never bare "Protein".
+//
+// Deliberately excludes sugar, salt, water and oil, which are genuine
+// ingredients that also appear as panel rows -- matching those would
+// reject half the real labels in India.
+const NUTRITION_PANEL_TERMS = new Set([
+  'energy', 'energy value', 'calories', 'kcal', 'kj', 'kilojoules',
+  'carbohydrate', 'carbohydrates', 'total carbohydrate', 'total carbohydrates',
+  'protein', 'proteins',
+  'fat', 'total fat', 'saturated fat', 'trans fat', 'unsaturated fat',
+  'monounsaturated fat', 'polyunsaturated fat', 'saturated fatty acids',
+  'trans fatty acids', 'cholesterol',
+  'fibre', 'fiber', 'dietary fibre', 'dietary fiber', 'crude fibre',
+  'total sugars', 'added sugars', 'of which sugars',
+  'sodium', 'serving size', 'per serve', 'per serving',
+]);
+
+/**
+ * True when a parsed "ingredient list" is really a photographed
+ * NUTRITION PANEL. Caught from a real scan (Parle-G, barcode
+ * 8901719134852) whose stored ingredients text was the single line
+ * "Energy.protrin.carbohydrate." -- three macro names, each of which
+ * individually resolves as a perfectly harmless food term with nothing
+ * to penalize, so the product scored a flat 100/100 "Very Healthy".
+ *
+ * This needs its own check rather than leaning on the "mostly
+ * unrecognized" guard in analyzeText.js: those words ARE real
+ * food-science vocabulary, so they come back recognized and that guard
+ * never fires. Requires two or more panel terms before rejecting, so a
+ * single coincidental match in a short real list can't trip it.
+ */
+export function looksLikeNutritionPanel(ingredients) {
+  if (!ingredients || ingredients.length === 0) return false;
+  const panelTerms = ingredients.filter((i) =>
+    NUTRITION_PANEL_TERMS.has(normalizeName(i.displayName || i.name || ''))
+  );
+  return panelTerms.length >= 2 && panelTerms.length / ingredients.length >= 0.5;
+}
+
 /**
  * Cheap, deterministic check for "does this actually look like an
  * ingredient name" vs. a typed sentence/question/random text. Runs

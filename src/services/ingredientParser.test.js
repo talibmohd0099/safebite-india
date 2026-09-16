@@ -5,7 +5,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseIngredients, parseLabel } from './ingredientParser.js';
+import { parseIngredients, parseLabel, looksLikeNutritionPanel } from './ingredientParser.js';
 
 function byName(ingredients, name) {
   return ingredients.find((i) => i.displayName === name);
@@ -341,6 +341,32 @@ test('a trailing bracket with no closer at all recovers everything inside it ins
   assert.ok(names.includes('Salt'));
   assert.ok(names.includes('Citric Acid'));
   assert.ok(!names.includes('Seasoning'), 'the generic wrapper name should not itself become an ingredient');
+});
+
+test('recognizes a photographed nutrition panel instead of scoring it as a clean ingredient list', () => {
+  // Regression test for a real scanned product (Parle-G, barcode
+  // 8901719134852) whose entire stored "ingredients" text was
+  // "Energy.protrin.carbohydrate." -- the nutrition panel's row labels,
+  // photographed instead of the ingredients list. Each word resolves as
+  // a harmless real food term with nothing to penalize, so a biscuit
+  // that's roughly a quarter sugar scored a flat 100/100 "Very Healthy".
+  assert.equal(looksLikeNutritionPanel(parseIngredients('Energy.protrin.carbohydrate.')), true);
+  assert.equal(
+    looksLikeNutritionPanel(parseIngredients('Energy, Protein, Carbohydrate, Total Fat, Saturated Fat, Sodium')),
+    true
+  );
+});
+
+test('does not mistake a real ingredient list for a nutrition panel just because it contains sugar or salt', () => {
+  // Sugar, salt, water and oil are genuine ingredients that also appear
+  // as panel rows -- treating those as panel terms would reject a large
+  // share of real Indian labels.
+  const real = parseIngredients('Refined Wheat Flour (Maida) 68%, Sugar, Refined Palm Oil, Iodised Salt, Milk Solids');
+  assert.equal(looksLikeNutritionPanel(real), false);
+
+  // A single coincidental panel word in a real list must not trip it --
+  // two or more are required.
+  assert.equal(looksLikeNutritionPanel(parseIngredients('Whey Protein Concentrate, Cocoa Solids, Sugar')), false);
 });
 
 test('strips a leftover "and/or" conjunction fragment instead of leaving it stuck to the ingredient name', () => {
