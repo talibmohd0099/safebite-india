@@ -7,6 +7,7 @@ import { updateProductName, getCachedReport, getSaferAlternatives, deleteReport,
 import { analyzeText } from '../services/analyzeText';
 import { lookupBarcode } from '../services/openFoodFacts';
 import { getRelatedNews } from '../services/newsRepo';
+import { submitProductFlag, FLAG_REASONS } from '../services/productFlags';
 import { categoryIcon } from '../utils/categoryIcon';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useFamily } from '../contexts/FamilyContext';
@@ -183,6 +184,11 @@ export default function Result() {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState('');
   const [showWhyPersonal, setShowWhyPersonal] = useState(false);
+  const [showFlagModal, setShowFlagModal] = useState(false);
+  const [flagReason, setFlagReason] = useState('');
+  const [flagRemarks, setFlagRemarks] = useState('');
+  const [flagState, setFlagState] = useState('idle'); // 'idle' | 'sending' | 'sent' | 'error'
+  const [flagError, setFlagError] = useState('');
 
   useEffect(() => {
     const data = getHistoryById(id);
@@ -318,6 +324,28 @@ export default function Result() {
   // hook call here would run after the early return above on some
   // renders, violating the Rules of Hooks.
   const personalAssessment = activeProfile ? calculatePersonalAssessment(result, activeProfile) : null;
+  const openFlagModal = () => {
+    setFlagReason('');
+    setFlagRemarks('');
+    setFlagState('idle');
+    setFlagError('');
+    setShowFlagModal(true);
+  };
+
+  const sendFlag = async () => {
+    setFlagState('sending');
+    const { ok, error } = await submitProductFlag({ report: result, reason: flagReason, remarks: flagRemarks });
+    if (ok) {
+      setFlagState('sent');
+    } else {
+      // Never closes the sheet on failure -- losing what someone just
+      // typed and telling them nothing went wrong would be worse than
+      // the failure itself.
+      setFlagState('error');
+      setFlagError(error || 'Could not send that report.');
+    }
+  };
+
   const selectProfile = (profileId) => {
     setSelectedProfileId(profileId);
     setActiveProfile(profileId);
@@ -1173,6 +1201,17 @@ export default function Result() {
         <p className="text-[12px] mt-2" style={{ color: 'var(--label-3)' }}>
           {reportId} · {savedDate}
         </p>
+        {/* Deliberately plain and low-key down here rather than a
+            prominent button up top: this should be findable when a
+            result genuinely looks wrong, without inviting a tap on
+            every single report. */}
+        <button
+          onClick={openFlagModal}
+          className="tap-scale text-[12.5px] font-semibold mt-3 underline underline-offset-2"
+          style={{ color: 'var(--label-2)' }}
+        >
+          {t('flagReportIssue')}
+        </button>
       </div>
 
       <div className="px-4 pt-6">
@@ -1402,6 +1441,112 @@ export default function Result() {
           page. A modal rather than its own route/URL: this is
           supplementary detail about the product already on screen, not
           content that needs its own deep link. */}
+      {/* Report an issue -- what someone saw is captured alongside what
+          they typed (see productFlags.js), since the product gets
+          re-analyzed the moment anything here is acted on. */}
+      {showFlagModal && createPortal(
+        <div
+          className="fixed inset-0 z-[999] bg-black/50 flex items-end sm:items-center justify-center"
+          onClick={() => setShowFlagModal(false)}
+        >
+          <div
+            className="relative w-full sm:max-w-[480px] max-h-[85vh] overflow-y-auto rounded-t-[24px] sm:rounded-[20px] p-5"
+            style={{ background: 'var(--bg-card)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowFlagModal(false)}
+              aria-label="Close"
+              className="tap-scale absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-[18px]"
+              style={{ background: 'var(--fill)', color: 'var(--label-2)' }}
+            >
+              ×
+            </button>
+
+            {flagState === 'sent' ? (
+              <div className="py-4 text-center">
+                <p className="text-[34px] leading-none mb-2">✅</p>
+                <p className="text-[17px] font-bold mb-1" style={{ color: 'var(--label-1)' }}>
+                  {t('flagThanksTitle')}
+                </p>
+                <p className="text-[14px] leading-relaxed" style={{ color: 'var(--label-2)' }}>
+                  {t('flagThanksBody')}
+                </p>
+                <button
+                  onClick={() => setShowFlagModal(false)}
+                  className="tap-scale w-full mt-5 py-3 rounded-[14px] text-[16px] font-semibold text-white"
+                  style={{ background: 'var(--tint)' }}
+                >
+                  {t('gotIt')}
+                </button>
+              </div>
+            ) : (
+              <>
+                <p className="text-[17px] font-bold pr-8 mb-1" style={{ color: 'var(--label-1)' }}>
+                  {t('flagTitle')}
+                </p>
+                <p className="text-[13.5px] leading-relaxed mb-4" style={{ color: 'var(--label-2)' }}>
+                  {t('flagSubtitle')}
+                </p>
+
+                <div className="space-y-2 mb-4">
+                  {FLAG_REASONS.map((r) => {
+                    const picked = flagReason === r.key;
+                    return (
+                      <button
+                        key={r.key}
+                        onClick={() => setFlagReason(r.key)}
+                        className="tap-scale w-full text-left px-3.5 py-3 rounded-[12px] text-[14px] font-semibold flex items-center gap-2.5"
+                        style={{
+                          background: picked ? 'var(--tint)' : 'var(--fill)',
+                          color: picked ? '#fff' : 'var(--label-1)',
+                        }}
+                      >
+                        <span
+                          className="w-[18px] h-[18px] rounded-full flex-shrink-0 flex items-center justify-center text-[11px]"
+                          style={{
+                            border: `2px solid ${picked ? 'rgba(255,255,255,0.9)' : 'var(--label-3)'}`,
+                            color: '#fff',
+                          }}
+                        >
+                          {picked ? '✓' : ''}
+                        </span>
+                        {r.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <textarea
+                  value={flagRemarks}
+                  onChange={(e) => setFlagRemarks(e.target.value)}
+                  placeholder={t('flagRemarksPlaceholder')}
+                  rows={4}
+                  className="w-full rounded-[12px] p-3 text-[14px] leading-relaxed resize-none focus:outline-none"
+                  style={{ background: 'var(--fill)', color: 'var(--label-1)' }}
+                />
+
+                {flagState === 'error' && (
+                  <p className="text-[13px] mt-2" style={{ color: 'var(--v-poor)' }}>
+                    {flagError}
+                  </p>
+                )}
+
+                <button
+                  onClick={sendFlag}
+                  disabled={!flagReason || flagState === 'sending'}
+                  className="tap-scale w-full mt-4 py-3.5 rounded-[14px] text-[16px] font-semibold text-white disabled:opacity-40"
+                  style={{ background: 'var(--tint)' }}
+                >
+                  {flagState === 'sending' ? t('flagSending') : t('flagSubmit')}
+                </button>
+              </>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
+
       {showHabitModal && habitDisplay && createPortal(
         <div
           className="fixed inset-0 z-[999] bg-black/50 flex items-end sm:items-center justify-center"

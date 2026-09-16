@@ -147,6 +147,15 @@ export const STRINGS = {
     saferAlternatives: 'Safer alternatives in this category',
     betterOptionsFor: 'Better options for {name}',
 
+    flagReportIssue: 'Report an issue with this result',
+    flagTitle: 'What looks wrong?',
+    flagSubtitle: "We'll save this result exactly as you're seeing it now, so it can be checked properly later.",
+    flagRemarksPlaceholder: 'Anything else worth knowing? (optional)',
+    flagSubmit: 'Send report',
+    flagSending: 'Sending…',
+    flagThanksTitle: 'Thanks — that helps.',
+    flagThanksBody: 'This result has been saved for review.',
+
     tabOverview: 'Overview',
     tabIngredients: 'Ingredients ({count})',
     tabStory: 'Story',
