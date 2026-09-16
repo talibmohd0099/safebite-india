@@ -47,13 +47,24 @@ const HABIT_NUTRIENT_LABEL_KEY = {
 // HABIT_NUTRIENT_LABEL_KEY's labels for the four nutrients that
 // section already names, so this table and that one never disagree on
 // what to call the same nutrient.
+// Ordered to mirror the panel as it's actually printed on an Indian
+// pack -- energy, then protein, then carbohydrate and its sugars, then
+// fat and its fractions, then the rest -- so this reads as the same
+// table someone is holding, rather than a reordered subset of it. Any
+// row whose number we genuinely don't have is dropped at render rather
+// than shown as a blank or a zero.
 const NUTRITION_TABLE_ROWS = [
   { key: 'caloriesKcal', labelKey: 'nutrientCaloriesKcal', unit: ' kcal' },
   { key: 'proteinG', labelKey: 'nutrientProteinG', unit: 'g' },
-  { key: 'sodiumMg', labelKey: HABIT_NUTRIENT_LABEL_KEY.sodiumMg, unit: 'mg' },
+  { key: 'carbohydrateG', labelKey: 'nutrientCarbohydrateG', unit: 'g' },
+  { key: 'totalSugarG', labelKey: 'nutrientTotalSugarG', unit: 'g' },
   { key: 'addedSugarG', labelKey: HABIT_NUTRIENT_LABEL_KEY.addedSugarG, unit: 'g' },
+  { key: 'totalFatG', labelKey: 'nutrientTotalFatG', unit: 'g' },
   { key: 'saturatedFatG', labelKey: HABIT_NUTRIENT_LABEL_KEY.saturatedFatG, unit: 'g' },
   { key: 'transFatG', labelKey: HABIT_NUTRIENT_LABEL_KEY.transFatG, unit: 'g' },
+  { key: 'cholesterolMg', labelKey: 'nutrientCholesterolMg', unit: 'mg' },
+  { key: 'fibreG', labelKey: 'nutrientFibreG', unit: 'g' },
+  { key: 'sodiumMg', labelKey: HABIT_NUTRIENT_LABEL_KEY.sodiumMg, unit: 'mg' },
 ];
 
 // Ranks the "Why did this score X" modal's factors worst-tier-first,

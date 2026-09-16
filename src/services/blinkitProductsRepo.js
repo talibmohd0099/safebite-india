@@ -64,6 +64,15 @@ export function extractNutrientsForHabitCheck(nutrition) {
   const transFatG = toG(parseAmount(nutrition['Trans Fat']));
   const caloriesKcal = parseKcal(nutrition['Energy']);
   const proteinG = toG(parseAmount(nutrition['Protein']));
+  // The rest of the rows an FSSAI-mandated Indian panel prints -- shown
+  // in the Nutrition section, not used by scoring. Same key names as
+  // openFoodFacts.js produces, so the UI never has to care which source
+  // a product's numbers came from.
+  const carbohydrateG = toG(parseAmount(nutrition['Carbohydrate'] || nutrition['Carbohydrates'] || nutrition['Total Carbohydrate']));
+  const totalSugarG = toG(parseAmount(nutrition['Total Sugar'] || nutrition['Total Sugars'] || nutrition['Sugar']));
+  const totalFatG = toG(parseAmount(nutrition['Total Fat'] || nutrition['Fat']));
+  const fibreG = toG(parseAmount(nutrition['Dietary Fibre'] || nutrition['Dietary Fiber'] || nutrition['Fibre']));
+  const cholesterolMg = toMg(parseAmount(nutrition['Cholesterol']));
 
   const nutrients = {};
   if (typeof sodiumMg === 'number') nutrients.sodiumMg = sodiumMg;
@@ -72,6 +81,16 @@ export function extractNutrientsForHabitCheck(nutrition) {
   if (typeof transFatG === 'number') nutrients.transFatG = transFatG;
   if (typeof caloriesKcal === 'number') nutrients.caloriesKcal = caloriesKcal;
   if (typeof proteinG === 'number') nutrients.proteinG = proteinG;
+  if (typeof carbohydrateG === 'number') nutrients.carbohydrateG = carbohydrateG;
+  if (typeof totalFatG === 'number') nutrients.totalFatG = totalFatG;
+  if (typeof fibreG === 'number') nutrients.fibreG = fibreG;
+  if (typeof cholesterolMg === 'number') nutrients.cholesterolMg = cholesterolMg;
+  // Same reason as openFoodFacts.js: addedSugarG already falls back to
+  // the total when no added-sugar row exists, so keeping both would
+  // print one measurement twice under two different names.
+  if (typeof totalSugarG === 'number' && totalSugarG !== addedSugarG) {
+    nutrients.totalSugarG = totalSugarG;
+  }
 
   if (Object.keys(nutrients).length === 0) return null;
   // No pack-size attribute is captured by the scraper today, so

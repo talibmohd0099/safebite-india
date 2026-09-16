@@ -131,6 +131,11 @@ export const STRINGS = {
     nutritionPer100g: 'Per 100g',
     nutrientCaloriesKcal: 'calories',
     nutrientProteinG: 'protein',
+    nutrientCarbohydrateG: 'carbohydrate',
+    nutrientTotalSugarG: 'total sugar',
+    nutrientTotalFatG: 'total fat',
+    nutrientCholesterolMg: 'cholesterol',
+    nutrientFibreG: 'dietary fibre',
 
     quickHealthCheck: 'Quick health check',
     habitBarCaption: '{percent}% of your daily {nutrient} limit, in {servingText}.',

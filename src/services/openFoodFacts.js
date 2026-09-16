@@ -98,14 +98,45 @@ export function extractNutrientsForHabitCheck(product) {
   const transFatG = n['trans-fat_100g'];
   const caloriesKcal = n['energy-kcal_100g'];
   const proteinG = n.proteins_100g;
+  // The rest of the rows an FSSAI-mandated Indian panel actually
+  // prints. None of these feed the scoring or the daily-habit check
+  // (which only reads the WHO-limit nutrients above) -- they're here so
+  // the Nutrition section shows the panel a person is looking at on the
+  // pack, rather than only the handful of figures the score happens to
+  // care about.
+  const carbohydrateG = n.carbohydrates_100g;
+  const totalSugarG = n.sugars_100g;
+  const totalFatG = n.fat_100g;
+  const fibreG = n.fiber_100g;
+  const cholesterolG = n.cholesterol_100g;
+
+  // Scaling a per-100g figure by a pack weight lands on values like
+  // 720.000000000001 -- harmless once rounded for display, but stored
+  // as-is it makes every equality check downstream unreliable (the
+  // added-vs-total sugar comparison below being the first casualty).
+  const at = (value, multiplier = 1) =>
+    typeof value === 'number' ? Math.round(value * multiplier * scale * 100) / 100 : null;
 
   const nutrients = {};
-  if (typeof sodiumG === 'number') nutrients.sodiumMg = sodiumG * 1000 * scale;
-  if (typeof addedSugarG === 'number') nutrients.addedSugarG = addedSugarG * scale;
-  if (typeof saturatedFatG === 'number') nutrients.saturatedFatG = saturatedFatG * scale;
-  if (typeof transFatG === 'number') nutrients.transFatG = transFatG * scale;
-  if (typeof caloriesKcal === 'number') nutrients.caloriesKcal = caloriesKcal * scale;
-  if (typeof proteinG === 'number') nutrients.proteinG = proteinG * scale;
+  const put = (key, value) => { if (value !== null) nutrients[key] = value; };
+
+  put('sodiumMg', at(sodiumG, 1000));
+  put('addedSugarG', at(addedSugarG));
+  put('saturatedFatG', at(saturatedFatG));
+  put('transFatG', at(transFatG));
+  put('caloriesKcal', at(caloriesKcal));
+  put('proteinG', at(proteinG));
+  put('carbohydrateG', at(carbohydrateG));
+  put('totalFatG', at(totalFatG));
+  put('fibreG', at(fibreG));
+  put('cholesterolMg', at(cholesterolG, 1000));
+  // Only kept when it actually differs from the added-sugar figure --
+  // addedSugarG falls back to this same total when OFF has no
+  // added-sugars field, and printing one number twice under two
+  // different names reads as two separate measurements.
+  if (at(totalSugarG) !== null && at(totalSugarG) !== nutrients.addedSugarG) {
+    put('totalSugarG', at(totalSugarG));
+  }
 
   if (Object.keys(nutrients).length === 0) return null;
   return { nutrients, servingGrams: packGrams ? Math.round(packGrams) : null };
