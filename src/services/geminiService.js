@@ -522,6 +522,72 @@ export async function repairLabelPunctuation(rawText) {
   }
 }
 
+// Real examples from the static curated list (didYouKnowTips.js) --
+// not asking Gemini to write in the app's voice from a description,
+// but showing it. "Do not repeat these" doubles as the few-shot
+// examples that set tone/specificity.
+const DAILY_FACT_PROMPT = `You write one "Did you know?" fact for FoodGuard India, an Indian packaged-food ingredient scanner. It must be:
+- Specifically about INDIAN food regulation, labeling, ingredients, or nutrition (FSSAI rules, Indian-specific practices) -- not generic global nutrition trivia.
+- Something you are genuinely confident is factually correct. If you aren't sure a specific number or regulation is exactly right, write a more general but still accurate fact instead of guessing at specifics -- a wrong fact is worse than a less exciting true one.
+- Plain and non-alarmist -- explain what a rule or label means, don't imply anyone is hiding something if they're simply following a real, disclosed rule.
+- Never a medical claim ("causes cancer", "is dangerous") -- describe regulation/labeling/composition, not health outcomes.
+
+Examples of the right tone and specificity (do not repeat these or their exact topic):
+- "FSSAI requires ingredients to be listed by weight, heaviest first -- so whatever's listed first is genuinely the biggest part of the product."
+- "INS numbers and E numbers are usually the same substance -- INS is India's naming system, E numbers are Europe's, for the same additive."
+- "Maida (refined wheat flour) isn't a banned or illegal ingredient -- it's just been stripped of the bran and germ, which is where most of the fibre and nutrients were."
+
+Return ONLY a JSON object, no markdown, in this exact shape:
+{"shortFact": "one sentence, under 200 characters, same voice as the examples", "detail": "3-5 sentences giving more context or nuance than the short fact -- not just restating it, still India-specific and factually careful"}`;
+
+/**
+ * Generates today's homepage "Did you know?" fact -- see
+ * scripts/generate-daily-fact.js, which calls this once a day and
+ * saves the result to daily_facts. Returns null on any failure
+ * (including a response that doesn't parse or is missing a field);
+ * the caller leaves the static curated rotation in place for that day
+ * rather than saving anything.
+ *
+ * @param {string[]} avoidTopics - recent facts' short_fact text, so the
+ *   same topic doesn't repeat day after day.
+ */
+export async function generateDailyFact(avoidTopics = []) {
+  if (GEMINI_API_KEYS.length === 0) return null;
+
+  const avoid = avoidTopics.length
+    ? `\n\nAlready used recently -- write about a genuinely different topic, not a rephrasing of any of these:\n${avoidTopics.map((t) => `- ${t}`).join('\n')}`
+    : '';
+
+  const requestBody = {
+    contents: [{ parts: [{ text: DAILY_FACT_PROMPT + avoid }] }],
+    generationConfig: {
+      // Some variety is the point (a different real fact each day), but
+      // not so high the "genuinely confident" instruction gets ignored.
+      temperature: 0.8,
+      topK: 40,
+      topP: 0.95,
+      maxOutputTokens: 500,
+      thinkingConfig: { thinkingLevel: 'low' },
+    },
+  };
+
+  try {
+    const { text, finishReason } = await callGemini(requestBody);
+    if (!text || finishReason !== 'STOP') return null;
+
+    const parsed = extractJson(text, finishReason);
+    const shortFact = typeof parsed?.shortFact === 'string' ? parsed.shortFact.trim() : null;
+    const detail = typeof parsed?.detail === 'string' ? parsed.detail.trim() : null;
+    if (!shortFact || !detail) return null;
+
+    return { shortFact, detail };
+  } catch {
+    // extractJson throws on unparseable output -- same as any other
+    // failure here, the caller just leaves the static rotation in place.
+    return null;
+  }
+}
+
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

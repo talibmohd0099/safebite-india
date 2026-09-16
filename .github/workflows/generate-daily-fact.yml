@@ -1,0 +1,39 @@
+name: Generate Daily Fact
+
+# Generates the homepage's "Did you know?" fact once a day via Gemini
+# and saves it to daily_facts (see scripts/generate-daily-fact.js and
+# supabase/daily_facts_schema.sql). A plain daily cron is fine -- one
+# fact a day is all this ever needs, no matter GitHub's well-known
+# best-effort scheduling delays on free-tier repos.
+#
+# Offset from Fetch News's 3am slot so the two don't compete for the
+# same Gemini-key quota at the exact same minute.
+
+on:
+  schedule:
+    - cron: '30 3 * * *' # once a day
+  workflow_dispatch:
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Generate today's fact
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+          VITE_GEMINI_API_KEY_2: ${{ secrets.VITE_GEMINI_API_KEY_2 }}
+          VITE_GEMINI_API_KEY_3: ${{ secrets.VITE_GEMINI_API_KEY_3 }}
+        run: node scripts/generate-daily-fact.js

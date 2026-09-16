@@ -1,5 +1,6 @@
 // src/pages/Home.jsx
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { extractIngredientsFromImage } from '../services/geminiService';
 import { analyzeText } from '../services/analyzeText';
@@ -11,6 +12,7 @@ import ProductStripCard from '../components/ProductStripCard';
 import ProductImage from '../components/ProductImage';
 import { CATEGORIES } from '../data/categories';
 import { getTodaysTip } from '../data/didYouKnowTips';
+import { getTodaysFact } from '../services/dailyFactRepo';
 import BarcodeScanner, { isBarcodeScanSupported } from '../components/BarcodeScanner';
 import ScanBadge from '../components/ScanBadge';
 import { useFamily } from '../contexts/FamilyContext';
@@ -54,6 +56,16 @@ export default function Home() {
   const searchInputRef = useRef(null);
   const navigate = useNavigate();
   const todaysTip = getTodaysTip(dayOfYearSeed());
+  // The AI-generated fact (see scripts/generate-daily-fact.js) for
+  // today, when one exists -- null keeps todaysTip (the static
+  // curated rotation) as the fallback, so the card always has
+  // something true to show even on a day the job hasn't run yet.
+  const [dailyFact, setDailyFact] = useState(null);
+  const [showFactDetail, setShowFactDetail] = useState(false);
+
+  useEffect(() => {
+    getTodaysFact().then(setDailyFact);
+  }, []);
   const { profiles, activeProfileId, setActiveProfile } = useFamily();
 
   // Real usage/catalog data for the home screen's discovery sections --
@@ -716,42 +728,93 @@ export default function Home() {
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2 px-0.5">
                 <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Explore food</p>
-                <button onClick={() => navigate('/browse')} className="tap-scale text-xs font-semibold text-green-600 dark:text-green-400">
-                  See all
-                </button>
               </div>
-              <div className="grid grid-cols-2 gap-2.5">
-                {CATEGORIES.map((cat, i) => (
+              {/* One compact row of 4, not the full catalog of categories
+                  -- a homepage teaser, not a second Browse page. "See
+                  more" below (not a top-right link) is the one way
+                  into the rest, right where the row that was cut off
+                  ends. */}
+              <div className="grid grid-cols-4 gap-2">
+                {CATEGORIES.slice(0, 4).map((cat, i) => (
                   <button
                     key={cat.id}
                     onClick={() => navigate(`/category/${cat.id}`)}
                     style={{ animationDelay: `${i * 40}ms` }}
-                    className="item-in tap-scale flex items-center justify-center py-1"
+                    className="item-in tap-scale flex flex-col items-center gap-1"
                   >
-                    {/* 80% width, not 100% -- full-bleed tiles read as too
-                        large in this 2-column teaser grid. */}
                     <img
                       src={cat.image}
-                      alt={cat.label}
-                      className="w-4/5 aspect-[4/5] object-cover rounded-2xl shadow-sm transition-transform hover:-translate-y-0.5"
+                      alt=""
+                      className="w-full aspect-square object-cover rounded-2xl shadow-sm transition-transform hover:-translate-y-0.5"
                     />
+                    <span className="text-[10.5px] font-semibold text-slate-600 dark:text-slate-300 text-center leading-tight line-clamp-2">
+                      {cat.label}
+                    </span>
                   </button>
                 ))}
+              </div>
+              <button
+                onClick={() => navigate('/browse')}
+                className="tap-scale w-full mt-2.5 text-xs font-semibold text-green-600 dark:text-green-400"
+              >
+                See more categories ›
+              </button>
+            </div>
+          )}
+
+          {/* Did you know -- prefers today's AI-generated fact
+              (dailyFact, from scripts/generate-daily-fact.js) when
+              one exists, falling back to the static curated rotation
+              (todaysTip) otherwise. Only the AI-generated one gets a
+              "Learn more" button -- the static tips have no separate
+              detail text to expand into, and a button that opens
+              nothing would be worse than no button. */}
+          {searchQuery.trim().length === 0 && (
+            <div className="mb-6 flex gap-3 items-start p-3.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-800">
+              <span className="text-lg flex-shrink-0">💡</span>
+              <div className="min-w-0">
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  <span className="font-bold text-slate-800 dark:text-slate-100">Did you know? </span>
+                  {dailyFact ? dailyFact.shortFact : todaysTip}
+                </p>
+                {dailyFact && (
+                  <button
+                    onClick={() => setShowFactDetail(true)}
+                    className="tap-scale text-xs font-semibold text-green-600 dark:text-green-400 mt-1"
+                  >
+                    Learn more
+                  </button>
+                )}
               </div>
             </div>
           )}
 
-          {/* Did you know -- a small, static, curated fact. Not AI text --
-              a wrong "fun fact" would undercut the app's whole pitch of
-              being accurate about Indian food regulations. */}
-          {searchQuery.trim().length === 0 && (
-            <div className="mb-6 flex gap-3 items-start p-3.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-800">
-              <span className="text-lg flex-shrink-0">💡</span>
-              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                <span className="font-bold text-slate-800 dark:text-slate-100">Did you know? </span>
-                {todaysTip}
-              </p>
-            </div>
+          {showFactDetail && dailyFact && createPortal(
+            <div
+              className="fixed inset-0 z-[999] bg-black/50 flex items-end sm:items-center justify-center"
+              onClick={() => setShowFactDetail(false)}
+            >
+              <div
+                className="relative w-full sm:max-w-[480px] max-h-[85vh] overflow-y-auto rounded-t-[24px] sm:rounded-[20px] p-5 bg-white dark:bg-slate-800"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => setShowFactDetail(false)}
+                  aria-label="Close"
+                  className="tap-scale absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-lg bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300"
+                >
+                  ×
+                </button>
+                <p className="text-[13px] font-bold text-green-600 dark:text-green-400 pr-8 mb-2">💡 Did you know?</p>
+                <p className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 leading-relaxed mb-3">
+                  {dailyFact.shortFact}
+                </p>
+                <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                  {dailyFact.detail}
+                </p>
+              </div>
+            </div>,
+            document.body
           )}
 
           {searching && (
