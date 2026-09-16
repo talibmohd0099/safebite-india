@@ -438,7 +438,7 @@ export default function Home() {
 
             <div className="relative flex items-center justify-between gap-3">
               <h1 className="text-white text-[17px] leading-tight font-bold min-w-0">
-                Is your food actually <span className="text-lime-300">safe?</span>
+                Know what's <span className="text-lime-300">in</span> your food.
               </h1>
               <ScanBadge size={40} />
             </div>
@@ -448,7 +448,7 @@ export default function Home() {
                 <div className="flex-1 flex items-center gap-1.5 bg-white/15 backdrop-blur-sm rounded-xl px-2.5 py-1.5 min-w-0">
                   <span className="text-xs flex-shrink-0">📊</span>
                   <p className="text-white text-[12.5px] leading-none truncate">
-                    <span className="font-extrabold">{stats.total.toLocaleString()}</span> scored
+                    <span className="font-extrabold">{stats.total.toLocaleString()}</span> foods checked
                   </p>
                 </div>
                 <div className="flex-1 flex items-center gap-1.5 bg-white/15 backdrop-blur-sm rounded-xl px-2.5 py-1.5 min-w-0">
@@ -527,7 +527,18 @@ export default function Home() {
               there's no scanned product yet to score against. */}
           {searchQuery.trim().length === 0 && profiles.length > 0 && (
             <div className="mb-5">
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">Who are you checking food for?</p>
+              <div className="flex items-start justify-between gap-2 mb-2 px-0.5">
+                <div>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Who are you checking food for?</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">FoodGuard can personalize the result to each family member.</p>
+                </div>
+                <button
+                  onClick={() => navigate('/family')}
+                  className="tap-scale text-xs font-semibold text-green-600 dark:text-green-400 flex-shrink-0 pt-0.5"
+                >
+                  Manage family
+                </button>
+              </div>
               <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
                 {profiles.map((p) => {
                   const active = p.id === activeProfileId;
@@ -552,6 +563,12 @@ export default function Home() {
                     </button>
                   );
                 })}
+                <button
+                  onClick={() => navigate('/family')}
+                  className="tap-scale flex-shrink-0 flex items-center px-3 py-2 rounded-full text-sm font-semibold bg-slate-100 dark:bg-slate-800 text-green-600 dark:text-green-400"
+                >
+                  + Add person
+                </button>
               </div>
             </div>
           )}
@@ -575,35 +592,64 @@ export default function Home() {
             </div>
           )}
 
-          {/* Today's spotlight -- one high scorer, one low scorer, both
-              real and rotating daily. Teaches by example instead of just
-              telling people what to avoid in the abstract. */}
+          {/* Today's picks -- one high scorer, one low scorer, both real
+              and rotating daily. "FoodGuard pick" (not "Healthiest
+              pick") avoids implying there's one absolute winner when the
+              score is a contextual ingredient/nutrition assessment, not
+              a medical verdict -- same reasoning as the hero line above.
+              Each card shows its score badge plus up to 2 of the actual
+              reasons behind it (report.positives / report.flags,
+              already computed by scoringEngine.js), so the homepage
+              teaches by example instead of asserting "worth a closer
+              look" with nothing to back it up. */}
           {searchQuery.trim().length === 0 && (spotlight.best || spotlight.worst) && (
             <div className="mb-6">
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">Today's spotlight</p>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">Today's FoodGuard picks</p>
               <div className="grid grid-cols-2 gap-2.5">
                 {spotlight.best && (
                   <button
                     onClick={() => openCachedSuggestion(spotlight.best)}
-                    className="tap-scale flex items-center gap-2.5 p-3 rounded-2xl bg-green-50 dark:bg-green-950 border border-green-100 dark:border-green-900 text-left"
+                    className="tap-scale flex flex-col gap-1.5 p-3 rounded-2xl bg-green-50 dark:bg-green-950 border border-green-100 dark:border-green-900 text-left"
                   >
-                    <ProductImage src={spotlight.best.imageUrl} size={44} expandable={false} />
-                    <span className="min-w-0">
-                      <span className="block text-[10px] font-bold text-green-700 dark:text-green-400 uppercase tracking-wide">Healthiest pick</span>
-                      <span className="block text-xs font-semibold text-slate-700 dark:text-slate-200 leading-tight line-clamp-2">{spotlight.best.productName}</span>
-                    </span>
+                    <span className="text-[10px] font-bold text-green-700 dark:text-green-400 uppercase tracking-wide">FoodGuard pick</span>
+                    <div className="flex items-center gap-2.5">
+                      <ProductImage src={spotlight.best.imageUrl} size={44} expandable={false} />
+                      <span className="block min-w-0 flex-1 text-xs font-semibold text-slate-700 dark:text-slate-200 leading-tight line-clamp-2">{spotlight.best.productName}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className="flex-shrink-0 text-[10.5px] font-bold rounded-full px-1.5 py-0.5"
+                        style={{ background: getScoreColor(spotlight.best.score).bg, color: getScoreColor(spotlight.best.score).color }}
+                      >
+                        {spotlight.best.score}/100
+                      </span>
+                      {spotlight.best.reasons[0] && (
+                        <span className="text-[10.5px] text-green-700 dark:text-green-400 leading-tight line-clamp-1 min-w-0">✓ {spotlight.best.reasons[0]}</span>
+                      )}
+                    </div>
                   </button>
                 )}
                 {spotlight.worst && (
                   <button
                     onClick={() => openCachedSuggestion(spotlight.worst)}
-                    className="tap-scale flex items-center gap-2.5 p-3 rounded-2xl bg-red-50 dark:bg-red-950 border border-red-100 text-left"
+                    className="tap-scale flex flex-col gap-1.5 p-3 rounded-2xl bg-red-50 dark:bg-red-950 border border-red-100 dark:border-red-900 text-left"
                   >
-                    <ProductImage src={spotlight.worst.imageUrl} size={44} expandable={false} />
-                    <span className="min-w-0">
-                      <span className="block text-[10px] font-bold text-red-700 uppercase tracking-wide">Worth a closer look</span>
-                      <span className="block text-xs font-semibold text-slate-700 dark:text-slate-200 leading-tight line-clamp-2">{spotlight.worst.productName}</span>
-                    </span>
+                    <span className="text-[10px] font-bold text-red-700 dark:text-red-400 uppercase tracking-wide">Worth a closer look</span>
+                    <div className="flex items-center gap-2.5">
+                      <ProductImage src={spotlight.worst.imageUrl} size={44} expandable={false} />
+                      <span className="block min-w-0 flex-1 text-xs font-semibold text-slate-700 dark:text-slate-200 leading-tight line-clamp-2">{spotlight.worst.productName}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className="flex-shrink-0 text-[10.5px] font-bold rounded-full px-1.5 py-0.5"
+                        style={{ background: getScoreColor(spotlight.worst.score).bg, color: getScoreColor(spotlight.worst.score).color }}
+                      >
+                        {spotlight.worst.score}/100
+                      </span>
+                      {spotlight.worst.reasons[0] && (
+                        <span className="text-[10.5px] text-red-700 dark:text-red-400 leading-tight line-clamp-1 min-w-0">⚠ {spotlight.worst.reasons[0]}</span>
+                      )}
+                    </div>
                   </button>
                 )}
               </div>
@@ -637,12 +683,14 @@ export default function Home() {
             </div>
           )}
 
-          {/* Recently added -- the newest products in the catalog, so the
-              app has something fresh to show even to someone who never
-              types a search. */}
+          {/* Recently analyzed -- the newest products in the catalog, so
+              the app has something fresh to show even to someone who
+              never types a search. Named for what actually happened to
+              these products (FoodGuard analyzed them), not "added" --
+              which reads ambiguously as "added by whom, to what". */}
           {searchQuery.trim().length === 0 && recentlyAdded.length > 0 && (
             <div className="mb-6">
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">Recently added</p>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">Recently analyzed</p>
               <div className="relative">
                 <div className="flex gap-3 overflow-x-auto pb-1 pr-8" style={{ scrollbarWidth: 'none' }}>
                   {recentlyAdded.map((item, i) => (

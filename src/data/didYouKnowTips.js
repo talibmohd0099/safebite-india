@@ -15,7 +15,13 @@ export const DID_YOU_KNOW_TIPS = [
   'A long ingredient list isn\'t automatically bad — many whole spices (turmeric, cumin, coriander) just take up a lot of lines without adding any real risk.',
   'FSSAI has banned several substances still legal in other countries, like potassium bromate (INS 924) in bread — a label being "internationally approved" doesn\'t always mean it meets Indian standards.',
   '"Natural flavour" and "nature-identical flavour" aren\'t the same thing — the second is made in a lab to taste like the natural version.',
-  'Trans fats can legally be labelled "0g" if a serving has under 0.5g — checking for "partially hydrogenated" in the ingredients catches what the nutrition panel can hide.',
+  // Was citing the US FDA's 0.5g rounding threshold, not India's --
+  // FSSAI's own "trans fat free" claim requires under 0.2g per 100g,
+  // a stricter number (verified against FSSAI's guidance document).
+  // Also reworded away from "hide" -- a label rounding down within a
+  // real, disclosed rule isn't concealment, and ingredients and the
+  // nutrition panel are just two different, complementary sources.
+  'FSSAI allows a "trans fat free" claim only under 0.2g per 100g — checking the ingredients for "partially hydrogenated" adds detail the nutrition panel\'s rounded numbers don\'t show on their own.',
   'Maida (refined wheat flour) isn\'t a banned or illegal ingredient — it\'s just been stripped of the bran and germ, which is where most of the fibre and nutrients were.',
   'Some Indian snacks list "acidity regulators" as a group (like INS 296, INS 330) — these are usually just citric or malic acid, common and low-risk on their own.',
   'A product can be "100% natural" and still score poorly — sugar and palm oil are both completely natural, and both still matter to your health in quantity.',

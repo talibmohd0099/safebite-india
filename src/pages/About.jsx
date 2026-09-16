@@ -126,7 +126,10 @@ export default function About() {
 
       {/* Score guide */}
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 mb-4">
-        <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-3">📊 Score Guide</h2>
+        <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-1">📊 FoodGuard Score</h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+          A product assessment based on its ingredients, nutrition and available product information — not a medical judgment.
+        </p>
         <div className="space-y-2">
           {[
             { range: '85–100', color: 'bg-green-500', label: 'Excellent', desc: 'Whole/minimally processed, nothing concerning' },

@@ -130,7 +130,10 @@ export async function getPopularSearchTerms(limit = 8) {
     // to read as a pill.
     const label = row.product_name?.length <= 32 ? row.product_name : null;
     if (!label) continue;
-    const key = label.toLowerCase();
+    // Collapses trivial near-duplicates from different scan sources --
+    // "Parle-G" vs "Parle G" vs "parle  g" -- that plain lowercasing
+    // let through as separate pills for what's visibly the same search.
+    const key = label.toLowerCase().replace(/[-\s]+/g, ' ').trim();
     if (seen.has(key)) continue;
     seen.add(key);
     terms.push(normalizeCasing(label));
@@ -190,7 +193,7 @@ export async function getDailySpotlight() {
 
   const { data, error } = await supabase
     .from('product_reports')
-    .select('lookup_key, product_name, score:report->>overallScore, verdict:report->>verdict, brand:report->>brand, imageUrl:report->>imageUrl')
+    .select('lookup_key, product_name, score:report->>overallScore, verdict:report->>verdict, brand:report->>brand, imageUrl:report->>imageUrl, flags:report->flags, positives:report->positives')
     .limit(1000);
 
   if (error || !data?.length) return { best: null, worst: null };
@@ -205,18 +208,27 @@ export async function getDailySpotlight() {
   const poolSize = Math.min(20, sorted.length);
   const seed = dayOfYearSeed();
 
-  const toItem = (row) => ({
+  // Up to 2 reasons each -- the positives/flags a real report already
+  // computed (scoringEngine.js), not a new classification invented for
+  // this card. Lets the homepage teach by example what actually moved
+  // the score, instead of a bare "worth a closer look" with nothing to
+  // back it up. Best shows what went RIGHT (positives); worst shows
+  // what went WRONG (flags) -- picking whichever field happens to be
+  // non-empty would show a low scorer's positives instead of why it's
+  // actually flagged.
+  const toItem = (row, reasonField) => ({
     lookupKey: row.lookup_key,
     productName: row.product_name,
     brand: row.brand || null,
     imageUrl: row.imageUrl || null,
     score: row.score,
     verdict: row.verdict || null,
+    reasons: (row[reasonField] || []).slice(0, 2),
   });
 
   return {
-    best: toItem(sorted[seed % poolSize]),
-    worst: toItem(sorted[sorted.length - 1 - (seed % poolSize)]),
+    best: toItem(sorted[seed % poolSize], 'positives'),
+    worst: toItem(sorted[sorted.length - 1 - (seed % poolSize)], 'flags'),
   };
 }
 
