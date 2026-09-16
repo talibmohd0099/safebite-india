@@ -43,8 +43,38 @@ const MIN_PERCENT_TO_SHOW = 30;
 // 94 -> 61 on a sodium reading nobody would ever eat in one sitting).
 // A deterministic name check costs nothing and can't silently go
 // missing.
+// Added after a second real case: sharbat/syrup/squash concentrates
+// (mixed with a glass of water), instant soup powder (dissolved into a
+// bowl), and syrups used as a topping (a spoonful, not a bowlful) all
+// have the exact same problem as oil/butter -- just for dilution/
+// topping-sized use instead of dosing. A real scanned Ching's Hot &
+// Sour Soup showed 438% of the daily sodium limit, and a Khus Sharbat
+// showed 152% of the daily sugar limit, both read against the full
+// 100g of the concentrate/powder. "soup" is included bare (not just
+// "soup mix"/"instant soup") because the real product that motivated
+// this -- "Ching's Secret Hot & Sour Veg Soup" -- doesn't contain
+// either narrower phrase; isSmallPortionFood's servingGrams check
+// below is what makes this safe to do broadly: a soup WITH a real
+// serving size (two real ones, Knorr and Manchow, already compute
+// correctly) is protected regardless of this keyword list, so the
+// only residual risk is a ready-to-drink soup with no real serving
+// data at all, which loses a signal quietly rather than showing a
+// wrong one loudly.
 const SMALL_PORTION_RE =
-  /\b(oils?|ghee|butter|papads?|pappads?|pickles?|achar|vinegar|salt|baking powder|yeast|essence|masala|spice mix|seasoning)\b/i;
+  /\b(oils?|ghee|butter|papads?|pappads?|pickles?|achar|vinegar|salt|baking powder|yeast|essence|masala|spice mix|seasoning|sharbat|syrups?|squash|cordial|soups?)\b/i;
+
+// "concentrate" is checked separately from SMALL_PORTION_RE, and BEFORE
+// the ordinary-food override below, not after -- a real case
+// ("Orange Juice Concentrate") also contains "juice", which normally
+// protects a ready-to-drink juice from over-exclusion, but "concentrate"
+// says the opposite is true here and must win regardless of what other
+// food word appears alongside it. Excludes "not from concentrate" --
+// a real product ("Real Activ Coconut Water Not from Concentrate")
+// states the exact opposite fact about itself, and matching the bare
+// word there would flag a product for the one thing its own label says
+// it isn't.
+const CONCENTRATE_RE = /\bconcentrate\b/i;
+const NOT_FROM_CONCENTRATE_RE = /\bnot\s+from\s+concentrate\b/i;
 
 // ...unless the name also says it's an ordinary food that merely
 // CONTAINS or is FLAVOURED with one of those. "Masala oats" is a
@@ -59,9 +89,20 @@ const ORDINARY_PORTION_RE =
  * a full day's limit at all, because nobody consumes it by the 100g.
  * Used to skip both the "daily habit" projection and the score cap that
  * reads it (see applyRealNutrientCap in scoringEngine.js).
+ *
+ * @param {number|null} [servingGrams] - the REAL pack/serving weight,
+ *   when known (see openFoodFacts.js/blinkitProductsRepo.js). Real data
+ *   always wins over a name guess -- if we know the actual amount
+ *   someone consumes, that's strictly better than inferring it from
+ *   the product name, and two real products (Knorr, Manchow soup) are
+ *   already computed correctly once their real serving size is known.
+ *   The name-based check below is only a fallback for when we don't
+ *   have that real number at all.
  */
-export function isSmallPortionFood(productName) {
+export function isSmallPortionFood(productName, servingGrams) {
+  if (typeof servingGrams === 'number') return false;
   const name = productName || '';
+  if (CONCENTRATE_RE.test(name) && !NOT_FROM_CONCENTRATE_RE.test(name)) return true;
   if (ORDINARY_PORTION_RE.test(name)) return false;
   return SMALL_PORTION_RE.test(name);
 }

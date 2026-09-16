@@ -161,7 +161,7 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
     // isCondimentOrSeasoning already changes how the score itself reads
     // means a "here's what a daily habit of this looks like" framing
     // would be actively misleading for one, so it's skipped entirely.
-    if (nutrientsInfo && !report.isCondimentOrSeasoning && !isSmallPortionFood(report.productName)) {
+    if (nutrientsInfo && !report.isCondimentOrSeasoning && !isSmallPortionFood(report.productName, nutrientsInfo.servingGrams)) {
       const habitCheck = buildDailyHabitCheck(nutrientsInfo.nutrients, nutrientsInfo.servingGrams);
       if (habitCheck) {
         report.dailyHabitCheck = habitCheck;

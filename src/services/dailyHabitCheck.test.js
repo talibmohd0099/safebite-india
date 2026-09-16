@@ -74,6 +74,65 @@ test('a real meal or snack that merely mentions masala/butter/oats is still judg
   }
 });
 
+test('treats dilutable concentrates and small-quantity toppings as small-portion too', () => {
+  // Real products, no real serving size on file, each read against the
+  // full 100g of the concentrate/syrup itself: Ching's Hot & Sour Soup
+  // (438% of daily sodium), Khus Sharbat (152% added sugar), Mountqueen
+  // Passion Fruit Squash (52%), Amul and Hershey's Chocolate Syrup (91%
+  // and 128%) -- the syrups prove this isn't only about dilution with
+  // water; a topping used a spoonful at a time has the same problem.
+  for (const name of [
+    "Ching's Secret Hot & Sour Veg Soup",
+    'Hitkary Shahi Khus Sharbat',
+    'Mountqueen Passion Fruit Squash',
+    'Amul Chocolate Syrup',
+    "Hershey's Chocolate Syrup",
+    'Rose Cordial',
+    'Orange Juice Concentrate',
+  ]) {
+    assert.equal(isSmallPortionFood(name), true, `${name} should be treated as a small-portion food`);
+  }
+});
+
+test('a real serving size always wins over the name, even for a concentrate-sounding product', () => {
+  // Two real products that already compute correctly BECAUSE a real
+  // serving size is on file (Knorr 11g, Manchow 12g) -- the fix must
+  // not start treating these as small-portion just because "soup" (or
+  // any other keyword) appears in the name once a trustworthy real
+  // number already exists.
+  assert.equal(isSmallPortionFood('Knorr hot & sour veg soup', 11), false);
+  assert.equal(isSmallPortionFood('Manchow instant soup', 12), false);
+  // Even a strong keyword match (butter) must defer to real data.
+  assert.equal(isSmallPortionFood('Amul Butter', 15), false);
+  // No real serving size -- falls back to the name check as before.
+  assert.equal(isSmallPortionFood('Amul Butter', null), true);
+  assert.equal(isSmallPortionFood('Amul Butter', undefined), true);
+});
+
+test('"concentrate" overrides "juice", and "not from concentrate" is correctly left alone', () => {
+  // "Orange Juice Concentrate" also contains "juice", which normally
+  // protects a ready-to-drink juice from over-exclusion -- but
+  // "concentrate" says the product genuinely is one, and must win.
+  assert.equal(isSmallPortionFood('Orange Juice Concentrate'), true);
+  // The exact opposite real case: a product whose own label states it
+  // is NOT a concentrate must not be flagged for the one thing it says
+  // it isn't.
+  assert.equal(isSmallPortionFood('Real Activ Coconut Water Not from Concentrate'), false);
+});
+
+test("bare 'soup' is included, not just compounds like 'soup mix' -- the real motivating product has neither phrase", () => {
+  // "Ching's Secret Hot & Sour Veg Soup" contains neither "soup mix"
+  // nor "instant soup" -- only bare "soup" catches it, which is why
+  // the keyword had to be the plain word rather than a narrower
+  // compound. Safe to do broadly BECAUSE of the servingGrams test
+  // above: any soup with a real serving size on file is protected
+  // regardless of this keyword, so the only residual risk is a
+  // ready-to-drink soup with no real serving data at all -- which
+  // just loses a signal quietly, never shows a wrong one loudly.
+  assert.equal(isSmallPortionFood('Generic Ready to Eat Tomato Soup'), true);
+  assert.equal(isSmallPortionFood('Generic Ready to Eat Tomato Soup', 250), false);
+});
+
 test('handles a missing product name without throwing', () => {
   assert.equal(isSmallPortionFood(null), false);
   assert.equal(isSmallPortionFood(''), false);
