@@ -108,7 +108,14 @@ export function clearHistory() {
  * "Moderate" while being painted the colour of "Poor".
  */
 const SCORE_TIERS = [
-  { min: 85, label: 'Very Healthy', token: 'very-healthy' },
+  // "Excellent", not "Very Healthy" -- this score rates how clean a
+  // product's INGREDIENTS are, which is not the same claim as the food
+  // being healthy, and the gap between the two is exactly where this
+  // app kept embarrassing itself: a biscuit that's a quarter sugar and
+  // a bag of deep-fried chips both earned "Very Healthy" on nothing but
+  // a short, recognizable ingredient list. A rating word makes the same
+  // point without asserting anything about anyone's health.
+  { min: 85, label: 'Excellent', token: 'very-healthy' },
   { min: 65, label: 'Good', token: 'good' },
   { min: 45, label: 'Moderate', token: 'moderate' },
   { min: 25, label: 'Poor', token: 'poor' },

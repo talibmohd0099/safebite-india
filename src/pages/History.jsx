@@ -8,12 +8,12 @@ import ProductImage from '../components/ProductImage';
 const FILTERS = ['All', 'Good', 'Moderate', 'Caution'];
 
 // Collapses the app's real 5-tier verdict scale into the 3 buckets the
-// filter row offers -- Very Healthy/Good read the same at a glance here,
+// filter row offers -- Excellent/Good read the same at a glance here,
 // and Poor/Very Poor both mean "be cautious", without changing the
 // precise label shown on each row's own score circle.
 function bucketFor(score) {
   const label = getScoreColor(score).label;
-  if (label === 'Very Healthy' || label === 'Good') return 'Good';
+  if (label === 'Excellent' || label === 'Good') return 'Good';
   if (label === 'Moderate') return 'Moderate';
   return 'Caution';
 }

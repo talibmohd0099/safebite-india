@@ -97,7 +97,7 @@ const ALTERNATIVES_POOL_SIZE = 12;
 // in utils/storage.js / VERDICT_TIERS in scoringEngine.js, so it can
 // never disagree with the score colour shown right next to it.
 const EAT_ANSWER_KEY = {
-  'Very Healthy': 'eatAnswerYes',
+  Excellent: 'eatAnswerYes',
   Good: 'eatAnswerMostly',
   Moderate: 'eatAnswerOccasionally',
   Poor: 'eatAnswerRarely',
@@ -320,7 +320,14 @@ export default function Result() {
 
   const score = result.overallScore || 0;
   const scoreColors = getScoreColor(score);
-  const verdictLabel = result.verdict || scoreColors.label;
+  // Always derived from the score, never read back from the stored
+  // report. Every cached report carries the verdict wording that was
+  // current when it was written, so trusting it would leave thousands
+  // of products still saying "Very Healthy" until each one happened to
+  // be re-analyzed -- and would let the word disagree with the number
+  // printed right beside it. The score is the single source of truth;
+  // the label is just how it reads.
+  const verdictLabel = scoreColors.label;
   const eatAnswer = t(EAT_ANSWER_KEY[verdictLabel] || 'eatAnswerOccasionally');
   const ingredients = result.ingredients || [];
 

@@ -7,7 +7,10 @@
 // service is any good if you still need an AI call to score the product.
 
 const VERDICT_TIERS = [
-  { min: 85, label: 'Very Healthy' },
+  // Kept identical to SCORE_TIERS in utils/storage.js -- see the note
+  // there on why the top tier rates the ingredients ("Excellent")
+  // rather than making a health claim about the food.
+  { min: 85, label: 'Excellent' },
   { min: 65, label: 'Good' },
   { min: 45, label: 'Moderate' },
   { min: 25, label: 'Poor' },
@@ -210,7 +213,7 @@ export function buildReport(ingredients, { productName, brand, imageUrl } = {}) 
 // naming -- kept separate from `recommendation` below (the UI shows both:
 // this is the hook, that's the "what should I do" advice).
 const CONCERN_OPENERS = {
-  'Very Healthy': 'About as clean as packaged food gets, but not quite —',
+  Excellent: 'About as clean as packaged food gets, but not quite —',
   Good: 'A solid pick overall —',
   Moderate: 'Not the healthiest option on the shelf, but not the worst either —',
   Poor: 'This one leans heavily processed —',

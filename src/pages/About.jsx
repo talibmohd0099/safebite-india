@@ -129,7 +129,7 @@ export default function About() {
         <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-3">📊 Score Guide</h2>
         <div className="space-y-2">
           {[
-            { range: '85–100', color: 'bg-green-500', label: 'Very Healthy', desc: 'Whole/minimally processed, nothing concerning' },
+            { range: '85–100', color: 'bg-green-500', label: 'Excellent', desc: 'Whole/minimally processed, nothing concerning' },
             { range: '65–84', color: 'bg-green-400', label: 'Good', desc: 'Mostly natural, only minor deductions' },
             { range: '45–64', color: 'bg-yellow-400', label: 'Moderate', desc: 'Real concerns present — also the ceiling whenever any ingredient is flagged "concerning," however small the penalty' },
             { range: '25–44', color: 'bg-orange-400', label: 'Poor', desc: 'Multiple or significant concerns, heavily processed' },
