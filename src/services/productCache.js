@@ -409,6 +409,16 @@ async function upsertProductNutrition(lookupKey, productName, report) {
         trans_fat_g: n.transFatG ?? null,
         calories_kcal: n.caloriesKcal ?? null,
         protein_g: n.proteinG ?? null,
+        // The rest of the printed panel (see openFoodFacts.js /
+        // blinkitProductsRepo.js) -- shown in the app's Nutrition
+        // section already; mirrored here so the same numbers are
+        // browsable in Supabase's dashboard too, matching the six
+        // original columns.
+        carbohydrate_g: n.carbohydrateG ?? null,
+        total_sugar_g: n.totalSugarG ?? null,
+        total_fat_g: n.totalFatG ?? null,
+        fibre_g: n.fibreG ?? null,
+        cholesterol_mg: n.cholesterolMg ?? null,
         serving_grams: report.realNutrientsServingGrams ?? null,
         // Only ever populated from one of these two real sources (see
         // analyzeText.js) -- text/photo scans never reach this function
