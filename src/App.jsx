@@ -22,6 +22,7 @@ import Onboarding, { ONBOARDING_KEY } from './components/Onboarding';
 import Home from './pages/Home';
 import Result from './pages/Result';
 import PersonalScore from './pages/PersonalScore';
+import SharedProduct from './pages/SharedProduct';
 import History from './pages/History';
 import Family from './pages/Family';
 import About from './pages/About';
@@ -64,7 +65,13 @@ export default function App() {
   // Unlike the splash screen, this genuinely is a one-time "first ever
   // visit" flag -- read once at startup so a returning user's very
   // first render never shows onboarding, not even for a flash.
+  //
+  // Skipped (not marked as seen) when the app was opened from a shared
+  // WhatsApp link: that person came to read one specific report, and
+  // three intro slides in front of it is a good way to lose them. They
+  // still get onboarding the next time they open the app on its own.
   const [showOnboarding, setShowOnboarding] = useState(() => {
+    if (window.location.hash.startsWith('#/p/')) return false;
     try { return !localStorage.getItem(ONBOARDING_KEY); } catch { return false; }
   });
 
@@ -80,6 +87,7 @@ export default function App() {
                 <Route path="/" element={<Home />} />
                 <Route path="/result/:id" element={<Result />} />
                 <Route path="/result/:id/personal" element={<PersonalScore />} />
+                <Route path="/p/:reportId" element={<SharedProduct />} />
                 <Route path="/history" element={<History />} />
                 <Route path="/family" element={<Family />} />
                 <Route path="/about" element={<About />} />

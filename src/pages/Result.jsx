@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getHistoryById, updateHistoryProductName, refreshHistoryEntry, saveToHistory, getScoreColor, getIngredientSeverity } from '../utils/storage';
-import { updateProductName, getCachedReport, getSaferAlternatives, deleteReport, saveReport } from '../services/productCache';
+import { updateProductName, getCachedReport, getSaferAlternatives, deleteReport, saveReport, getReportIdByLookupKey } from '../services/productCache';
+import { buildProductShareText, productShareUrl, whatsappShareUrl } from '../utils/share';
 import { analyzeText } from '../services/analyzeText';
 import { lookupBarcode } from '../services/openFoodFacts';
 import { getRelatedNews } from '../services/newsRepo';
@@ -196,6 +197,7 @@ export default function Result() {
   const [flagRemarks, setFlagRemarks] = useState('');
   const [flagState, setFlagState] = useState('idle'); // 'idle' | 'sending' | 'sent' | 'error'
   const [flagError, setFlagError] = useState('');
+  const [shareReportId, setShareReportId] = useState(null);
 
   useEffect(() => {
     const data = getHistoryById(id);
@@ -205,6 +207,21 @@ export default function Result() {
     }
     setResult(data);
   }, [id, navigate]);
+
+  // Resolved up front, not when the share button is tapped -- a link
+  // opened after an await is no longer a direct tap as far as a mobile
+  // browser is concerned, and gets silently blocked as a popup.
+  useEffect(() => {
+    if (!result?.lookupKey) {
+      setShareReportId(null);
+      return;
+    }
+    let cancelled = false;
+    getReportIdByLookupKey(result.lookupKey).then((reportId) => {
+      if (!cancelled) setShareReportId(reportId);
+    });
+    return () => { cancelled = true; };
+  }, [result?.lookupKey]);
 
   // Only worth asking for when the score is actually low -- a "Good"
   // or better product doesn't need an alternative suggested to it.
@@ -421,6 +438,13 @@ export default function Result() {
   const displayUsefulContext = hi?.usefulContext || result.usefulContext;
   const displayFlags = hi?.flags?.length === result.flags?.length ? hi.flags : result.flags;
   const displayPositives = hi?.positives?.length === result.positives?.length ? hi.positives : result.positives;
+  const whatsappHref = whatsappShareUrl(buildProductShareText({
+    productName: result.productName,
+    score,
+    verdict: verdictLabel,
+    flags: displayFlags || [],
+    link: shareReportId ? productShareUrl(shareReportId) : null,
+  }, t));
   const displayStory = result.story && {
     ...result.story,
     ...(hi?.story || {}),
@@ -607,6 +631,25 @@ export default function Result() {
               {t('howCalculated')}
             </Link>
           </div>
+        )}
+
+        {/* WhatsApp's own green, not the app tint -- people recognise a
+            share button by its brand colour before they read the label.
+            A plain link (same pattern as the News cards), so it stays a
+            direct tap and is never blocked as a popup. */}
+        {ingredients.length > 0 && (
+          <a
+            href={whatsappHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="tap-scale mt-4 w-full flex items-center justify-center gap-2 py-2.5 rounded-[12px] text-[14.5px] font-semibold text-white"
+            style={{ background: '#25D366' }}
+          >
+            <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" fill="currentColor" aria-hidden="true">
+              <path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.64.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.88 1.21 3.08c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.08 1.76-.72 2.01-1.41.25-.7.25-1.29.17-1.41-.07-.13-.27-.2-.57-.35zM12.05 21.8h-.01a9.8 9.8 0 0 1-5-1.37l-.36-.21-3.72.98 1-3.63-.24-.37a9.77 9.77 0 0 1-1.5-5.21c0-5.41 4.41-9.82 9.83-9.82 2.62 0 5.09 1.02 6.94 2.88a9.76 9.76 0 0 1 2.87 6.95c0 5.41-4.41 9.8-9.81 9.8zm8.36-18.17A11.75 11.75 0 0 0 12.05.2C5.5.2.17 5.53.17 12.08c0 2.09.55 4.14 1.6 5.94L.07 24.2l6.34-1.66a11.85 11.85 0 0 0 5.64 1.44h.01c6.54 0 11.87-5.33 11.87-11.88 0-3.17-1.24-6.16-3.48-8.4z" />
+            </svg>
+            {t('shareOnWhatsApp')}
+          </a>
         )}
       </div>
 

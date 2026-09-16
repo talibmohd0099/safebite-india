@@ -324,6 +324,45 @@ export async function getCatalogStats() {
  * on error, or if Supabase isn't configured yet — callers should treat
  * null the same as "no cache, go ahead and call the AI".
  */
+/**
+ * The cached report's short, stable row id -- what a shared link
+ * carries instead of the lookup key, which for a text/photo scan is the
+ * entire ingredients label and far too long to put in a WhatsApp link.
+ * Null when the product was never saved to the shared cache.
+ */
+export async function getReportIdByLookupKey(lookupKey) {
+  if (!isSupabaseConfigured || !lookupKey) return null;
+
+  const { data, error } = await supabase
+    .from('product_reports')
+    .select('id')
+    .eq('lookup_key', lookupKey)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return data.id;
+}
+
+/**
+ * Opens a shared link (see pages/SharedProduct.jsx). Same shape as
+ * getCachedReport, plus the lookup key, so the recipient's copy behaves
+ * exactly like one they'd found through search. Deliberately doesn't
+ * bump scan_count -- that counter drives "Popular searches", and a link
+ * forwarded around a family group chat isn't a search.
+ */
+export async function getReportById(id) {
+  if (!isSupabaseConfigured || !id) return null;
+
+  const { data, error } = await supabase
+    .from('product_reports')
+    .select('lookup_key, report, ingredients_text')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return { ...data.report, ingredientsText: data.ingredients_text, lookupKey: data.lookup_key };
+}
+
 export async function getCachedReport(lookupKey) {
   if (!isSupabaseConfigured) return null;
 

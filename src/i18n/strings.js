@@ -165,6 +165,15 @@ export const STRINGS = {
     saferAlternatives: 'Safer alternatives in this category',
     betterOptionsFor: 'Better options for {name}',
 
+    shareOnWhatsApp: 'Share on WhatsApp',
+    shareMessage: 'I checked *{name}* on FoodGuard India — it scored *{score}/100 ({verdict})*.',
+    shareFlagsLine: 'Worth knowing: {flags}',
+    shareSeeReport: 'See the full report: {link}',
+    shareTryApp: 'Check what\'s in your food: {link}',
+    sharedProductLoading: 'Opening the shared report…',
+    sharedProductNotFound: "We couldn't find this shared report. It may have been removed.",
+    sharedProductGoHome: 'Go to FoodGuard',
+
     flagReportIssue: 'Report an issue with this result',
     flagTitle: 'What looks wrong?',
     flagSubtitle: "We'll save this result exactly as you're seeing it now, so it can be checked properly later.",
