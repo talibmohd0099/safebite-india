@@ -96,6 +96,35 @@ function computeScore(ingredients) {
   return score;
 }
 
+// A product can have a perfectly "clean" ingredient list -- no banned
+// substances, nothing artificial, nothing to flag -- and still be
+// something WHO's own daily limits say isn't a good idea to eat
+// regularly. Potato, oil and salt are each "safe" ingredients on their
+// own, but a real, measured 75%-of-a-day's-saturated-fat serving is a
+// genuine reason a bag of chips shouldn't read as "Very Healthy" --
+// found in production doing exactly that (a 92/100 potato chips product
+// whose own "Quick health check" section already showed 75% of the
+// daily saturated fat limit, with nothing in the score reflecting it).
+//
+// Deliberately reuses the exact same squeeze mechanism as the harmful/
+// concerning ingredient caps above, at the same severity (capped at
+// "Moderate" at most) -- this is a second, independent way to earn that
+// cap, not a new scoring dimension with its own tuning. Triggered by
+// dailyHabitCheck.js's own "worth mentioning" bar (>=30% of a WHO daily
+// limit) rather than a new threshold invented here: if a number is
+// already good enough to show the user in the Quick Health Check
+// section, it's also good enough to keep the score honest about it.
+// Never called for condiments/seasonings (see analyzeText.js) -- a
+// masala eaten a pinch at a time genuinely isn't held to a "100g
+// serving" standard, the same reasoning that already excludes those
+// from the Quick Health Check section entirely.
+export function applyRealNutrientCap(report, dailyHabitCheck) {
+  if (!dailyHabitCheck) return report;
+  report.overallScore = squeezeToCap(report.overallScore, CONCERNING_SCORE_CAP, CONCERNING_SCORE_FLOOR);
+  report.verdict = verdictFor(report.overallScore);
+  return report;
+}
+
 // The fallback recommendations, used when the AI-written per-product one
 // (see generateProductInsights) isn't available. Exported as a set so a
 // bulk re-score can tell "this row still has the generic line, safe to

@@ -7,7 +7,7 @@
 
 import { parseLabel, isBracketBalanced } from './ingredientParser.js';
 import { resolveIngredients } from './ingredientLibrary.js';
-import { buildReport } from './scoringEngine.js';
+import { buildReport, applyRealNutrientCap } from './scoringEngine.js';
 import { generateProductInsights, repairLabelPunctuation } from './geminiService.js';
 import { translateReportToHindi } from './translateService.js';
 import { applyOffPercentEstimates } from './openFoodFacts.js';
@@ -138,7 +138,13 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
     // would be actively misleading for one, so it's skipped entirely.
     if (nutrientsInfo && !report.isCondimentOrSeasoning) {
       const habitCheck = buildDailyHabitCheck(nutrientsInfo.nutrients, nutrientsInfo.servingGrams);
-      if (habitCheck) report.dailyHabitCheck = habitCheck;
+      if (habitCheck) {
+        report.dailyHabitCheck = habitCheck;
+        // A real nutrient number worth showing in the Quick Health
+        // Check section is also worth reflecting in the score itself --
+        // see applyRealNutrientCap in scoringEngine.js.
+        applyRealNutrientCap(report, habitCheck);
+      }
     }
 
     // Hindi translation of everything above -- a completely separate
