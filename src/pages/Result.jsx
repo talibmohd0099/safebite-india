@@ -5,6 +5,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getHistoryById, updateHistoryProductName, refreshHistoryEntry, saveToHistory, getScoreColor, getIngredientSeverity } from '../utils/storage';
 import { updateProductName, getCachedReport, getSaferAlternatives, deleteReport, saveReport, getReportIdByLookupKey } from '../services/productCache';
 import { buildProductShareText, productShareUrl, whatsappShareUrl } from '../utils/share';
+import { renderShareCardImage } from '../utils/shareCard';
+import headerIcon from '../assets/header-icon.png';
 import { analyzeText } from '../services/analyzeText';
 import { lookupBarcode } from '../services/openFoodFacts';
 import { getRelatedNews } from '../services/newsRepo';
@@ -198,6 +200,7 @@ export default function Result() {
   const [flagState, setFlagState] = useState('idle'); // 'idle' | 'sending' | 'sent' | 'error'
   const [flagError, setFlagError] = useState('');
   const [shareReportId, setShareReportId] = useState(null);
+  const [shareImageBlob, setShareImageBlob] = useState(null);
 
   useEffect(() => {
     const data = getHistoryById(id);
@@ -222,6 +225,36 @@ export default function Result() {
     });
     return () => { cancelled = true; };
   }, [result?.lookupKey]);
+
+  // Same reason as shareReportId above -- ready before the icon is
+  // tapped, not after, so navigator.share() still runs inside the
+  // click's own "direct user gesture" window instead of losing it to
+  // an await and getting silently blocked. Uses result.flags directly
+  // rather than the Hindi-aware displayFlags below (computed after the
+  // early return, so not reachable from a hook up here) -- the card is
+  // pixels, not translated text, and always renders in English
+  // regardless of the app's own language while Hindi is off.
+  useEffect(() => {
+    if (!result) {
+      setShareImageBlob(null);
+      return;
+    }
+    const score = result.overallScore || 0;
+    const verdictLabel = getScoreColor(score).label;
+    const eatAnswerLabel = t(EAT_ANSWER_KEY[verdictLabel] || 'eatAnswerOccasionally');
+    let cancelled = false;
+    renderShareCardImage({
+      productName: result.productName,
+      score,
+      verdictLabel,
+      eatAnswerLabel,
+      flags: result.flags || [],
+      logoUrl: headerIcon,
+    }).then((blob) => {
+      if (!cancelled) setShareImageBlob(blob);
+    });
+    return () => { cancelled = true; };
+  }, [result, t]);
 
   // Only worth asking for when the score is actually low -- a "Good"
   // or better product doesn't need an alternative suggested to it.
@@ -438,13 +471,44 @@ export default function Result() {
   const displayUsefulContext = hi?.usefulContext || result.usefulContext;
   const displayFlags = hi?.flags?.length === result.flags?.length ? hi.flags : result.flags;
   const displayPositives = hi?.positives?.length === result.positives?.length ? hi.positives : result.positives;
-  const whatsappHref = whatsappShareUrl(buildProductShareText({
+  const shareText = buildProductShareText({
     productName: result.productName,
     score,
     verdict: verdictLabel,
     flags: displayFlags || [],
     link: shareReportId ? productShareUrl(shareReportId) : null,
-  }, t));
+  }, t);
+  const whatsappHref = whatsappShareUrl(shareText);
+
+  // Fires the OS share sheet with the pre-generated score-card image
+  // (shareImageBlob) when the device supports sharing files -- WhatsApp
+  // is one of the apps offered there, same as any other. Deliberately
+  // synchronous: calling navigator.share() after an await no longer
+  // counts as "in response to a user gesture" on some browsers and gets
+  // silently blocked, which is exactly why the image itself was already
+  // generated ahead of time in the effect above rather than here.
+  // Falls back to downloading the picture plus opening the existing
+  // text-only wa.me link when file sharing isn't available (desktop
+  // browsers mainly) -- two actions from one tap, but still less
+  // friction than making someone choose only one.
+  const handleShareClick = () => {
+    if (shareImageBlob) {
+      const file = new File([shareImageBlob], 'foodguard-score.png', { type: 'image/png' });
+      if (navigator.canShare?.({ files: [file] })) {
+        navigator.share({ files: [file], text: shareText }).catch(() => {});
+        return;
+      }
+      const blobUrl = URL.createObjectURL(shareImageBlob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = 'foodguard-score.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+    }
+    window.open(whatsappHref, '_blank', 'noopener,noreferrer');
+  };
   const displayStory = result.story && {
     ...result.story,
     ...(hi?.story || {}),
@@ -618,38 +682,40 @@ export default function Result() {
           </div>
         )}
 
+        {/* Why/how links share this row with the share icon (justify-
+            between) rather than the share button owning a full extra
+            row of its own below -- it was the same width as the whole
+            card just to hold one icon-sized action. */}
         {ingredients.length > 0 && (
-          <div className={`flex flex-wrap gap-x-3 gap-y-1 mt-3 ${displayRecommendation ? 'pl-[27px]' : ''}`}>
-            <button
-              onClick={() => setShowScoreModal(true)}
-              className="tap-scale text-[13.5px] font-semibold"
-              style={{ color: 'var(--tint)' }}
-            >
-              {t('whyScoreLink', { score })}
-            </button>
-            <Link to="/about#how-score-works" className="text-[13px]" style={{ color: 'var(--label-3)' }}>
-              {t('howCalculated')}
-            </Link>
-          </div>
-        )}
+          <div className={`flex items-center justify-between gap-3 mt-3 ${displayRecommendation ? 'pl-[27px]' : ''}`}>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 min-w-0">
+              <button
+                onClick={() => setShowScoreModal(true)}
+                className="tap-scale text-[13.5px] font-semibold"
+                style={{ color: 'var(--tint)' }}
+              >
+                {t('whyScoreLink', { score })}
+              </button>
+              <Link to="/about#how-score-works" className="text-[13px]" style={{ color: 'var(--label-3)' }}>
+                {t('howCalculated')}
+              </Link>
+            </div>
 
-        {/* WhatsApp's own green, not the app tint -- people recognise a
-            share button by its brand colour before they read the label.
-            A plain link (same pattern as the News cards), so it stays a
-            direct tap and is never blocked as a popup. */}
-        {ingredients.length > 0 && (
-          <a
-            href={whatsappHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="tap-scale mt-4 w-full flex items-center justify-center gap-2 py-2.5 rounded-[12px] text-[14.5px] font-semibold text-white"
-            style={{ background: '#25D366' }}
-          >
-            <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" fill="currentColor" aria-hidden="true">
-              <path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.64.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.88 1.21 3.08c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.08 1.76-.72 2.01-1.41.25-.7.25-1.29.17-1.41-.07-.13-.27-.2-.57-.35zM12.05 21.8h-.01a9.8 9.8 0 0 1-5-1.37l-.36-.21-3.72.98 1-3.63-.24-.37a9.77 9.77 0 0 1-1.5-5.21c0-5.41 4.41-9.82 9.83-9.82 2.62 0 5.09 1.02 6.94 2.88a9.76 9.76 0 0 1 2.87 6.95c0 5.41-4.41 9.8-9.81 9.8zm8.36-18.17A11.75 11.75 0 0 0 12.05.2C5.5.2.17 5.53.17 12.08c0 2.09.55 4.14 1.6 5.94L.07 24.2l6.34-1.66a11.85 11.85 0 0 0 5.64 1.44h.01c6.54 0 11.87-5.33 11.87-11.88 0-3.17-1.24-6.16-3.48-8.4z" />
-            </svg>
-            {t('shareOnWhatsApp')}
-          </a>
+            {/* WhatsApp's own green, not the app tint -- people
+                recognise a share icon by its brand colour before they
+                read anything next to it. */}
+            <button
+              onClick={handleShareClick}
+              aria-label={t('shareOnWhatsApp')}
+              title={t('shareOnWhatsApp')}
+              className="tap-scale flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-white"
+              style={{ background: '#25D366' }}
+            >
+              <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" fill="currentColor" aria-hidden="true">
+                <path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.64.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.88 1.21 3.08c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.08 1.76-.72 2.01-1.41.25-.7.25-1.29.17-1.41-.07-.13-.27-.2-.57-.35zM12.05 21.8h-.01a9.8 9.8 0 0 1-5-1.37l-.36-.21-3.72.98 1-3.63-.24-.37a9.77 9.77 0 0 1-1.5-5.21c0-5.41 4.41-9.82 9.83-9.82 2.62 0 5.09 1.02 6.94 2.88a9.76 9.76 0 0 1 2.87 6.95c0 5.41-4.41 9.8-9.81 9.8zm8.36-18.17A11.75 11.75 0 0 0 12.05.2C5.5.2.17 5.53.17 12.08c0 2.09.55 4.14 1.6 5.94L.07 24.2l6.34-1.66a11.85 11.85 0 0 0 5.64 1.44h.01c6.54 0 11.87-5.33 11.87-11.88 0-3.17-1.24-6.16-3.48-8.4z" />
+              </svg>
+            </button>
+          </div>
         )}
       </div>
 
