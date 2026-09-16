@@ -178,7 +178,7 @@ test('personal score tier colors reuse the same 85/65/45/25 breakpoints as the u
   assert.equal(getPersonalScoreColor(90).label, 'Good Choice');
   assert.equal(getPersonalScoreColor(70).label, 'Moderate');
   assert.equal(getPersonalScoreColor(50).label, 'Limit');
-  assert.equal(getPersonalScoreColor(30).label, 'Occasional');
+  assert.equal(getPersonalScoreColor(30).label, 'Minimize');
   assert.equal(getPersonalScoreColor(10).label, 'Avoid');
 });
 

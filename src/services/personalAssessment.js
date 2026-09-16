@@ -196,11 +196,22 @@ const POINTS_PER_CONCERN = 8;
 // VERDICT_TIERS (scoringEngine.js), for colour consistency -- but
 // distinct, non-medical labels, since "personal fit" is a different
 // concept from the universal verdict and must not be confused with it.
+//
+// Deliberately worded to NOT collide with getPersonalEatAnswerKey's
+// words below (Yes/Mostly yes/Occasionally/Rarely/Avoid) -- the same
+// principle Result.jsx's EAT_ANSWER_KEY comment states for the
+// universal score ("deliberately a different word than the big
+// verdict label above it"). This tier list used to say "Occasional"
+// for the 25-45 band, which nearly duplicated "Occasionally" (the
+// eat-answer word for the BETTER 45-65 band) -- so the two lines in
+// the same card read as contradictory ("Occasional" sounding more
+// lenient than the "Rarely" right below it, even though "Occasional"
+// was the worse band). Real bug, caught from a live screenshot.
 const PERSONAL_TIERS = [
   { min: 85, label: 'Good Choice', token: 'very-healthy' },
   { min: 65, label: 'Moderate', token: 'good' },
   { min: 45, label: 'Limit', token: 'moderate' },
-  { min: 25, label: 'Occasional', token: 'poor' },
+  { min: 25, label: 'Minimize', token: 'poor' },
   { min: 0, label: 'Avoid', token: 'very-poor' },
 ];
 
