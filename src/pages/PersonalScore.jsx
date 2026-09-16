@@ -21,6 +21,7 @@ import {
   PRIORITY_LABEL_KEY,
   PRIORITY_CONCERN_KEY,
   PRIORITY_NOTE_KEY,
+  SEEK_MORE_PRIORITIES,
 } from '../services/personalAssessment';
 
 function ScoreBlock({ caption, score, label, color, bg, dim }) {
@@ -72,11 +73,6 @@ export default function PersonalScore() {
   const generalColors = getScoreColor(generalScore);
   const priorities = profile.priorities || [];
 
-  const flaggedKeys = new Set([
-    ...assessment.matchedConcerns.map((c) => c.priorityKey),
-    ...assessment.notes.map((n) => n.priorityKey),
-  ]);
-  const clearPriorities = priorities.filter((key) => !flaggedKeys.has(key));
 
   return (
     <div className="max-w-2xl mx-auto pb-28">
@@ -130,10 +126,25 @@ export default function PersonalScore() {
             </span>
           </p>
         </div>
+
+        {/* Without this line the page can read as a contradiction:
+            "nothing conflicts with Ibbu's priorities" directly above
+            "should Ibbu eat it? Occasionally". Both are true -- the
+            caution comes from the product's general profile, not from
+            anything specific to Ibbu -- but only if that's said out
+            loud. */}
+        {assessment.hasNoConcerns && assessment.personalScore < 85 && (
+          <p className="text-[12.5px] leading-relaxed mt-2.5 pl-[27px]" style={{ color: 'var(--label-3)' }}>
+            {t('personalGeneralCaution', { name: profile.nickname })}
+          </p>
+        )}
       </div>
 
       {/* Nothing matched at all -- say so plainly instead of leaving the
-          page looking like something failed to load. */}
+          page looking like something failed to load. Carefully worded
+          as "nothing conflicts" rather than "everything matches": a
+          product can raise no conflicts without being a good match, and
+          claiming the stronger thing would be overselling it. */}
       {assessment.hasNothingToShow && (
         <div className="mx-4 mt-3 rounded-[20px] p-5 text-center" style={{ background: 'var(--bg-card)' }}>
           <p className="text-[30px] leading-none mb-2">👍</p>
@@ -141,7 +152,7 @@ export default function PersonalScore() {
             {t('personalAllClearTitle', { name: profile.nickname })}
           </p>
           <p className="text-[13.5px] leading-relaxed" style={{ color: 'var(--label-2)' }}>
-            {t('personalAllClearBody')}
+            {t('personalAllClearBody', { name: profile.nickname })}
           </p>
         </div>
       )}
@@ -205,12 +216,22 @@ export default function PersonalScore() {
             {priorities.map((key, i) => {
               const isConcern = assessment.matchedConcerns.some((c) => c.priorityKey === key);
               const isNote = assessment.notes.some((n) => n.priorityKey === key);
-              const icon = isConcern ? '⚠' : isNote ? '💡' : '✓';
+              // Two kinds of priority need two different vocabularies.
+              // For something being AVOIDED, silence is good news:
+              // "no concern". For something being SOUGHT (protein,
+              // whole foods), "nothing to flag" is meaningless -- the
+              // question was never whether it's a problem, but whether
+              // the food actually contributes. Saying "nothing to flag"
+              // for "prioritize protein" tells you nothing at all.
+              const seeking = SEEK_MORE_PRIORITIES.has(key);
+              const icon = isConcern ? '⚠' : isNote ? '○' : '✓';
               const statusKey = isConcern
                 ? 'personalPriorityFlagged'
                 : isNote
-                  ? 'personalPriorityNoted'
-                  : 'personalPriorityClear';
+                  ? 'personalPriorityNotMajor'
+                  : seeking
+                    ? 'personalPriorityGoodSource'
+                    : 'personalPriorityNoConcern';
               return (
                 <div
                   key={key}
@@ -230,11 +251,6 @@ export default function PersonalScore() {
               );
             })}
           </div>
-          {clearPriorities.length === priorities.length && (
-            <p className="px-5 pt-2 text-[12px] leading-relaxed" style={{ color: 'var(--label-3)' }}>
-              {t('personalExplainerNote', { name: profile.nickname })}
-            </p>
-          )}
         </>
       )}
 

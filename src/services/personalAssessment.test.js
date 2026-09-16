@@ -6,6 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { calculatePersonalAssessment, getPersonalScoreColor } from './personalAssessment.js';
+import { getScoreColor } from '../utils/storage.js';
 
 function ing(overrides) {
   return { name: 'Ingredient', status: 'safe', category: null, penalty: 0, insCode: null, ...overrides };
@@ -174,12 +175,18 @@ test('real protein data (20g) confirms a genuinely protein-rich product has noth
   assert.equal(calculatePersonalAssessment(report, profile).hasNothingToShow, true);
 });
 
-test('personal score tier colors reuse the same 85/65/45/25 breakpoints as the universal score', () => {
-  assert.equal(getPersonalScoreColor(90).label, 'Good Choice');
-  assert.equal(getPersonalScoreColor(70).label, 'Moderate');
-  assert.equal(getPersonalScoreColor(50).label, 'Limit');
-  assert.equal(getPersonalScoreColor(30).label, 'Minimize');
-  assert.equal(getPersonalScoreColor(10).label, 'Avoid');
+test('the personal score uses the exact same tier labels as the universal score', () => {
+  // A version of this used its own vocabulary and produced a real
+  // screenshot reading "General 53 -- Moderate" next to "For Ibbu 53 --
+  // Limit": same number, same scale, two different words. The label
+  // must now only ever differ when the SCORE differs.
+  for (const score of [90, 70, 53, 50, 30, 10]) {
+    assert.equal(
+      getPersonalScoreColor(score).label,
+      getScoreColor(score).label,
+      `score ${score} should read the same on both scales`
+    );
+  }
 });
 
 test('handles a profile with no priorities selected at all', () => {

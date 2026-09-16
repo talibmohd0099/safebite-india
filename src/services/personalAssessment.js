@@ -13,7 +13,7 @@
 // a condition — only "aligned" or "less aligned" with selected
 // priorities. See PERSONAL_TIER_LABELS below.
 
-import { getIngredientSeverity } from '../utils/storage.js';
+import { getIngredientSeverity, getScoreColor } from '../utils/storage.js';
 import { NUTRIENT_LIMITS } from './dailyHabitCheck.js';
 
 const LIMIT_BY_KEY = Object.fromEntries(NUTRIENT_LIMITS.map((n) => [n.key, n.limit]));
@@ -192,32 +192,24 @@ const PRIORITY_CHECKS = {
 // this number (see rule: proprietary methodology stays hidden).
 const POINTS_PER_CONCERN = 8;
 
-// Same 85/65/45/25 breakpoints as SCORE_TIERS (utils/storage.js) /
-// VERDICT_TIERS (scoringEngine.js), for colour consistency -- but
-// distinct, non-medical labels, since "personal fit" is a different
-// concept from the universal verdict and must not be confused with it.
+// The personal score uses the SAME 0-100 scale and the SAME tier labels
+// as the universal score -- deliberately, after a version that didn't.
 //
-// Deliberately worded to NOT collide with getPersonalEatAnswerKey's
-// words below (Yes/Mostly yes/Occasionally/Rarely/Avoid) -- the same
-// principle Result.jsx's EAT_ANSWER_KEY comment states for the
-// universal score ("deliberately a different word than the big
-// verdict label above it"). This tier list used to say "Occasional"
-// for the 25-45 band, which nearly duplicated "Occasionally" (the
-// eat-answer word for the BETTER 45-65 band) -- so the two lines in
-// the same card read as contradictory ("Occasional" sounding more
-// lenient than the "Rarely" right below it, even though "Occasional"
-// was the worse band). Real bug, caught from a live screenshot.
-const PERSONAL_TIERS = [
-  { min: 85, label: 'Good Choice', token: 'very-healthy' },
-  { min: 65, label: 'Moderate', token: 'good' },
-  { min: 45, label: 'Limit', token: 'moderate' },
-  { min: 25, label: 'Minimize', token: 'poor' },
-  { min: 0, label: 'Avoid', token: 'very-poor' },
-];
-
+// This used to carry its own vocabulary (Good Choice / Moderate / Limit
+// / Minimize / Avoid) on the reasoning that "personal fit" is a
+// different concept and shouldn't be confused with the universal
+// verdict. In practice it created precisely the confusion it was meant
+// to prevent: a real product showed "General 53 -- Moderate" beside
+// "For Ibbu 53 -- Limit". Same number, same scale, two different words,
+// no way for anyone to tell what the difference was supposed to mean.
+//
+// One scale, one set of words. When the personal score matches the
+// general one the two now read identically, which is the honest
+// answer; when priorities actually cost the product points, the label
+// differs because the SCORE differs, which is the only reason it ever
+// should.
 export function getPersonalScoreColor(score) {
-  const tier = PERSONAL_TIERS.find((t) => score >= t.min) || PERSONAL_TIERS[PERSONAL_TIERS.length - 1];
-  return { label: tier.label, color: `var(--v-${tier.token})`, bg: `var(--v-${tier.token}-bg)` };
+  return getScoreColor(score);
 }
 
 // Same breakpoints again, but returning the i18n key for the "Should I
