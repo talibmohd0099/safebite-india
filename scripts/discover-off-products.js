@@ -99,6 +99,31 @@ const CATEGORIES = [
   { category: 'Cheeses', tag: 'en:cheeses' },
   { category: 'Yogurts', tag: 'en:yogurts' },
   { category: 'Butters', tag: 'en:butters' },
+
+  // Added once the original 28 all reached "exhausted" (see
+  // seed_progress) -- same discipline as above: India-tagged counts
+  // verified live before adding, not guessed. Several plausible names
+  // tested alongside these (dals, ghees, ketchups, namkeens, papadums,
+  // sweets, cookies, ready-to-eat-meals, muesli, popcorns, jaggeries)
+  // returned zero and were left out.
+  { category: 'Crackers', tag: 'en:crackers' },
+  { category: 'Wafers', tag: 'en:wafers' },
+  { category: 'Energy bars', tag: 'en:energy-bars' },
+  { category: 'Protein bars', tag: 'en:protein-bars' },
+  { category: 'Fruit juices', tag: 'en:fruit-juices' },
+  { category: 'Carbonated drinks', tag: 'en:carbonated-drinks' },
+  { category: 'Energy drinks', tag: 'en:energy-drinks' },
+  { category: 'Pulses', tag: 'en:pulses' },
+  { category: 'Crisps', tag: 'en:crisps' },
+  { category: 'Peanut butters', tag: 'en:peanut-butters' },
+  { category: 'Nut butters', tag: 'en:nut-butters' },
+  { category: 'Frozen foods', tag: 'en:frozen-foods' },
+  { category: 'Honeys', tag: 'en:honeys' },
+  { category: 'Mayonnaises', tag: 'en:mayonnaises' },
+  { category: 'Jams', tag: 'en:jams' },
+  { category: 'Spreads', tag: 'en:spreads' },
+  { category: 'Nuts', tag: 'en:nuts' },
+  { category: 'Desserts', tag: 'en:desserts' },
 ];
 
 // Being crowdsourced, some Open Food Facts entries have nutrition facts
