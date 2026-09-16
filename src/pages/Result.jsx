@@ -14,9 +14,6 @@ import { useFamily } from '../contexts/FamilyContext';
 import {
   calculatePersonalAssessment,
   getPersonalEatAnswerKey,
-  PRIORITY_LABEL_KEY,
-  PRIORITY_CONCERN_KEY,
-  PRIORITY_NOTE_KEY,
 } from '../services/personalAssessment';
 import ScoreCircle from '../components/ScoreCircle';
 import IngredientCard from '../components/IngredientCard';
@@ -194,7 +191,6 @@ export default function Result() {
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState('');
-  const [showWhyPersonal, setShowWhyPersonal] = useState(false);
   const [showFlagModal, setShowFlagModal] = useState(false);
   const [flagReason, setFlagReason] = useState('');
   const [flagRemarks, setFlagRemarks] = useState('');
@@ -367,7 +363,6 @@ export default function Result() {
   const selectProfile = (profileId) => {
     setSelectedProfileId(profileId);
     setActiveProfile(profileId);
-    setShowWhyPersonal(false);
   };
 
   // Alternatives, ranked for whoever's being checked for. Without a
@@ -718,59 +713,20 @@ export default function Result() {
               much sodium) lowers the score; a note (seek-more-type
               priority, e.g. not a big protein source) never does --
               it's just useful context, not a flaw in the food. */}
-          {!personalAssessment.hasNothingToShow && (
-            <>
-              <button
-                onClick={() => setShowWhyPersonal((v) => !v)}
-                className="tap-scale mt-3 pl-[27px] text-[13px] font-semibold"
-                style={{ color: 'var(--tint)' }}
-              >
-                {t(
-                  personalAssessment.matchedConcerns.length > 0 ? 'personalWhyDifferent' : 'personalMoreAboutFit',
-                  { name: activeProfile.nickname }
-                )}
-              </button>
-
-              {showWhyPersonal && (
-                <div className="mt-2 pl-[27px] space-y-1.5 item-in">
-                  {personalAssessment.matchedConcerns.map((c) => (
-                    <div key={c.priorityKey} className="rounded-[12px] p-2.5" style={{ background: 'var(--fill)' }}>
-                      <p className="text-[13px] font-semibold" style={{ color: 'var(--v-poor)' }}>
-                        ⚠ {t(PRIORITY_CONCERN_KEY[c.priorityKey])}
-                      </p>
-                      <p className="text-[12.5px] leading-relaxed mt-0.5" style={{ color: 'var(--label-2)' }}>
-                        {t('personalPriorityReason', {
-                          name: activeProfile.nickname,
-                          priority: t(PRIORITY_LABEL_KEY[c.priorityKey]).toLowerCase(),
-                        })}
-                      </p>
-                    </div>
-                  ))}
-                  {personalAssessment.notes.map((n) => (
-                    <div key={n.priorityKey} className="rounded-[12px] p-2.5" style={{ background: 'var(--fill)' }}>
-                      <p className="text-[13px] font-semibold" style={{ color: 'var(--label-2)' }}>
-                        💡 {t(PRIORITY_NOTE_KEY[n.priorityKey])}
-                      </p>
-                      <p className="text-[12.5px] leading-relaxed mt-0.5" style={{ color: 'var(--label-3)' }}>
-                        {t('personalPriorityNoteReason', {
-                          name: activeProfile.nickname,
-                          priority: t(PRIORITY_LABEL_KEY[n.priorityKey]).toLowerCase(),
-                        })}
-                      </p>
-                    </div>
-                  ))}
-                  <p className="text-[11.5px] leading-relaxed pt-1" style={{ color: 'var(--label-3)' }}>
-                    {t('personalExplainerNote', { name: activeProfile.nickname })}
-                  </p>
-                  {!result.realNutrients && (
-                    <p className="text-[11.5px] leading-relaxed" style={{ color: 'var(--label-3)' }}>
-                      {t('personalNoNutritionData')}
-                    </p>
-                  )}
-                </div>
-              )}
-            </>
-          )}
+          {/* The "why" lives on its own page (pages/PersonalScore.jsx)
+              rather than expanding in place: it needs room to show both
+              scores side by side and every priority that was checked,
+              including the ones that came back clean -- which is most of
+              them, most of the time, and is the reassuring half of the
+              answer. Always offered, even when nothing matched, since
+              "here's what we checked for you" is worth reading too. */}
+          <Link
+            to={`/result/${id}/personal`}
+            className="tap-scale block mt-3 pl-[27px] text-[13px] font-semibold"
+            style={{ color: 'var(--tint)' }}
+          >
+            {t('personalSeeBreakdown')} ›
+          </Link>
         </div>
       )}
 

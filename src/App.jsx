@@ -21,6 +21,7 @@ import SplashScreen from './components/SplashScreen';
 import Onboarding, { ONBOARDING_KEY } from './components/Onboarding';
 import Home from './pages/Home';
 import Result from './pages/Result';
+import PersonalScore from './pages/PersonalScore';
 import History from './pages/History';
 import Family from './pages/Family';
 import About from './pages/About';
@@ -78,6 +79,7 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/result/:id" element={<Result />} />
+                <Route path="/result/:id/personal" element={<PersonalScore />} />
                 <Route path="/history" element={<History />} />
                 <Route path="/family" element={<Family />} />
                 <Route path="/about" element={<About />} />
