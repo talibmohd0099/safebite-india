@@ -16,13 +16,21 @@
 //
 // Most products expose ingredients as a structured attribute. For the
 // ones that don't, Gemini is asked to find the ingredients inside the
-// other text already on that page -- extraction only, never invention.
+// other text already on that page (--no-ai to skip; real runs showed a
+// near-zero recovery rate, so it's off by default via the loop script).
+// --image-fallback goes further: when there's no ingredients text
+// anywhere on the page either, it downloads the product's gallery
+// photos and asks Gemini to read an ingredients panel directly off one
+// of them -- some products (seen on real besan listings) only ever
+// publish it that way. Costs one vision call per photo checked, so
+// it's opt-in.
 //
 // Usage:
 //   node scripts/scrape-blinkit.js --list
 //   node scripts/scrape-blinkit.js --all --per-category 8
 //   node scripts/scrape-blinkit.js --category soft-drinks --limit 15
 //   node scripts/scrape-blinkit.js --all --per-category 5 --dry-run --no-ai
+//   node scripts/scrape-blinkit.js --all --per-category 5 --no-ai --image-fallback
 
 import { createClient } from '@supabase/supabase-js';
 
@@ -49,6 +57,7 @@ const LIMIT = parseInt(flag('limit', '15'), 10);
 const PER_CATEGORY = parseInt(flag('per-category', '8'), 10);
 const DRY_RUN = has('dry-run');
 const USE_AI = !has('no-ai');
+const USE_IMAGE_FALLBACK = has('image-fallback');
 
 function client() {
   const url = process.env.VITE_SUPABASE_URL;
@@ -141,11 +150,13 @@ async function main() {
     }
     console.log(`Matched ${targets.length} category/categories for "${CATEGORY}".`);
   }
-  console.log(USE_AI ? 'AI fallback: on\n' : 'AI fallback: off\n');
+  console.log(USE_AI ? 'AI text fallback: on' : 'AI text fallback: off');
+  console.log(USE_IMAGE_FALLBACK ? 'AI image fallback: on\n' : 'AI image fallback: off\n');
 
   const collected = [];
   let skipped = 0;
   let aiRescued = 0;
+  let imageRescued = 0;
 
   // In --all mode, resume each category where the last run stopped.
   // Without this, repeated runs would re-scrape the same opening
@@ -182,7 +193,7 @@ async function main() {
     let savedHere = 0;
 
     for (const url of urls) {
-      const result = await scrapeProduct(url, sitemap.category, { useAI: USE_AI });
+      const result = await scrapeProduct(url, sitemap.category, { useAI: USE_AI, useImageFallback: USE_IMAGE_FALLBACK });
       await sleep(REQUEST_GAP_MS);
 
       if (result.error) {
@@ -193,8 +204,10 @@ async function main() {
       collected.push(result.product);
       savedHere++;
       if (result.viaAI) aiRescued++;
+      if (result.viaImage) imageRescued++;
       const p = result.product;
-      console.log(`   ${result.viaAI ? 'ai ' : 'ok '} ${p.brand || '?'} — ${p.product_name}`);
+      const tag = result.viaImage ? 'img' : result.viaAI ? 'ai ' : 'ok ';
+      console.log(`   ${tag} ${p.brand || '?'} — ${p.product_name}`);
       console.log(`        ${p.ingredients_text.replace(/\s+/g, ' ').slice(0, 100)}…`);
     }
 
@@ -212,7 +225,7 @@ async function main() {
   // per brand+name so the upsert doesn't fight itself in a single batch.
   const deduped = [...new Map(collected.map((p) => [`${p.brand}|${p.product_name}`, p])).values()];
 
-  console.log(`\n${deduped.length} products with ingredients (${aiRescued} recovered by AI), ${skipped} skipped.`);
+  console.log(`\n${deduped.length} products with ingredients (${aiRescued} recovered by AI text, ${imageRescued} by AI image), ${skipped} skipped.`);
 
   if (DRY_RUN) {
     console.log('--dry-run: nothing written to the database.');

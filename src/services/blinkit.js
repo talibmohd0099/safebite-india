@@ -76,6 +76,23 @@ async function curlGet(url) {
   return { status: Number(stdout.slice(idx + STATUS_MARKER.length).trim()), body: stdout.slice(0, idx) };
 }
 
+/**
+ * Same as fetchText, but returns raw bytes -- for downloading a gallery
+ * photo rather than parsing HTML. No retry/status-marker plumbing here:
+ * a missing photo just means this one candidate is skipped, not a page
+ * worth re-fetching.
+ */
+async function fetchImageBuffer(url) {
+  try {
+    const { stdout } = await execFileAsync('curl', [
+      '-sS', '--max-time', '20', '-A', USER_AGENT, url,
+    ], { maxBuffer: 25 * 1024 * 1024, encoding: 'buffer' });
+    return stdout.length > 0 ? stdout : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchText(url, retries = 3) {
   let lastFailure = null;
 
@@ -137,6 +154,77 @@ Rules:
 - A description of the product ("refreshing cola drink", "made with real fruit") is NOT an ingredients list. Return NONE for those.
 - Do not add commentary, labels or markdown. Just the ingredients text, or NONE.`;
 
+/** The product's full photo gallery, in the order Blinkit lists them. */
+export function extractImageGallery(html) {
+  const m = html.match(/"images":\[([^\]]*)\]/);
+  if (!m) return [];
+  return [...m[1].matchAll(/"([^"]+)"/g)].map((x) =>
+    x[1].replace(/\\u002F/g, '/').replace(/\\\//g, '/')
+  );
+}
+
+const IMAGE_AI_PROMPT = `You are reading one photo from an Indian packaged food product's listing.
+
+Rules:
+- If THIS image shows a printed ingredients list, transcribe it exactly as written.
+- Do NOT invent, infer, complete or guess ingredients.
+- If no ingredients list is visible in this image (e.g. it's a front-of-pack marketing shot, a nutrition table only, or a lifestyle photo), reply with exactly: NONE
+- Do not add commentary, labels or markdown. Just the ingredients text, or NONE.`;
+
+// Checked in order, stopping at the first photo that actually shows an
+// ingredients panel -- most galleries put the back-of-pack shot within
+// the first 8-10 images, and every image beyond that just spends quota
+// for a shrinking chance of a hit (confirmed against real product
+// galleries during this feature's research).
+const MAX_GALLERY_IMAGES_TRIED = 10;
+const IMAGE_REQUEST_GAP_MS = 4200; // free-tier vision limit is 15 req/min
+
+/**
+ * Last resort for products with no structured Ingredients attribute AND
+ * no ingredients findable in the page's own text: try reading the
+ * ingredients straight off the product's gallery photos instead. Some
+ * products (seen on real Blinkit besan listings) only ever put the
+ * ingredients list on the pack photo, never in any text attribute — this
+ * is the only way to recover those.
+ */
+export async function extractIngredientsFromImages(productName, imageUrls) {
+  if (GEMINI_API_KEYS.length === 0 || imageUrls.length === 0) return null;
+
+  for (const url of imageUrls.slice(0, MAX_GALLERY_IMAGES_TRIED)) {
+    const buf = await fetchImageBuffer(url);
+    await sleep(IMAGE_REQUEST_GAP_MS);
+    if (!buf) continue;
+
+    const body = {
+      contents: [{
+        parts: [
+          { text: `${IMAGE_AI_PROMPT}\n\nProduct: ${productName}` },
+          { inline_data: { mime_type: 'image/jpeg', data: buf.toString('base64') } },
+        ],
+      }],
+      generationConfig: {
+        temperature: 0,
+        topK: 1,
+        maxOutputTokens: 500,
+        thinkingConfig: { thinkingLevel: 'low' },
+      },
+    };
+
+    try {
+      const { text, finishReason } = await callGemini(body);
+      if (finishReason !== 'STOP') continue;
+      const trimmed = text?.trim();
+      if (!trimmed || /^NONE\b/i.test(trimmed) || trimmed.length < 12) continue;
+      return trimmed;
+    } catch {
+      // This one photo's call failed (quota/transient) — try the next
+      // photo rather than giving up on the whole product.
+      continue;
+    }
+  }
+  return null;
+}
+
 /**
  * Last resort for products with no structured Ingredients attribute:
  * show Gemini only the text already on that page and let it find an
@@ -180,7 +268,7 @@ export async function extractIngredientsWithAI(productName, attributes) {
  * Scrape one product page into a blinkit_products row.
  * Returns { error } when there's nothing usable to save.
  */
-export async function scrapeProduct(url, category, { useAI = false } = {}) {
+export async function scrapeProduct(url, category, { useAI = false, useImageFallback = false } = {}) {
   const html = await fetchText(url);
   if (!html) return { error: 'fetch failed' };
 
@@ -190,10 +278,21 @@ export async function scrapeProduct(url, category, { useAI = false } = {}) {
   const attributes = allAttributes(html);
   let ingredients = attributes['Ingredients'] || null;
   let viaAI = false;
+  let viaImage = false;
 
   if (!ingredients && useAI) {
     ingredients = await extractIngredientsWithAI(productName, attributes);
     viaAI = Boolean(ingredients);
+  }
+
+  // Some products (seen on real besan listings) never publish an
+  // ingredients list as text anywhere on the page -- only on a gallery
+  // photo. Tried last since it costs a vision call per photo checked,
+  // the most expensive of the three routes.
+  if (!ingredients && useImageFallback) {
+    const images = extractImageGallery(html);
+    ingredients = await extractIngredientsFromImages(productName, images);
+    viaImage = Boolean(ingredients);
   }
 
   // The whole point is complete ingredient text — a row without it
@@ -209,6 +308,7 @@ export async function scrapeProduct(url, category, { useAI = false } = {}) {
 
   return {
     viaAI,
+    viaImage,
     product: {
       product_name: productName,
       brand: jsonField(html, 'brand') || '',
