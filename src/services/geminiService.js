@@ -164,18 +164,24 @@ export async function analyzeIngredients(ingredientsText) {
   return extractJson(text, finishReason);
 }
 
-const EXTRACTION_PROMPT = `You are transcribing the ingredients list from a photo of an Indian packaged food label.
+const EXTRACTION_PROMPT = `You are transcribing the ingredients list and, if visible in this same photo, the nutrition table from a photo of an Indian packaged food label.
 
 Read the image carefully and return ONLY valid JSON, no markdown, no explanation:
 {
   "productName": "product name if visible on the pack, otherwise 'Unknown Product'",
   "ingredientsText": "the full ingredients list exactly as printed, comma separated, keep INS numbers and sub-brackets as written",
   "readable": true,
-  "notes": "short note ONLY if the photo was blurry, the list looked cut off, small/faded text was hard to read, or you are not fully confident you captured everything — otherwise an empty string"
+  "notes": "short note ONLY if the photo was blurry, the list looked cut off, small/faded text was hard to read, or you are not fully confident you captured everything — otherwise an empty string",
+  "nutrition": {
+    "energyKcal": 0, "proteinG": 0, "totalCarbG": 0, "totalSugarG": 0, "addedSugarG": 0,
+    "totalFatG": 0, "saturatedFatG": 0, "transFatG": 0, "fiberG": 0, "sodiumMg": 0, "calciumMg": 0
+  },
+  "servingGrams": 0
 }
 
 If the label truly cannot be read at all, set "readable": false, leave "ingredientsText" empty, and explain why in "notes".
-Never invent or guess ingredients that aren't legible — it is better to leave something out and note it than to make it up.`;
+Never invent or guess ingredients that aren't legible — it is better to leave something out and note it than to make it up.
+If NO nutrition table is visible in this photo at all, omit the "nutrition" key and the "servingGrams" key entirely rather than guessing numbers. If a nutrition table IS visible, only include the specific fields it actually states — per 100g/100ml, not per serving — and never invent a value for a field the table doesn't show.`;
 
 /**
  * Extract (transcribe) the ingredients list from a food label photo.

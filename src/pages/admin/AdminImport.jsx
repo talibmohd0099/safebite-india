@@ -117,8 +117,7 @@ export default function AdminImport() {
           onChange={(e) => setCsvText(e.target.value)}
           rows={6}
           placeholder={SAMPLE}
-          className="w-full px-3.5 py-2.5 rounded-[12px] text-[13px] font-mono outline-none resize-none"
-          style={{ background: 'var(--fill)', color: 'var(--label-1)' }}
+          className="admin-field w-full px-3.5 py-2.5 rounded-[12px] text-[13px] font-mono resize-none"
         />
         {parseError && <p className="text-[13px] mt-2" style={{ color: 'var(--v-poor)' }}>{parseError}</p>}
         <button

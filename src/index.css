@@ -190,6 +190,25 @@ body {
   transform: scale(0.96);
 }
 
+/* Admin panel's text inputs/selects/textareas -- var(--fill) (a ~12%
+   grey tint) is the right subtlety for the consumer app's iOS-style
+   look, but on a plain desktop form it reads as barely-there, hard to
+   tell a field's edges from the page. A real border on a white/dark
+   surface reads as an actual input, the way a desktop tool should. */
+.admin-field {
+  background: var(--bg-card);
+  border: 1px solid var(--separator);
+  color: var(--label-1);
+  transition: border-color 0.15s ease;
+}
+.admin-field::placeholder {
+  color: var(--label-3);
+}
+.admin-field:focus {
+  outline: none;
+  border-color: var(--tint);
+}
+
 /* Home screen's top hero band -- a slow, flowing gradient instead of a
    flat fill, so the very first thing a user sees has some life to it.
    Stays within the existing green brand palette rather than introducing

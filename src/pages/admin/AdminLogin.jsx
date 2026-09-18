@@ -56,8 +56,7 @@ export default function AdminLogin() {
           autoComplete="username"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full px-3.5 py-2.5 rounded-[12px] text-[15px] mb-3 outline-none"
-          style={{ background: 'var(--fill)', color: 'var(--label-1)' }}
+          className="admin-field w-full px-3.5 py-2.5 rounded-[12px] text-[15px] mb-3"
           required
         />
         <label className="block text-[13px] font-semibold mb-1.5" style={{ color: 'var(--label-2)' }}>Password</label>
@@ -66,8 +65,7 @@ export default function AdminLogin() {
           autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full px-3.5 py-2.5 rounded-[12px] text-[15px] mb-4 outline-none"
-          style={{ background: 'var(--fill)', color: 'var(--label-1)' }}
+          className="admin-field w-full px-3.5 py-2.5 rounded-[12px] text-[15px] mb-4"
           required
         />
         {error && <p className="text-[13px] mb-3" style={{ color: 'var(--v-poor)' }}>{error}</p>}

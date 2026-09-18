@@ -116,8 +116,7 @@ export default function AdminProductList() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search…"
-            className="w-full px-3 py-2 rounded-[10px] text-[14px] outline-none"
-            style={{ background: 'var(--fill)', color: 'var(--label-1)' }}
+            className="admin-field w-full px-3 py-2 rounded-[10px] text-[14px]"
           />
         </div>
         <div className="flex-1 min-w-[160px]">
@@ -126,8 +125,7 @@ export default function AdminProductList() {
             value={brand}
             onChange={(e) => setBrand(e.target.value)}
             placeholder="Any brand"
-            className="w-full px-3 py-2 rounded-[10px] text-[14px] outline-none"
-            style={{ background: 'var(--fill)', color: 'var(--label-1)' }}
+            className="admin-field w-full px-3 py-2 rounded-[10px] text-[14px]"
           />
         </div>
         <div className="min-w-[170px]">
@@ -135,8 +133,7 @@ export default function AdminProductList() {
           <select
             value={categoryId}
             onChange={(e) => handleCategoryChange(e.target.value)}
-            className="w-full px-3 py-2 rounded-[10px] text-[14px] outline-none"
-            style={{ background: 'var(--fill)', color: 'var(--label-1)' }}
+            className="admin-field w-full px-3 py-2 rounded-[10px] text-[14px]"
           >
             <option value="">All categories</option>
             {CATEGORY_KEYWORDS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}

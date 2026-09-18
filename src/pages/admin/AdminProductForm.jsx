@@ -8,12 +8,13 @@
 // score/verdict/summary/recommendation are then directly editable
 // below, for the real correction cases this session kept running into
 // (a wrong AI verdict, a name that needs fixing).
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import AdminLayout from './AdminLayout';
 import { analyzeText } from '../../services/analyzeText';
 import { buildReport } from '../../services/scoringEngine';
 import { extractIngredientsFromImage } from '../../services/geminiService';
+import { parseLabel, isBracketBalanced, looksLikeNutritionPanel } from '../../services/ingredientParser';
 import { barcodeKey, textKey } from '../../services/productCache';
 import {
   adminGetProduct,
@@ -25,12 +26,15 @@ import {
 import { imageFileFromClipboard, compressImageToDataUrl } from '../../utils/adminImage';
 
 const VERDICTS = ['Excellent', 'Good', 'Moderately Healthy', 'Poor', 'Very Poor'];
+const FIELD = 'admin-field w-full px-3.5 py-2.5 rounded-[12px] text-[15px]';
 
 // The 4 keys analyzeText.js's nutrientsInfo actually scores against
 // (dailyHabitCheck.js's NUTRIENT_LIMITS), plus the rest kept purely for
 // a complete, displayable nutrition record -- same fields Blinkit
 // stores (see NUTRITION_FIELDS in services/blinkit.js), so a manually
-// added product's data looks like every scraped one's.
+// added product's data looks like every scraped one's. Keys match what
+// geminiService.js's extraction prompt returns, so an extracted value
+// drops straight into this shape with no remapping.
 const NUTRIENT_FIELDS = [
   { key: 'energyKcal', label: 'Energy', unit: 'kcal' },
   { key: 'proteinG', label: 'Protein', unit: 'g' },
@@ -57,8 +61,7 @@ function NutrientField({ label, value, onChange, unit, scored }) {
           inputMode="decimal"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full px-3 py-2 rounded-[10px] text-[14px] outline-none"
-          style={{ background: 'var(--fill)', color: 'var(--label-1)' }}
+          className="admin-field w-full px-3 py-2 rounded-[10px] text-[14px]"
         />
         <span className="text-[11px] flex-shrink-0" style={{ color: 'var(--label-3)' }}>{unit}</span>
       </div>
@@ -88,12 +91,47 @@ function DuplicateWarning({ match, label, onOverride, overridden, blocking }) {
   );
 }
 
+/** One of up to two source photos used only to extract ingredients/nutrition -- never saved as the product's display image. */
+function SourcePhotoSlot({ label, photo, onFile, onPaste, onRemove }) {
+  const inputRef = useRef(null);
+  return (
+    <div
+      tabIndex={0}
+      onPaste={onPaste}
+      className="rounded-[12px] p-3 flex items-center gap-2.5 outline-none"
+      style={{ background: 'var(--bg-card)', border: '1px dashed var(--separator)' }}
+    >
+      {photo ? (
+        <img src={photo.dataUrl} alt={label} className="w-14 h-14 rounded-[8px] object-cover flex-shrink-0" />
+      ) : (
+        <div className="w-14 h-14 rounded-[8px] flex items-center justify-center text-[20px] flex-shrink-0" style={{ background: 'var(--fill)' }}>
+          📷
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="text-[11.5px] font-semibold mb-0.5" style={{ color: 'var(--label-2)' }}>{label}</p>
+        <p className="text-[11px]" style={{ color: 'var(--label-3)' }}>Click, then paste (Ctrl+V), or choose a file.</p>
+        <div className="flex gap-3 mt-1">
+          <button type="button" onClick={() => inputRef.current?.click()} className="tap-scale text-[11.5px] font-semibold" style={{ color: 'var(--tint)' }}>
+            Choose file
+          </button>
+          {photo && (
+            <button type="button" onClick={onRemove} className="tap-scale text-[11.5px] font-semibold" style={{ color: 'var(--v-poor)' }}>
+              Remove
+            </button>
+          )}
+        </div>
+      </div>
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
+    </div>
+  );
+}
+
 export default function AdminProductForm() {
   const { id } = useParams();
   const isEdit = Boolean(id);
   const navigate = useNavigate();
-  const fileInputRef = useRef(null);
-  const pasteAreaRef = useRef(null);
+  const heroFileInputRef = useRef(null);
 
   const [loadingExisting, setLoadingExisting] = useState(isEdit);
   const [error, setError] = useState('');
@@ -105,8 +143,15 @@ export default function AdminProductForm() {
   const [brand, setBrand] = useState('');
   const [barcode, setBarcode] = useState('');
   const [ingredientsText, setIngredientsText] = useState('');
-  const [photoFile, setPhotoFile] = useState(null); // raw File, for the extract-from-photo call
-  const [photoDataUrl, setPhotoDataUrl] = useState(''); // compressed, what actually gets saved
+
+  // The hero/display photo -- what actually gets saved as report.imageUrl.
+  const [photoDataUrl, setPhotoDataUrl] = useState('');
+
+  // Up to 2 separate photos used ONLY to extract ingredients/nutrition
+  // from (a pack's ingredients and nutrition table are often on
+  // different faces, or one photo comes out too blurry to read) --
+  // never saved anywhere, purely an input to the Extract action below.
+  const [sourcePhotos, setSourcePhotos] = useState([null, null]);
 
   const [nutrients, setNutrients] = useState({});
   const [servingGrams, setServingGrams] = useState('');
@@ -138,6 +183,32 @@ export default function AdminProductForm() {
       .finally(() => setLoadingExisting(false));
   }, [id, isEdit]);
 
+  // Live sanity-check on the ingredients text, reusing the exact same
+  // checks analyzeText.js relies on (parseLabel/isBracketBalanced/
+  // looksLikeNutritionPanel) -- so a problem that would otherwise only
+  // surface as a thrown error after clicking Analyze is visible right
+  // under the field instead, while it's still easy to fix by hand.
+  const ingredientsQuality = useMemo(() => {
+    const text = ingredientsText.trim();
+    if (!text) return null;
+    if (!isBracketBalanced(text)) {
+      return { ok: false, message: 'Bracket mismatch — check for a missing ( or ).' };
+    }
+    let parsed;
+    try {
+      parsed = parseLabel(text).ingredients;
+    } catch {
+      return null; // never let the sanity check itself break the page
+    }
+    if (parsed.length === 0) {
+      return { ok: false, message: 'No recognizable ingredients found in this text — check it, or re-extract.' };
+    }
+    if (looksLikeNutritionPanel(parsed)) {
+      return { ok: false, message: 'This looks like a nutrition panel, not an ingredients list.' };
+    }
+    return { ok: true, message: `Looks parseable — ${parsed.length} ingredient${parsed.length === 1 ? '' : 's'} found.` };
+  }, [ingredientsText]);
+
   const checkNameDuplicate = async () => {
     if (!productName.trim()) { setNameDuplicate(null); return; }
     const match = await adminFindByName(productName.trim(), isEdit ? id : null);
@@ -151,40 +222,74 @@ export default function AdminProductForm() {
     setBarcodeDuplicate(match);
   };
 
-  const applyPhoto = async (file) => {
+  const applyHeroPhoto = async (file) => {
     if (!file) return;
-    setPhotoFile(file);
     try {
-      const dataUrl = await compressImageToDataUrl(file);
-      setPhotoDataUrl(dataUrl);
+      setPhotoDataUrl(await compressImageToDataUrl(file));
     } catch (err) {
       setError(err.message);
     }
   };
 
-  const handlePaste = (e) => {
-    const file = imageFileFromClipboard(e);
-    if (file) {
-      e.preventDefault();
-      applyPhoto(file);
+  const applySourcePhoto = async (index, file) => {
+    if (!file) return;
+    try {
+      const dataUrl = await compressImageToDataUrl(file);
+      setSourcePhotos((prev) => prev.map((p, i) => (i === index ? { file, dataUrl } : p)));
+    } catch (err) {
+      setError(err.message);
     }
   };
 
-  const handleExtractFromPhoto = async () => {
-    if (!photoFile) { setError('Paste or choose a photo first.'); return; }
+  const removeSourcePhoto = (index) => setSourcePhotos((prev) => prev.map((p, i) => (i === index ? null : p)));
+
+  const handleExtractInfo = async () => {
+    const photos = sourcePhotos.filter(Boolean);
+    if (photos.length === 0) { setError('Add at least one ingredients/nutrition photo first.'); return; }
     setError('');
     setExtracting(true);
     try {
-      const extracted = await extractIngredientsFromImage(photoFile);
-      if (!extracted.readable && !extracted.ingredientsText) {
-        setError(extracted.notes || "Couldn't read that photo clearly. Try a clearer one, or type the ingredients in.");
-        return;
+      let foundIngredientsText = '';
+      let foundProductName = '';
+      const mergedNutrition = {};
+      let foundServingGrams = '';
+      const notes = [];
+      let anyReadable = false;
+
+      for (const photo of photos) {
+        const extracted = await extractIngredientsFromImage(photo.file);
+        if (extracted.readable) anyReadable = true;
+        if (!foundIngredientsText && extracted.ingredientsText) foundIngredientsText = extracted.ingredientsText;
+        if (!foundProductName && extracted.productName && extracted.productName !== 'Unknown Product') foundProductName = extracted.productName;
+        if (extracted.nutrition) {
+          for (const [k, v] of Object.entries(extracted.nutrition)) {
+            if (mergedNutrition[k] === undefined && typeof v === 'number') mergedNutrition[k] = v;
+          }
+        }
+        if (!foundServingGrams && extracted.servingGrams) foundServingGrams = extracted.servingGrams;
+        if (extracted.notes) notes.push(extracted.notes);
       }
-      setIngredientsText(extracted.ingredientsText);
-      if (extracted.productName && extracted.productName !== 'Unknown Product' && !productName.trim()) {
-        setProductName(extracted.productName);
+
+      if (foundIngredientsText) setIngredientsText(foundIngredientsText);
+      if (foundProductName && !productName.trim()) setProductName(foundProductName);
+      if (Object.keys(mergedNutrition).length > 0) {
+        setNutrients((prev) => {
+          const next = { ...prev };
+          for (const [k, v] of Object.entries(mergedNutrition)) {
+            if (next[k] === undefined || next[k] === '') next[k] = v;
+          }
+          return next;
+        });
       }
-      if (extracted.notes) setError(`Extracted, but: ${extracted.notes}`);
+      if (foundServingGrams && !servingGrams) setServingGrams(foundServingGrams);
+
+      const messages = [];
+      if (!foundIngredientsText) {
+        messages.push(anyReadable ? 'No ingredients list found in these photos — type it in manually.' : "Couldn't read these photos clearly.");
+      }
+      if (Object.keys(mergedNutrition).length === 0) messages.push('No nutrition table found in these photos.');
+      if (notes.length) messages.push(notes.join(' '));
+      if (messages.length) setError(messages.join(' '));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -309,40 +414,17 @@ export default function AdminProductForm() {
             <p className="text-[13px] font-semibold mb-3" style={{ color: 'var(--label-2)' }}>Product details</p>
 
             <label className="block text-[12px] font-semibold mb-1" style={{ color: 'var(--label-3)' }}>Product name *</label>
-            <input
-              value={productName}
-              onChange={(e) => setProductName(e.target.value)}
-              onBlur={checkNameDuplicate}
-              className="w-full px-3.5 py-2.5 rounded-[12px] text-[15px] outline-none"
-              style={{ background: 'var(--fill)', color: 'var(--label-1)' }}
-            />
-            <DuplicateWarning
-              match={nameDuplicate}
-              label="A product named"
-              onOverride={setNameDuplicateOverride}
-              overridden={nameDuplicateOverride}
-            />
+            <input value={productName} onChange={(e) => setProductName(e.target.value)} onBlur={checkNameDuplicate} className={FIELD} />
+            <DuplicateWarning match={nameDuplicate} label="A product named" onOverride={setNameDuplicateOverride} overridden={nameDuplicateOverride} />
 
             <div className="grid grid-cols-2 gap-3 mt-3 mb-1">
               <div>
                 <label className="block text-[12px] font-semibold mb-1" style={{ color: 'var(--label-3)' }}>Brand</label>
-                <input
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-[12px] text-[15px] outline-none"
-                  style={{ background: 'var(--fill)', color: 'var(--label-1)' }}
-                />
+                <input value={brand} onChange={(e) => setBrand(e.target.value)} className={FIELD} />
               </div>
               <div>
                 <label className="block text-[12px] font-semibold mb-1" style={{ color: 'var(--label-3)' }}>Barcode (optional)</label>
-                <input
-                  value={barcode}
-                  onChange={(e) => setBarcode(e.target.value)}
-                  onBlur={checkBarcodeDuplicate}
-                  placeholder="Leave blank if unknown"
-                  className="w-full px-3.5 py-2.5 rounded-[12px] text-[15px] outline-none"
-                  style={{ background: 'var(--fill)', color: 'var(--label-1)' }}
-                />
+                <input value={barcode} onChange={(e) => setBarcode(e.target.value)} onBlur={checkBarcodeDuplicate} placeholder="Leave blank if unknown" className={FIELD} />
               </div>
             </div>
             <DuplicateWarning match={barcodeDuplicate} label="This barcode is already used by" blocking />
@@ -353,13 +435,49 @@ export default function AdminProductForm() {
               onChange={(e) => setIngredientsText(e.target.value)}
               rows={5}
               placeholder="Sugar, Refined Wheat Flour (Maida), Palm Oil, ..."
-              className="w-full px-3.5 py-2.5 rounded-[12px] text-[14px] outline-none resize-none"
-              style={{ background: 'var(--fill)', color: 'var(--label-1)' }}
+              className={`${FIELD} text-[14px] resize-none`}
             />
+            {ingredientsQuality && (
+              <p className="text-[12px] mt-1.5" style={{ color: ingredientsQuality.ok ? 'var(--v-good)' : 'var(--v-poor)' }}>
+                {ingredientsQuality.ok ? '✓' : '⚠'} {ingredientsQuality.message}
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-[16px] p-4 mb-4" style={{ background: 'var(--bg-card)' }}>
+            <p className="text-[13px] font-semibold mb-1" style={{ color: 'var(--label-2)' }}>Ingredients &amp; nutrition photos</p>
+            <p className="text-[11.5px] mb-3" style={{ color: 'var(--label-3)' }}>
+              Up to 2 photos — the back-of-pack ingredients list and/or the nutrition table. Only used to fill the fields below, never saved.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <SourcePhotoSlot
+                label="Photo 1"
+                photo={sourcePhotos[0]}
+                onFile={(f) => applySourcePhoto(0, f)}
+                onPaste={(e) => { const f = imageFileFromClipboard(e); if (f) { e.preventDefault(); applySourcePhoto(0, f); } }}
+                onRemove={() => removeSourcePhoto(0)}
+              />
+              <SourcePhotoSlot
+                label="Photo 2 (optional)"
+                photo={sourcePhotos[1]}
+                onFile={(f) => applySourcePhoto(1, f)}
+                onPaste={(e) => { const f = imageFileFromClipboard(e); if (f) { e.preventDefault(); applySourcePhoto(1, f); } }}
+                onRemove={() => removeSourcePhoto(1)}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleExtractInfo}
+              disabled={sourcePhotos.every((p) => !p) || extracting}
+              className="tap-scale w-full mt-3 py-2.5 rounded-[12px] text-[13.5px] font-semibold"
+              style={{ background: 'var(--tint-bg)', color: 'var(--tint)', opacity: sourcePhotos.every((p) => !p) || extracting ? 0.5 : 1 }}
+            >
+              {extracting ? 'Reading photos…' : '📷 Extract ingredients & nutrition'}
+            </button>
           </div>
 
           {error && (
-            <p className="text-[13px] mb-4 p-3 rounded-[12px]" style={{ background: 'var(--fill)', color: 'var(--v-poor)' }}>
+            <p className="text-[13px] mb-4 p-3 rounded-[12px]" style={{ background: 'var(--v-poor-bg)', color: 'var(--v-poor)' }}>
               {error}
             </p>
           )}
@@ -389,18 +507,12 @@ export default function AdminProductForm() {
                     max="100"
                     value={report.overallScore}
                     onChange={(e) => setReport({ ...report, overallScore: Number(e.target.value) })}
-                    className="w-full px-3.5 py-2.5 rounded-[12px] text-[15px] outline-none"
-                    style={{ background: 'var(--fill)', color: 'var(--label-1)' }}
+                    className={FIELD}
                   />
                 </div>
                 <div>
                   <label className="block text-[12px] font-semibold mb-1" style={{ color: 'var(--label-3)' }}>Verdict</label>
-                  <select
-                    value={report.verdict}
-                    onChange={(e) => setReport({ ...report, verdict: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-[12px] text-[15px] outline-none"
-                    style={{ background: 'var(--fill)', color: 'var(--label-1)' }}
-                  >
+                  <select value={report.verdict} onChange={(e) => setReport({ ...report, verdict: e.target.value })} className={FIELD}>
                     {VERDICTS.map((v) => <option key={v} value={v}>{v}</option>)}
                   </select>
                 </div>
@@ -411,8 +523,7 @@ export default function AdminProductForm() {
                 value={report.summary || ''}
                 onChange={(e) => setReport({ ...report, summary: e.target.value })}
                 rows={2}
-                className="w-full px-3.5 py-2.5 rounded-[12px] text-[13.5px] mb-3 outline-none resize-none"
-                style={{ background: 'var(--fill)', color: 'var(--label-1)' }}
+                className={`${FIELD} text-[13.5px] mb-3 resize-none`}
               />
 
               <label className="block text-[12px] font-semibold mb-1" style={{ color: 'var(--label-3)' }}>Recommendation</label>
@@ -420,8 +531,7 @@ export default function AdminProductForm() {
                 value={report.recommendation || ''}
                 onChange={(e) => setReport({ ...report, recommendation: e.target.value })}
                 rows={2}
-                className="w-full px-3.5 py-2.5 rounded-[12px] text-[13.5px] mb-1 outline-none resize-none"
-                style={{ background: 'var(--fill)', color: 'var(--label-1)' }}
+                className={`${FIELD} text-[13.5px] resize-none`}
               />
             </div>
           )}
@@ -445,12 +555,7 @@ export default function AdminProductForm() {
                 {report.ingredients.map((ing, i) => (
                   <div key={i} className="grid gap-2 px-3 py-2" style={{ gridTemplateColumns: '1.4fr 1fr 70px 1.6fr', borderBottom: i < report.ingredients.length - 1 ? '1px solid var(--separator)' : 'none' }}>
                     <span className="text-[12.5px] font-semibold truncate self-center" style={{ color: 'var(--label-1)' }}>{ing.name}</span>
-                    <select
-                      value={ing.status}
-                      onChange={(e) => updateIngredient(i, { status: e.target.value })}
-                      className="px-2 py-1.5 rounded-[8px] text-[12px] outline-none"
-                      style={{ background: 'var(--fill)', color: 'var(--label-1)' }}
-                    >
+                    <select value={ing.status} onChange={(e) => updateIngredient(i, { status: e.target.value })} className="admin-field px-2 py-1.5 rounded-[8px] text-[12px]">
                       <option value="safe">safe</option>
                       <option value="concerning">concerning</option>
                       <option value="harmful">harmful</option>
@@ -461,15 +566,13 @@ export default function AdminProductForm() {
                       max="40"
                       value={ing.penalty ?? 0}
                       onChange={(e) => updateIngredient(i, { penalty: Number(e.target.value) })}
-                      className="px-2 py-1.5 rounded-[8px] text-[12px] outline-none w-full"
-                      style={{ background: 'var(--fill)', color: 'var(--label-1)' }}
+                      className="admin-field px-2 py-1.5 rounded-[8px] text-[12px] w-full"
                     />
                     <input
                       value={ing.reason || ''}
                       onChange={(e) => updateIngredient(i, { reason: e.target.value })}
                       placeholder="Reason shown to users"
-                      className="px-2 py-1.5 rounded-[8px] text-[12px] outline-none w-full"
-                      style={{ background: 'var(--fill)', color: 'var(--label-1)' }}
+                      className="admin-field px-2 py-1.5 rounded-[8px] text-[12px] w-full"
                     />
                   </div>
                 ))}
@@ -493,19 +596,19 @@ export default function AdminProductForm() {
 
         <div>
           <div className="rounded-[16px] p-4 mb-4" style={{ background: 'var(--bg-card)' }}>
-            <p className="text-[13px] font-semibold mb-3" style={{ color: 'var(--label-2)' }}>Product photo</p>
+            <p className="text-[13px] font-semibold mb-1" style={{ color: 'var(--label-2)' }}>Product photo</p>
+            <p className="text-[11.5px] mb-3" style={{ color: 'var(--label-3)' }}>The hero image shown on the product's card and report — a clean front-of-pack shot.</p>
 
             <div
-              ref={pasteAreaRef}
               tabIndex={0}
-              onPaste={handlePaste}
+              onPaste={(e) => { const f = imageFileFromClipboard(e); if (f) { e.preventDefault(); applyHeroPhoto(f); } }}
               className="rounded-[12px] p-4 flex items-center gap-3 outline-none"
-              style={{ background: 'var(--fill)', border: '1px dashed var(--separator)' }}
+              style={{ background: 'var(--bg-card)', border: '1px dashed var(--separator)' }}
             >
               {photoDataUrl ? (
                 <img src={photoDataUrl} alt="Product" className="w-16 h-16 rounded-[10px] object-cover flex-shrink-0" />
               ) : (
-                <div className="w-16 h-16 rounded-[10px] flex items-center justify-center text-[24px] flex-shrink-0" style={{ background: 'var(--bg-card)' }}>
+                <div className="w-16 h-16 rounded-[10px] flex items-center justify-center text-[24px] flex-shrink-0" style={{ background: 'var(--fill)' }}>
                   📷
                 </div>
               )}
@@ -514,45 +617,28 @@ export default function AdminProductForm() {
                   Click here and paste (Ctrl+V) a copied photo, or choose a file.
                 </p>
                 <div className="flex gap-3 mt-1.5">
-                  <button type="button" onClick={() => fileInputRef.current?.click()} className="tap-scale text-[12.5px] font-semibold" style={{ color: 'var(--tint)' }}>
+                  <button type="button" onClick={() => heroFileInputRef.current?.click()} className="tap-scale text-[12.5px] font-semibold" style={{ color: 'var(--tint)' }}>
                     Choose file
                   </button>
                   {photoDataUrl && (
-                    <button type="button" onClick={() => { setPhotoDataUrl(''); setPhotoFile(null); }} className="tap-scale text-[12.5px] font-semibold" style={{ color: 'var(--v-poor)' }}>
+                    <button type="button" onClick={() => setPhotoDataUrl('')} className="tap-scale text-[12.5px] font-semibold" style={{ color: 'var(--v-poor)' }}>
                       Remove
                     </button>
                   )}
                 </div>
               </div>
             </div>
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={(e) => applyPhoto(e.target.files?.[0])} className="hidden" />
-
-            <button
-              type="button"
-              onClick={handleExtractFromPhoto}
-              disabled={!photoFile || extracting}
-              className="tap-scale w-full mt-3 py-2.5 rounded-[12px] text-[13.5px] font-semibold"
-              style={{ background: 'var(--tint-bg)', color: 'var(--tint)', opacity: !photoFile || extracting ? 0.5 : 1 }}
-            >
-              {extracting ? 'Reading label…' : '📷 Extract ingredients from this photo'}
-            </button>
+            <input ref={heroFileInputRef} type="file" accept="image/*" onChange={(e) => applyHeroPhoto(e.target.files?.[0])} className="hidden" />
           </div>
 
           <div className="rounded-[16px] p-4" style={{ background: 'var(--bg-card)' }}>
             <p className="text-[13px] font-semibold mb-1" style={{ color: 'var(--label-2)' }}>Nutrition (optional)</p>
             <p className="text-[11.5px] mb-3" style={{ color: 'var(--label-3)' }}>
-              Per 100g/100ml, if you have it. Fields marked • feed the daily-habit score check; the rest are kept for reference.
+              Per 100g/100ml. Fields marked • feed the daily-habit score check; the rest are kept for reference. "Extract ingredients &amp; nutrition" above fills these in automatically when a photo shows a nutrition table.
             </p>
             <div className="grid grid-cols-2 gap-3 mb-3">
               {NUTRIENT_FIELDS.map((f) => (
-                <NutrientField
-                  key={f.key}
-                  label={f.label}
-                  unit={f.unit}
-                  scored={f.scored}
-                  value={nutrients[f.key] ?? ''}
-                  onChange={(v) => setNutrient(f.key, v)}
-                />
+                <NutrientField key={f.key} label={f.label} unit={f.unit} scored={f.scored} value={nutrients[f.key] ?? ''} onChange={(v) => setNutrient(f.key, v)} />
               ))}
             </div>
             <NutrientField label="Real serving size" unit="g" value={servingGrams} onChange={setServingGrams} />
