@@ -34,6 +34,10 @@ import AdminLogin from './pages/admin/AdminLogin';
 import AdminGuard from './pages/admin/AdminGuard';
 import AdminProductList from './pages/admin/AdminProductList';
 import AdminProductForm from './pages/admin/AdminProductForm';
+import AdminFlagsList from './pages/admin/AdminFlagsList';
+import AdminDuplicates from './pages/admin/AdminDuplicates';
+import AdminImport from './pages/admin/AdminImport';
+import AdminActivityLog from './pages/admin/AdminActivityLog';
 
 // The Android app's hardware/gesture back button doesn't do anything by
 // default in a Capacitor WebView -- without this, it would just sit
@@ -89,6 +93,10 @@ function AppShell() {
           <Route path="/admin/products" element={<AdminGuard><AdminProductList /></AdminGuard>} />
           <Route path="/admin/products/new" element={<AdminGuard><AdminProductForm /></AdminGuard>} />
           <Route path="/admin/products/:id/edit" element={<AdminGuard><AdminProductForm /></AdminGuard>} />
+          <Route path="/admin/flags" element={<AdminGuard><AdminFlagsList /></AdminGuard>} />
+          <Route path="/admin/duplicates" element={<AdminGuard><AdminDuplicates /></AdminGuard>} />
+          <Route path="/admin/import" element={<AdminGuard><AdminImport /></AdminGuard>} />
+          <Route path="/admin/activity" element={<AdminGuard><AdminActivityLog /></AdminGuard>} />
         </Routes>
       </main>
       {!isAdmin && <BottomTabBar />}

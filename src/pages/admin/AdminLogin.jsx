@@ -24,7 +24,11 @@ export default function AdminLogin() {
     const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setLoading(false);
     if (signInError) {
-      setError('Wrong email or password.');
+      setError(
+        signInError.code === 'email_not_confirmed'
+          ? 'Confirm your email first — check your inbox for the confirmation link Supabase sent.'
+          : 'Wrong email or password.'
+      );
       return;
     }
     navigate('/admin/products', { replace: true });
