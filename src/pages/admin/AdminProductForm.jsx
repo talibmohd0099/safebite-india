@@ -15,7 +15,7 @@ import { analyzeText } from '../../services/analyzeText';
 import { buildReport } from '../../services/scoringEngine';
 import { extractIngredientsFromImage } from '../../services/geminiService';
 import { lookupBarcode } from '../../services/openFoodFacts';
-import { parseLabel, isBracketBalanced, looksLikeNutritionPanel } from '../../services/ingredientParser';
+import { parseLabel, looksLikeNutritionPanel, findIngredientTextIssues } from '../../services/ingredientParser';
 import { barcodeKey, textKey } from '../../services/productCache';
 import {
   adminGetProduct,
@@ -171,6 +171,83 @@ function SourcePhotoSlot({ label, photo, onFile, onPaste, onRemove }) {
   );
 }
 
+/** Splits `text` into plain strings and highlighted <mark>s for each issue -- text outside any issue passes through untouched. */
+function renderHighlightedText(text, issues) {
+  if (!issues?.length) return text;
+  const nodes = [];
+  let cursor = 0;
+  for (let i = 0; i < issues.length; i++) {
+    const from = Math.max(issues[i].from, cursor);
+    const to = Math.max(issues[i].to, from);
+    if (from > cursor) nodes.push(text.slice(cursor, from));
+    if (to > from) {
+      nodes.push(
+        <mark
+          key={i}
+          style={{
+            background: issues[i].severity === 'error' ? 'rgba(220,53,69,0.38)' : 'rgba(230,180,20,0.4)',
+            color: 'transparent',
+            borderRadius: 2,
+          }}
+        >
+          {text.slice(from, to)}
+        </mark>
+      );
+    }
+    cursor = Math.max(cursor, to);
+  }
+  if (cursor < text.length) nodes.push(text.slice(cursor));
+  return nodes;
+}
+
+/**
+ * A plain <textarea> with an exact-size copy of itself behind it
+ * (same font/padding/wrapping via the same className) whose text is
+ * invisible except for <mark> highlights at each issue's character
+ * range -- the real, visible, editable text stays in the actual
+ * textarea on top. Scroll position is synced by hand since a
+ * transparent-text div doesn't otherwise track a sibling's scroll.
+ */
+function IngredientsTextArea({ value, onChange, onBlur, issues, className, placeholder, rows }) {
+  const textareaRef = useRef(null);
+  const overlayRef = useRef(null);
+
+  const syncScroll = () => {
+    if (overlayRef.current && textareaRef.current) {
+      overlayRef.current.scrollTop = textareaRef.current.scrollTop;
+      overlayRef.current.scrollLeft = textareaRef.current.scrollLeft;
+    }
+  };
+
+  return (
+    <div className="relative">
+      <div
+        ref={overlayRef}
+        aria-hidden="true"
+        className={className}
+        style={{
+          position: 'absolute', inset: 0, color: 'transparent', background: 'transparent',
+          border: '1px solid transparent', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          overflow: 'hidden', pointerEvents: 'none', fontFamily: 'inherit', zIndex: 1,
+        }}
+      >
+        {renderHighlightedText(value, issues)}
+      </div>
+      <textarea
+        ref={textareaRef}
+        value={value}
+        onChange={onChange}
+        onBlur={onBlur}
+        onScroll={syncScroll}
+        rows={rows}
+        placeholder={placeholder}
+        className={className}
+        style={{ position: 'relative', background: 'transparent', fontFamily: 'inherit', zIndex: 2 }}
+      />
+    </div>
+  );
+}
+
 export default function AdminProductForm({ copyMode = false }) {
   const { id } = useParams();
   // A copy loads the same source row as edit mode but saves as a brand
@@ -255,16 +332,24 @@ export default function AdminProductForm({ copyMode = false }) {
       .finally(() => setLoadingExisting(false));
   }, [id, copyMode]);
 
+  // Every bracket-mismatch/missing-comma spot in the current text, with
+  // exact character positions -- feeds both the highlight overlay below
+  // and the summary message next to it.
+  const ingredientIssues = useMemo(() => findIngredientTextIssues(ingredientsText), [ingredientsText]);
+
   // Live sanity-check on the ingredients text, reusing the exact same
-  // checks analyzeText.js relies on (parseLabel/isBracketBalanced/
-  // looksLikeNutritionPanel) -- so a problem that would otherwise only
-  // surface as a thrown error after clicking Analyze is visible right
-  // under the field instead, while it's still easy to fix by hand.
+  // checks analyzeText.js relies on (parseLabel/looksLikeNutritionPanel)
+  // plus the bracket/comma issues above -- so a problem that would
+  // otherwise only surface as a thrown error after clicking Analyze is
+  // visible right under the field instead, while it's still easy to fix
+  // by hand.
   const ingredientsQuality = useMemo(() => {
     const text = ingredientsText.trim();
     if (!text) return null;
-    if (!isBracketBalanced(text)) {
-      return { ok: false, message: 'Bracket mismatch — check for a missing ( or ).' };
+    const bracketIssues = ingredientIssues.filter((i) => i.severity === 'error');
+    if (bracketIssues.length > 0) {
+      const extra = bracketIssues.length - 1;
+      return { status: 'error', message: bracketIssues[0].message + (extra > 0 ? ` (+${extra} more bracket issue${extra === 1 ? '' : 's'} highlighted below)` : '') };
     }
     let parsed;
     try {
@@ -273,13 +358,17 @@ export default function AdminProductForm({ copyMode = false }) {
       return null; // never let the sanity check itself break the page
     }
     if (parsed.length === 0) {
-      return { ok: false, message: 'No recognizable ingredients found in this text — check it, or re-extract.' };
+      return { status: 'error', message: 'No recognizable ingredients found in this text — check it, or re-extract.' };
     }
     if (looksLikeNutritionPanel(parsed)) {
-      return { ok: false, message: 'This looks like a nutrition panel, not an ingredients list.' };
+      return { status: 'error', message: 'This looks like a nutrition panel, not an ingredients list.' };
     }
-    return { ok: true, message: `Looks parseable — ${parsed.length} ingredient${parsed.length === 1 ? '' : 's'} found.` };
-  }, [ingredientsText]);
+    const commaIssues = ingredientIssues.filter((i) => i.severity === 'warning');
+    if (commaIssues.length > 0) {
+      return { status: 'warn', message: `Looks parseable (${parsed.length} ingredient${parsed.length === 1 ? '' : 's'}), but ${commaIssues.length === 1 ? 'one spot' : `${commaIssues.length} spots`} highlighted below might be missing a comma.` };
+    }
+    return { status: 'ok', message: `Looks parseable — ${parsed.length} ingredient${parsed.length === 1 ? '' : 's'} found.` };
+  }, [ingredientsText, ingredientIssues]);
 
   const checkNameDuplicate = async () => {
     if (!productName.trim()) { setNameDuplicate(null); return; }
@@ -624,16 +713,25 @@ export default function AdminProductForm({ copyMode = false }) {
             <DuplicateWarning match={barcodeDuplicate} label="This barcode is already used by" blocking />
 
             <label className="block text-[12px] font-semibold mb-1 mt-3" style={{ color: 'var(--label-3)' }}>Ingredients text *</label>
-            <textarea
+            <IngredientsTextArea
               value={ingredientsText}
               onChange={(e) => setIngredientsText(e.target.value)}
+              issues={ingredientIssues}
               rows={5}
               placeholder="Sugar, Refined Wheat Flour (Maida), Palm Oil, ..."
               className={`${FIELD} text-[14px] resize-none`}
             />
             {ingredientsQuality && (
-              <p className="text-[12px] mt-1.5" style={{ color: ingredientsQuality.ok ? 'var(--v-good)' : 'var(--v-poor)' }}>
-                {ingredientsQuality.ok ? '✓' : '⚠'} {ingredientsQuality.message}
+              <p
+                className="text-[12px] mt-1.5"
+                style={{
+                  color:
+                    ingredientsQuality.status === 'ok' ? 'var(--v-good)'
+                    : ingredientsQuality.status === 'warn' ? 'var(--v-moderate)'
+                    : 'var(--v-poor)',
+                }}
+              >
+                {ingredientsQuality.status === 'ok' ? '✓' : '⚠'} {ingredientsQuality.message}
               </p>
             )}
           </div>

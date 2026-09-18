@@ -5,7 +5,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseIngredients, parseLabel, looksLikeNutritionPanel } from './ingredientParser.js';
+import { parseIngredients, parseLabel, looksLikeNutritionPanel, findBracketIssues, findMissingCommaIssues, findIngredientTextIssues } from './ingredientParser.js';
 
 function byName(ingredients, name) {
   return ingredients.find((i) => i.displayName === name);
@@ -378,4 +378,68 @@ test('strips a leftover "and/or" conjunction fragment instead of leaving it stuc
   const names = result.map((i) => i.displayName);
   assert.ok(names.includes('Canola Oil'));
   assert.ok(!names.includes('And/or Canola Oil'));
+});
+
+// findBracketIssues -- admin form's live textbox highlighting.
+
+test('findBracketIssues finds nothing on real, well-formed label text', () => {
+  const text = 'Sugar, Refined Wheat Flour (Maida), Palm Oil, Salt, Raising Agents (INS 500(ii), INS 503(ii)), Emulsifiers (INS 322, INS 471)';
+  assert.deepEqual(findBracketIssues(text), []);
+});
+
+test('findBracketIssues catches an unclosed opener and points at it', () => {
+  const text = 'Sugar, Palm Oil (Ricebran, Cottonseed';
+  const issues = findBracketIssues(text);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].from, text.indexOf('('));
+  assert.match(issues[0].message, /never closed/);
+});
+
+test('findBracketIssues catches a closer with nothing open to match', () => {
+  const text = 'Sugar, Palm Oil), Salt';
+  const issues = findBracketIssues(text);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].from, text.indexOf(')'));
+  assert.match(issues[0].message, /no opening bracket/);
+});
+
+test('findBracketIssues catches a type mismatch ("(Maida]") that depth-only balance checking misses', () => {
+  // Depth-only balance is fine here (one opener, one closer) -- the bug
+  // is the closer is the wrong TYPE, which isBracketBalanced can't see.
+  const text = 'Refined Wheat Flour (Maida], Sugar';
+  const issues = findBracketIssues(text);
+  assert.equal(issues.length, 2); // flags both the opener and the mismatched closer
+  assert.equal(issues[0].from, text.indexOf('('));
+  assert.equal(issues[1].from, text.indexOf(']'));
+});
+
+// findMissingCommaIssues -- verified against 400 real scraped
+// ingredient texts before shipping (see the function's own comment);
+// these are the real positive and negative cases found there.
+
+test('findMissingCommaIssues catches a real scraping glitch (real KitKat listing) with zero space between closer and next word', () => {
+  const text = 'Raising Agent (500(ii))Artificial Flavouring Substance';
+  const issues = findMissingCommaIssues(text);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].from, text.indexOf('))') + 1);
+});
+
+test('findMissingCommaIssues catches a closer + one space + capitalized word with no comma (real Knorr listing)', () => {
+  const text = 'Vegetables (Onion (1%) and Leeks (0.4%)) Hydrolyzed Vegetable Protein';
+  const issues = findMissingCommaIssues(text);
+  assert.ok(issues.length >= 1);
+});
+
+test('findMissingCommaIssues does NOT flag a closer followed by a comma, another closer, or a lowercase word', () => {
+  assert.deepEqual(findMissingCommaIssues('Palm Oil (Ricebran), Sunflower Oil'), []);
+  assert.deepEqual(findMissingCommaIssues('Raising Agents (INS 500(ii), INS 503(ii))'), []);
+  assert.deepEqual(findMissingCommaIssues('Oil (Sunflower) and Preservative (INS 211)'), []);
+});
+
+test('findIngredientTextIssues merges both checks, sorted by position', () => {
+  const text = 'Sugar, Palm Oil (Ricebran]Sunflower Oil';
+  const issues = findIngredientTextIssues(text);
+  assert.ok(issues.some((i) => i.severity === 'error'));
+  assert.ok(issues.some((i) => i.severity === 'warning'));
+  for (let i = 1; i < issues.length; i++) assert.ok(issues[i].from >= issues[i - 1].from);
 });

@@ -30,6 +30,81 @@ export function isBracketBalanced(text) {
   return depth === 0;
 }
 
+const BRACKET_PAIR = { '(': ')', '[': ']', '{': '}' };
+
+/**
+ * Position-aware version of isBracketBalanced's check, for the admin
+ * add/edit form's live textbox highlighting -- isBracketBalanced only
+ * says yes/no, and (being depth-only) doesn't notice a WRONG closer
+ * ("(Maida]" is depth-balanced but still broken). This walks a real
+ * stack so it can report exactly which character is the problem: an
+ * opener that's never closed, a closer with nothing open to match, or
+ * a closer whose type doesn't match the opener it's closing.
+ *
+ * Returns [{ from, to, severity: 'error', message }], `to` exclusive,
+ * sorted by position.
+ */
+export function findBracketIssues(text) {
+  const issues = [];
+  const stack = [];
+  const chars = text || '';
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i];
+    if (OPENERS.includes(ch)) {
+      stack.push({ ch, i });
+    } else if (CLOSERS.includes(ch)) {
+      const top = stack[stack.length - 1];
+      if (!top) {
+        issues.push({ from: i, to: i + 1, severity: 'error', message: `"${ch}" here has no opening bracket before it.` });
+      } else if (BRACKET_PAIR[top.ch] !== ch) {
+        issues.push({ from: top.i, to: top.i + 1, severity: 'error', message: `"${top.ch}" is closed with "${ch}" instead of "${BRACKET_PAIR[top.ch]}".` });
+        issues.push({ from: i, to: i + 1, severity: 'error', message: `This "${ch}" doesn't match the "${top.ch}" it's closing.` });
+        stack.pop();
+      } else {
+        stack.pop();
+      }
+    }
+  }
+  for (const leftover of stack) {
+    issues.push({ from: leftover.i, to: leftover.i + 1, severity: 'error', message: `"${leftover.ch}" is never closed.` });
+  }
+  return issues.sort((a, b) => a.from - b.from);
+}
+
+// A closing bracket immediately (zero or one space, no comma) followed
+// by a capital letter reads as one ingredient's annotation running
+// straight into the next ingredient's name -- checked against 400 real
+// scraped ingredient texts before shipping: every zero-space case found
+// was a genuine scraping glitch ("...(500(ii))Artificial flavouring...",
+// real KitKat listing), and allowing one space still only matched real
+// missing-punctuation spots in the sample, not legitimate label text
+// ("... and Leeks (0.4%)) Hydrolyzed Vegetable...", missing a comma
+// before the next ingredient). A real closer already followed by a
+// comma, another closer, or lowercase word never matches, since those
+// are exactly the normal, correctly-punctuated cases.
+const MISSING_COMMA_RE = /[)\]}] ?(?=[A-Z])/g;
+
+/** Same shape as findBracketIssues, `severity: 'warning'` since this is a heuristic, not a hard syntax rule. */
+export function findMissingCommaIssues(text) {
+  const issues = [];
+  const chars = text || '';
+  for (const m of chars.matchAll(MISSING_COMMA_RE)) {
+    issues.push({
+      from: m.index,
+      to: m.index + m[0].length,
+      severity: 'warning',
+      message: 'Looks like a comma is missing here, before the next ingredient.',
+    });
+  }
+  return issues;
+}
+
+/** Everything findBracketIssues + findMissingCommaIssues find, in one sorted list -- what the admin form's textbox highlighting actually renders. */
+export function findIngredientTextIssues(text) {
+  if (!text) return [];
+  return [...findBracketIssues(text), ...findMissingCommaIssues(text)].sort((a, b) => a.from - b.from);
+}
+
 // Words that show up as label boilerplate rather than as ingredients.
 const NOISE_PREFIXES = [
   'ingredients', 'ingredient', 'contains', 'containing', 'made from',
