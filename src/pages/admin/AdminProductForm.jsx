@@ -14,6 +14,7 @@ import AdminLayout from './AdminLayout';
 import { analyzeText } from '../../services/analyzeText';
 import { buildReport } from '../../services/scoringEngine';
 import { extractIngredientsFromImage } from '../../services/geminiService';
+import { lookupBarcode } from '../../services/openFoodFacts';
 import { parseLabel, isBracketBalanced, looksLikeNutritionPanel } from '../../services/ingredientParser';
 import { barcodeKey, textKey } from '../../services/productCache';
 import {
@@ -48,6 +49,23 @@ const NUTRIENT_FIELDS = [
   { key: 'sodiumMg', label: 'Sodium', unit: 'mg', scored: true },
   { key: 'calciumMg', label: 'Calcium', unit: 'mg' },
 ];
+
+// openFoodFacts.js's extractNutrientsForHabitCheck uses slightly
+// different key names (caloriesKcal, carbohydrateG, fibreG) than this
+// form's NUTRIENT_FIELDS (energyKcal, totalCarbG, fiberG) -- this maps
+// OFF's keys onto this form's, for the barcode auto-fetch below.
+const OFF_TO_ADMIN_NUTRIENT_KEY = {
+  sodiumMg: 'sodiumMg',
+  addedSugarG: 'addedSugarG',
+  totalSugarG: 'totalSugarG',
+  saturatedFatG: 'saturatedFatG',
+  transFatG: 'transFatG',
+  caloriesKcal: 'energyKcal',
+  proteinG: 'proteinG',
+  carbohydrateG: 'totalCarbG',
+  totalFatG: 'totalFatG',
+  fibreG: 'fiberG',
+};
 
 function NutrientField({ label, value, onChange, unit, scored }) {
   return (
@@ -162,6 +180,8 @@ export default function AdminProductForm() {
   const [nameDuplicate, setNameDuplicate] = useState(null);
   const [nameDuplicateOverride, setNameDuplicateOverride] = useState(false);
   const [barcodeDuplicate, setBarcodeDuplicate] = useState(null);
+  const [fetchingBarcode, setFetchingBarcode] = useState(false);
+  const [autoAnalyzeTrigger, setAutoAnalyzeTrigger] = useState(0);
 
   useEffect(() => {
     if (!isEdit) return;
@@ -220,6 +240,63 @@ export default function AdminProductForm() {
     if (!barcode.trim()) { setBarcodeDuplicate(null); return; }
     const match = await adminFindByBarcode(barcode.trim(), isEdit ? id : null);
     setBarcodeDuplicate(match);
+  };
+
+  // Typing a barcode that's already on Open Food Facts fills in
+  // everything it has -- name, brand, ingredients, photo, nutrition --
+  // so most of the manual typing this form used to need only happens
+  // for products OFF genuinely doesn't have. Only ever fills EMPTY
+  // fields, so it never overwrites something already typed or (in edit
+  // mode) already loaded from this product's existing report.
+  const handleBarcodeBlur = async () => {
+    checkBarcodeDuplicate();
+    const cleaned = barcode.trim();
+    if (!cleaned) return;
+
+    setFetchingBarcode(true);
+    try {
+      const found = await lookupBarcode(cleaned);
+      if (!found.found) return;
+
+      if (!productName.trim() && found.productName && found.productName !== 'Unknown Product') setProductName(found.productName);
+      if (!brand.trim() && found.brand) setBrand(found.brand);
+      if (!photoDataUrl && found.imageUrl) setPhotoDataUrl(found.imageUrl);
+
+      let filledIngredients = false;
+      if (!ingredientsText.trim()) {
+        if (found.readable === false) {
+          setError(found.notes || "Found on Open Food Facts, but its ingredients look wrong there — type or extract them from a photo instead.");
+        } else if (found.ingredientsText) {
+          setIngredientsText(found.ingredientsText);
+          filledIngredients = true;
+        }
+      }
+
+      if (found.nutrientsInfo?.nutrients) {
+        setNutrients((prev) => {
+          const next = { ...prev };
+          for (const [offKey, adminKey] of Object.entries(OFF_TO_ADMIN_NUTRIENT_KEY)) {
+            const value = found.nutrientsInfo.nutrients[offKey];
+            if (value != null && (next[adminKey] === undefined || next[adminKey] === '')) next[adminKey] = value;
+          }
+          return next;
+        });
+        if (!servingGrams && found.nutrientsInfo.servingGrams) setServingGrams(found.nutrientsInfo.servingGrams);
+      }
+
+      // Enough to Analyze now -- do it automatically instead of making
+      // scan-a-barcode-and-review three separate clicks. (Deferred to
+      // the next render via the trigger below, since handleAnalyze
+      // called right here would still see this render's pre-update
+      // productName/ingredientsText.)
+      if (filledIngredients && (productName.trim() || found.productName)) {
+        setAutoAnalyzeTrigger((n) => n + 1);
+      }
+    } catch {
+      // Open Food Facts being slow/unreachable shouldn't block manual entry.
+    } finally {
+      setFetchingBarcode(false);
+    }
   };
 
   const applyHeroPhoto = async (file) => {
@@ -343,6 +420,15 @@ export default function AdminProductForm() {
     }
   };
 
+  // Fires once per successful barcode auto-fetch (see handleBarcodeBlur)
+  // -- deferred to an effect so it runs against the render where
+  // productName/ingredientsText/nutrients have actually updated,
+  // instead of the stale, pre-update values a direct call would close
+  // over.
+  useEffect(() => {
+    if (autoAnalyzeTrigger > 0) handleAnalyze();
+  }, [autoAnalyzeTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const updateIngredient = (index, patch) => {
     setReport((prev) => ({
       ...prev,
@@ -423,8 +509,10 @@ export default function AdminProductForm() {
                 <input value={brand} onChange={(e) => setBrand(e.target.value)} className={FIELD} />
               </div>
               <div>
-                <label className="block text-[12px] font-semibold mb-1" style={{ color: 'var(--label-3)' }}>Barcode (optional)</label>
-                <input value={barcode} onChange={(e) => setBarcode(e.target.value)} onBlur={checkBarcodeDuplicate} placeholder="Leave blank if unknown" className={FIELD} />
+                <label className="block text-[12px] font-semibold mb-1" style={{ color: 'var(--label-3)' }}>
+                  Barcode (optional) {fetchingBarcode && <span style={{ color: 'var(--tint)' }}>— checking Open Food Facts…</span>}
+                </label>
+                <input value={barcode} onChange={(e) => setBarcode(e.target.value)} onBlur={handleBarcodeBlur} placeholder="Type or scan — auto-fills from Open Food Facts if known" className={FIELD} />
               </div>
             </div>
             <DuplicateWarning match={barcodeDuplicate} label="This barcode is already used by" blocking />
