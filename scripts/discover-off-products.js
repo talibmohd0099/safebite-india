@@ -124,6 +124,27 @@ const CATEGORIES = [
   { category: 'Spreads', tag: 'en:spreads' },
   { category: 'Nuts', tag: 'en:nuts' },
   { category: 'Desserts', tag: 'en:desserts' },
+
+  // Added once the previous 47 all reached "exhausted" too. Same
+  // discipline: live India-tagged counts checked before adding.
+  // Several plausible ones (ketchups, custards, puddings, granolas,
+  // fruit-preserves, marmalades, cocoas, popcorns, clarified-butters,
+  // curds, paneers, lassis, vermicellis, semolinas, millets, tapiocas,
+  // indian-sweets, chikkis, laddus, barfis, gulab-jamuns, rasgullas,
+  // malted-drinks, cordials) returned zero and were left out.
+  { category: 'Chutneys', tag: 'en:chutneys' },
+  { category: 'Vinegars', tag: 'en:vinegars' },
+  { category: 'Syrups', tag: 'en:syrups' },
+  { category: 'Flavoured waters', tag: 'en:flavored-waters' },
+  { category: 'Mineral waters', tag: 'en:mineral-waters' },
+  { category: 'Muesli', tag: 'en:mueslis' },
+  { category: 'Cereal bars', tag: 'en:cereal-bars' },
+  { category: 'Olive oils', tag: 'en:olive-oils' },
+  { category: 'Sunflower oils', tag: 'en:sunflower-oils' },
+  { category: 'Mustard oils', tag: 'en:mustard-oils' },
+  { category: 'Coconut oils', tag: 'en:coconut-oils' },
+  { category: 'Milk powders', tag: 'en:milk-powders' },
+  { category: 'Buttermilks', tag: 'en:buttermilks' },
 ];
 
 // Being crowdsourced, some Open Food Facts entries have nutrition facts
