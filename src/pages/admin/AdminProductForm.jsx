@@ -182,6 +182,7 @@ export default function AdminProductForm() {
   const [barcodeDuplicate, setBarcodeDuplicate] = useState(null);
   const [fetchingBarcode, setFetchingBarcode] = useState(false);
   const [autoAnalyzeTrigger, setAutoAnalyzeTrigger] = useState(0);
+  const [existingSource, setExistingSource] = useState(null);
 
   useEffect(() => {
     if (!isEdit) return;
@@ -193,6 +194,7 @@ export default function AdminProductForm() {
         setBrand(r.brand || '');
         setBarcode(row.lookup_key?.startsWith('barcode:') ? row.lookup_key.slice('barcode:'.length) : '');
         setIngredientsText(row.ingredients_text || '');
+        setExistingSource(row.source || null);
         if (r.imageUrl) setPhotoDataUrl(r.imageUrl);
         if (r.nutritionPanel) setNutrients(r.nutritionPanel);
         else if (r.realNutrients) setNutrients(r.realNutrients);
@@ -468,7 +470,16 @@ export default function AdminProductForm() {
         nutritionPanel: buildNutritionPanel(),
       };
       const lookupKey = barcode.trim() ? barcodeKey(barcode.trim()) : textKey(ingredientsText.trim());
-      const source = barcode.trim() ? 'barcode' : 'text';
+      // 'blinkit' is a real provenance marker (this row came from the
+      // scraper) -- adding or editing a barcode on that product isn't a
+      // change of WHERE it came from, so it must survive the save.
+      // Everything else ('barcode'/'text'/'search'/'image', or brand
+      // new) has no such provenance worth keeping and just re-derives
+      // from whether a barcode is present, as before.
+      const PROVENANCE_SOURCES = ['blinkit'];
+      const source = isEdit && PROVENANCE_SOURCES.includes(existingSource)
+        ? existingSource
+        : barcode.trim() ? 'barcode' : 'text';
       const payload = { lookupKey, source, productName: finalReport.productName, ingredientsText: ingredientsText.trim(), report: finalReport };
 
       if (isEdit) {
