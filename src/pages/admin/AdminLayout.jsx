@@ -11,6 +11,7 @@ const NAV = [
   { to: '/admin/products', label: 'Products' },
   { to: '/admin/flags', label: 'Flags' },
   { to: '/admin/duplicates', label: 'Duplicates' },
+  { to: '/admin/barcode-check', label: 'Barcode check' },
   { to: '/admin/import', label: 'Import' },
   { to: '/admin/activity', label: 'Activity' },
 ];

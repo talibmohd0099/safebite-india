@@ -241,6 +241,35 @@ export async function adminListAllProductsLight() {
   return all;
 }
 
+/**
+ * Every barcode-sourced product's id/name/brand/barcode -- feeds the
+ * "Barcode check" tool (AdminBarcodeCheck.jsx), which resolves each
+ * barcode's GS1 country prefix client-side (gs1CountryPrefixes.js).
+ * Filtered server-side to barcode: rows only, so this is a small
+ * fraction of the full catalog rather than everything.
+ */
+export async function adminListAllBarcodeProductsLight() {
+  requireSupabase();
+  const PAGE = 1000;
+  const all = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await supabase
+      .from('product_reports')
+      .select('id, product_name, lookup_key, brand:report->brand')
+      .ilike('lookup_key', 'barcode:%')
+      .range(offset, offset + PAGE - 1);
+    if (error) throw new Error(error.message);
+    all.push(...data.map((row) => ({
+      id: row.id,
+      productName: row.product_name,
+      brand: row.brand || null,
+      barcode: row.lookup_key.slice('barcode:'.length),
+    })));
+    if (data.length < PAGE) break;
+  }
+  return all;
+}
+
 /** Deletes every id in `removeIds`, keeping `keepId` -- one merge, logged as one entry. */
 export async function adminMergeProducts(keepId, removeIds, productName) {
   requireSupabase();

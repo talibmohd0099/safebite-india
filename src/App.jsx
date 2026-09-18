@@ -39,6 +39,7 @@ import AdminDuplicates from './pages/admin/AdminDuplicates';
 import AdminImport from './pages/admin/AdminImport';
 import AdminActivityLog from './pages/admin/AdminActivityLog';
 import AdminProductHistory from './pages/admin/AdminProductHistory';
+import AdminBarcodeCheck from './pages/admin/AdminBarcodeCheck';
 
 // The Android app's hardware/gesture back button doesn't do anything by
 // default in a Capacitor WebView -- without this, it would just sit
@@ -97,6 +98,7 @@ function AppShell() {
           <Route path="/admin/products/:id/history" element={<AdminGuard><AdminProductHistory /></AdminGuard>} />
           <Route path="/admin/flags" element={<AdminGuard><AdminFlagsList /></AdminGuard>} />
           <Route path="/admin/duplicates" element={<AdminGuard><AdminDuplicates /></AdminGuard>} />
+          <Route path="/admin/barcode-check" element={<AdminGuard><AdminBarcodeCheck /></AdminGuard>} />
           <Route path="/admin/import" element={<AdminGuard><AdminImport /></AdminGuard>} />
           <Route path="/admin/activity" element={<AdminGuard><AdminActivityLog /></AdminGuard>} />
         </Routes>
