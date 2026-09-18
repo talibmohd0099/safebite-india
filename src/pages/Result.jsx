@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getHistoryById, updateHistoryProductName, refreshHistoryEntry, saveToHistory, getScoreColor, getIngredientSeverity } from '../utils/storage';
-import { updateProductName, getCachedReport, getSaferAlternatives, deleteReport, saveReport, getReportIdByLookupKey } from '../services/productCache';
+import { updateProductName, getCachedReport, getSaferAlternatives, getSimilarProducts, deleteReport, saveReport, getReportIdByLookupKey } from '../services/productCache';
 import { buildProductShareText, productShareUrl, whatsappShareUrl } from '../utils/share';
 import { renderShareCardImage } from '../utils/shareCard';
 import headerIcon from '../assets/header-icon.png';
@@ -256,15 +256,18 @@ export default function Result() {
     return () => { cancelled = true; };
   }, [result, t]);
 
-  // Only worth asking for when the score is actually low -- a "Good"
-  // or better product doesn't need an alternative suggested to it.
+  // A low score gets "Safer alternatives" (better-scoring only, a real
+  // health nudge); everything else gets "Similar products" (any score,
+  // plain discovery) -- so the Result page always has something to
+  // keep browsing to instead of dead-ending after a good score.
   useEffect(() => {
-    if (!result || (result.overallScore || 0) >= 65) {
+    if (!result) {
       setAlternatives([]);
       return;
     }
     let cancelled = false;
-    getSaferAlternatives({ productName: result.productName, lookupKey: result.lookupKey, limit: ALTERNATIVES_POOL_SIZE }).then((alts) => {
+    const fetchAlternatives = (result.overallScore || 0) < 65 ? getSaferAlternatives : getSimilarProducts;
+    fetchAlternatives({ productName: result.productName, lookupKey: result.lookupKey, limit: ALTERNATIVES_POOL_SIZE }).then((alts) => {
       if (!cancelled) setAlternatives(alts);
     });
     return () => { cancelled = true; };
@@ -1052,20 +1055,23 @@ export default function Result() {
         </>
       )}
 
-      {/* Safer alternatives -- moved below the point where the user has
-          already seen why this product scored what it did (was right
-          under the score before), only for a genuinely low score, and
-          only when the catalog actually has a better-scoring product in
-          the same category to suggest. No AI call: same category-keyword
-          match Category.jsx browses by, filtered to a "Good"-or-better
-          score, so every suggestion here is a real, already-verified
-          product rather than something a model guessed at. */}
+      {/* Safer alternatives (low score) or Similar products (everything
+          else) -- moved below the point where the user has already seen
+          why this product scored what it did (was right under the score
+          before), and only when the catalog actually has something in
+          the same category to show. No AI call: same category-keyword
+          match Category.jsx browses by -- a real, already-verified
+          product either way, never something a model guessed at. Keeps
+          the Result page from dead-ending after a good score instead of
+          only ever nudging away from a bad one. */}
       {view === 'overview' && rankedAlternatives.length > 0 && (
         <>
           <SectionHeader>
             {activeProfile
               ? t('betterOptionsFor', { name: activeProfile.nickname })
-              : t('saferAlternatives')}
+              : (result.overallScore || 0) < 65
+                ? t('saferAlternatives')
+                : t('similarProducts')}
           </SectionHeader>
           <div className="flex gap-3 overflow-x-auto px-4 pb-1" style={{ scrollbarWidth: 'none' }}>
             {rankedAlternatives.map((item) => (

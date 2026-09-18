@@ -164,6 +164,7 @@ export const STRINGS = {
 
     saferAlternatives: 'Safer alternatives in this category',
     betterOptionsFor: 'Better options for {name}',
+    similarProducts: 'Similar products in this category',
 
     shareOnWhatsApp: 'Share on WhatsApp',
     shareMessage: 'I checked *{name}* on FoodGuard India — it scored *{score}/100 ({verdict})*.',
@@ -388,6 +389,7 @@ export const STRINGS = {
     estimatedQtyNote: 'इस लेबल पर हर सामग्री की सटीक मात्रा नहीं दी गई है, इसलिए स्कोर का कुछ हिस्सा सही अंदाज़े पर आधारित है, पक्के आंकड़ों पर नहीं।',
 
     saferAlternatives: 'इस कैटेगरी में बेहतर विकल्प',
+    similarProducts: 'इस कैटेगरी के अन्य प्रोडक्ट्स',
 
     tabOverview: 'ओवरव्यू',
     tabIngredients: 'सामग्री ({count})',

@@ -248,14 +248,15 @@ function findCategoryForProduct(productName) {
 const SAFE_SCORE_THRESHOLD = 65;
 
 /**
- * Better-scoring products in the same category as a low-scoring one --
- * the Result page's "Safer alternatives" section. Deliberately not an
- * AI call: every candidate already has a real, verified score sitting
- * in the catalog, so picking by category + score is both free and more
- * trustworthy than asking a model to name a product that may not even
- * be in our database.
+ * Shared by getSaferAlternatives and getSimilarProducts below -- both
+ * are "other real, already-scored products in this same category",
+ * they just differ on whether a minimum score is required. Deliberately
+ * not an AI call: every candidate already has a real, verified score
+ * sitting in the catalog, so picking by category (+ score, when asked)
+ * is both free and more trustworthy than asking a model to name a
+ * product that may not even be in our database.
  */
-export async function getSaferAlternatives({ productName, lookupKey, limit = 3 }) {
+async function getCategoryProducts({ productName, lookupKey, limit, minScore }) {
   if (!isSupabaseConfigured) return [];
 
   const category = findCategoryForProduct(productName);
@@ -268,7 +269,15 @@ export async function getSaferAlternatives({ productName, lookupKey, limit = 3 }
     .select('lookup_key, product_name, report')
     .or(orFilter)
     .neq('lookup_key', lookupKey || '')
-    .limit(60); // score lives inside the report JSON, so filter/sort/slice client-side below
+    // Ordered server-side by score -- a category like "chocolates" has
+    // 250+ real rows, far more than the 60 this fetches, so without an
+    // explicit order Postgres hands back an arbitrary 60 that can miss
+    // every single qualifying (score >= minScore) row purely by chance.
+    // Confirmed live: the exact same query with no order intermittently
+    // returned zero safer alternatives for a real low-scoring product
+    // that genuinely had several in the catalog.
+    .order('report->overallScore', { ascending: false })
+    .limit(60); // score lives inside the report JSON, so filter/slice client-side below
 
   if (error || !data) return [];
 
@@ -288,9 +297,27 @@ export async function getSaferAlternatives({ productName, lookupKey, limit = 3 }
       ingredients: row.report?.ingredients || [],
       realNutrients: row.report?.realNutrients || null,
     }))
-    .filter((p) => typeof p.score === 'number' && p.score >= SAFE_SCORE_THRESHOLD)
+    .filter((p) => typeof p.score === 'number' && (minScore == null || p.score >= minScore))
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
+}
+
+/** Better-scoring products in the same category as a low-scoring one -- the Result page's "Safer alternatives" section. */
+export async function getSaferAlternatives({ productName, lookupKey, limit = 3 }) {
+  return getCategoryProducts({ productName, lookupKey, limit, minScore: SAFE_SCORE_THRESHOLD });
+}
+
+/**
+ * Other products in the same category, any score -- shown instead of
+ * getSaferAlternatives when the scanned product is already "Good" or
+ * better, so the Result page always has something to keep browsing to
+ * rather than dead-ending after a good score. No score filter: this is
+ * plain discovery, not a health suggestion, so a lower-scoring product
+ * can still show up here (each card shows its own real score, so
+ * nothing dishonest is implied either way).
+ */
+export async function getSimilarProducts({ productName, lookupKey, limit = 3 }) {
+  return getCategoryProducts({ productName, lookupKey, limit, minScore: null });
 }
 
 /**
