@@ -7,7 +7,7 @@
 // of it). saveReport()'s upsert-on-lookup_key would instead leave the
 // old row behind as an orphaned duplicate in that case.
 import { supabase, isSupabaseConfigured } from './supabaseClient.js';
-import { barcodeKey } from './productCache.js';
+import { barcodeKey, upsertProductNutrition } from './productCache.js';
 import { logActivity } from './adminActivityRepo.js';
 
 function requireSupabase() {
@@ -123,6 +123,7 @@ export async function adminCreateProduct({ lookupKey, source, productName, ingre
     .select('id')
     .single();
   if (error) rethrowFriendly(error);
+  await upsertProductNutrition(lookupKey, productName, report);
   logActivity({
     action: 'create',
     targetType: 'product',
@@ -156,6 +157,19 @@ export async function adminUpdateProduct(id, { lookupKey, source, productName, i
   requireSupabase();
   const { data: before } = await supabase.from('product_reports').select('product_name, lookup_key, ingredients_text, report').eq('id', id).maybeSingle();
 
+  // product_nutrition.lookup_key is a foreign key into product_reports
+  // (no ON UPDATE CASCADE) -- if this edit changes the barcode/lookup
+  // key, the old nutrition row would be left pointing at a value that's
+  // about to stop existing, and Postgres rejects the parent update
+  // outright ("violates foreign key constraint ... on table
+  // product_nutrition"). Deleting it first, then re-creating it under
+  // the new key below, is simpler than a migration -- this table is
+  // documented as a bonus dashboard mirror, not a read path anything
+  // depends on.
+  if (before && lookupKey !== before.lookup_key) {
+    await supabase.from('product_nutrition').delete().eq('lookup_key', before.lookup_key);
+  }
+
   const { error } = await supabase
     .from('product_reports')
     .update({
@@ -168,6 +182,12 @@ export async function adminUpdateProduct(id, { lookupKey, source, productName, i
     })
     .eq('id', id);
   if (error) rethrowFriendly(error);
+
+  // Keep the dashboard-mirror table current too -- not just on a
+  // lookup_key change (handled above), but on every save, the same way
+  // saveReport() does for a real scan. Harmless no-op when report has
+  // no realNutrients at all (see upsertProductNutrition's own guard).
+  await upsertProductNutrition(lookupKey, productName, report);
 
   const changes = before ? diffProductChange(before, { productName, lookupKey, ingredientsText, report }) : null;
   logActivity({ action: 'update', targetType: 'product', targetId: id, productName, details: changes && Object.keys(changes).length ? { changes } : null });

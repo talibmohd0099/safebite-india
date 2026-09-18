@@ -445,7 +445,7 @@ export async function deleteReport(lookupKey) {
  * in Supabase's dashboard instead of buried inside a jsonb column.
  * Best-effort, same as saveReport below: never blocks the user's report.
  */
-async function upsertProductNutrition(lookupKey, productName, report) {
+export async function upsertProductNutrition(lookupKey, productName, report) {
   const n = report?.realNutrients;
   if (!n) return;
 
