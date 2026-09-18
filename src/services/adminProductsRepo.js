@@ -196,8 +196,16 @@ export async function adminUpdateProduct(id, { lookupKey, source, productName, i
 export async function adminDeleteProduct(id, productName = null) {
   requireSupabase();
   const { data: before } = await supabase.from('product_reports').select('report').eq('id', id).maybeSingle();
-  const { error } = await supabase.from('product_reports').delete().eq('id', id);
+  // .select() after delete so we get back the actually-deleted rows --
+  // a missing RLS delete policy makes Postgres quietly filter the row
+  // out of the delete's target set, which PostgREST reports as a plain
+  // success (no error) even though nothing was removed. Confirmed live
+  // against product_reports itself (see the delete-policy migration).
+  const { data: deleted, error } = await supabase.from('product_reports').delete().eq('id', id).select('id');
   if (error) throw new Error(error.message);
+  if (!deleted || deleted.length === 0) {
+    throw new Error('Delete had no effect — the database rejected it silently (likely a missing RLS delete policy).');
+  }
   logActivity({
     action: 'delete',
     targetType: 'product',
