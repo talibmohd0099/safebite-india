@@ -171,13 +171,16 @@ function SourcePhotoSlot({ label, photo, onFile, onPaste, onRemove }) {
   );
 }
 
-export default function AdminProductForm() {
+export default function AdminProductForm({ copyMode = false }) {
   const { id } = useParams();
-  const isEdit = Boolean(id);
+  // A copy loads the same source row as edit mode but saves as a brand
+  // new row (see handleSave) -- so for every "am I editing an existing
+  // product" decision below, a copy counts as NOT editing.
+  const isEdit = Boolean(id) && !copyMode;
   const navigate = useNavigate();
   const heroFileInputRef = useRef(null);
 
-  const [loadingExisting, setLoadingExisting] = useState(isEdit);
+  const [loadingExisting, setLoadingExisting] = useState(Boolean(id));
   const [error, setError] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [extracting, setExtracting] = useState(false);
@@ -217,26 +220,40 @@ export default function AdminProductForm() {
   const [existingSource, setExistingSource] = useState(null);
 
   useEffect(() => {
-    if (!isEdit) return;
+    if (!id) return;
     adminGetProduct(id)
       .then((row) => {
         if (!row) { setError('Product not found.'); return; }
         const r = row.report || {};
-        setProductName(row.product_name || r.productName || '');
+        const name = row.product_name || r.productName || '';
+        setProductName(name);
         setBrand(r.brand || '');
-        setBarcode(row.lookup_key?.startsWith('barcode:') ? row.lookup_key.slice('barcode:'.length) : '');
-        setPackSize(r.packSize || '');
+        // Barcode, pack size and provenance are exactly the two things
+        // that DO differ between pack sizes of the same product -- a
+        // copy leaves these blank for the admin to fill in themselves,
+        // rather than inheriting the source product's own barcode.
+        if (!copyMode) {
+          setBarcode(row.lookup_key?.startsWith('barcode:') ? row.lookup_key.slice('barcode:'.length) : '');
+          setPackSize(r.packSize || '');
+          setExistingSource(row.source || null);
+        }
         setIngredientsText(row.ingredients_text || '');
-        setExistingSource(row.source || null);
         if (r.imageUrl) setPhotoDataUrl(r.imageUrl);
         if (r.nutritionPanel) setNutrients(r.nutritionPanel);
         else if (r.realNutrients) setNutrients(r.realNutrients);
         if (r.realNutrientsServingGrams) setServingGrams(r.realNutrientsServingGrams);
         setReport(r);
+        // The copy starts with the source product's exact name, so it
+        // WILL look like a duplicate -- surface that warning right away
+        // instead of waiting for the name field to be blurred, since the
+        // admin never has to touch that field to hit Save.
+        if (copyMode && name.trim()) {
+          adminFindByName(name.trim(), null).then(setNameDuplicate).catch(() => {});
+        }
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoadingExisting(false));
-  }, [id, isEdit]);
+  }, [id, copyMode]);
 
   // Live sanity-check on the ingredients text, reusing the exact same
   // checks analyzeText.js relies on (parseLabel/isBracketBalanced/
@@ -537,9 +554,30 @@ export default function AdminProductForm() {
 
   return (
     <AdminLayout>
-      <p className="text-[22px] font-bold tracking-tight mb-4" style={{ color: 'var(--label-1)' }}>
-        {isEdit ? 'Edit product' : 'Add new product'}
-      </p>
+      <div className="flex items-center justify-between gap-3 mb-1">
+        <p className="text-[22px] font-bold tracking-tight" style={{ color: 'var(--label-1)' }}>
+          {copyMode ? 'Copy product (as new)' : isEdit ? 'Edit product' : 'Add new product'}
+        </p>
+        {isEdit && (
+          <a
+            href={`#/admin/products/${id}/copy`}
+            target="_blank"
+            rel="noreferrer"
+            title="Open a copy of this product in a new tab -- for a different pack size that needs its own barcode"
+            className="tap-scale text-[12.5px] font-semibold px-3 py-2 rounded-[10px] flex-shrink-0"
+            style={{ background: 'var(--fill)', color: 'var(--label-2)' }}
+          >
+            📋 Copy as new product
+          </a>
+        )}
+      </div>
+      {copyMode ? (
+        <p className="text-[12.5px] mb-4 px-3 py-2 rounded-[10px]" style={{ background: 'var(--tint-bg)', color: 'var(--tint)' }}>
+          Name, ingredients, nutrition and photo copied from the source product. Enter this pack size's own barcode below, then save — this creates a separate new product.
+        </p>
+      ) : (
+        <div className="mb-3" />
+      )}
 
       <div className="grid gap-4" style={{ gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)' }}>
         <div>
@@ -750,7 +788,7 @@ export default function AdminProductForm() {
             className="tap-scale w-full py-3 rounded-[12px] text-[15px] font-semibold text-white"
             style={{ background: 'var(--v-very-healthy)', opacity: !report || saving ? 0.5 : 1 }}
           >
-            {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Save product'}
+            {saving ? 'Saving…' : isEdit ? 'Save changes' : copyMode ? 'Save as new product' : 'Save product'}
           </button>
         </div>
 

@@ -95,6 +95,7 @@ function AppShell() {
           <Route path="/admin/products" element={<AdminGuard><AdminProductList /></AdminGuard>} />
           <Route path="/admin/products/new" element={<AdminGuard><AdminProductForm /></AdminGuard>} />
           <Route path="/admin/products/:id/edit" element={<AdminGuard><AdminProductForm /></AdminGuard>} />
+          <Route path="/admin/products/:id/copy" element={<AdminGuard><AdminProductForm copyMode /></AdminGuard>} />
           <Route path="/admin/products/:id/history" element={<AdminGuard><AdminProductHistory /></AdminGuard>} />
           <Route path="/admin/flags" element={<AdminGuard><AdminFlagsList /></AdminGuard>} />
           <Route path="/admin/duplicates" element={<AdminGuard><AdminDuplicates /></AdminGuard>} />
