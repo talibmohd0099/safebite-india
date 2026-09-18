@@ -268,12 +268,32 @@ export async function extractIngredientsWithAI(productName, attributes) {
  * Scrape one product page into a blinkit_products row.
  * Returns { error } when there's nothing usable to save.
  */
+// A real found case (Habanero Jalapeno Cheese Dip + Habanero Zingy
+// Jalapeno Nachos Combo): Blinkit's own "Ingredients" attribute for a
+// combo listing only ever covers ONE of the bundled items -- the
+// resulting score/report would then silently represent just that one
+// item while its name and photo imply the whole bundle. " + " is
+// Blinkit's own consistent naming convention for joining two distinct
+// product names in a bundle listing (confirmed against the real
+// catalog: matches essentially every genuine multi-item combo, and
+// doesn't false-positive on single products that merely use the word
+// "combo" as marketing, e.g. "Orange Fruit Juice Combo With Pulp" --
+// a completely ordinary single juice, no "+" in its name). See
+// blinkit.combo.test.js for the real names this was checked against.
+export function isComboListing(productName) {
+  return / \+ /.test(productName || '');
+}
+
 export async function scrapeProduct(url, category, { useAI = false, useImageFallback = false } = {}) {
   const html = await fetchText(url);
   if (!html) return { error: 'fetch failed' };
 
   const productName = jsonField(html, 'product_name');
   if (!productName) return { error: 'no product name' };
+
+  if (isComboListing(productName)) {
+    return { error: 'combo listing (bundles multiple products)', productName };
+  }
 
   const attributes = allAttributes(html);
   let ingredients = attributes['Ingredients'] || null;
