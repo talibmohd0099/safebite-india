@@ -8,6 +8,15 @@ import { getScoreColor } from '../../utils/storage';
 import { CATEGORY_KEYWORDS } from '../../data/categoryKeywords';
 
 const PAGE_SIZE = 25;
+const FILTER_DEBOUNCE_MS = 400;
+
+// Real distinct values seen in product_reports.source. Note: OFF's own
+// discovery pipeline (discover-off-products.js) saves its rows with
+// source: 'barcode' too, since those products DO have real barcodes --
+// there's no way to tell "OFF-discovered" apart from "a real user
+// scanned this barcode" at this column, so this filter can't offer an
+// "off" option that doesn't already exist in the data.
+const SOURCES = ['barcode', 'blinkit', 'search', 'image', 'text'];
 
 function ScorePill({ score }) {
   if (typeof score !== 'number') return <span style={{ color: 'var(--label-3)' }}>—</span>;
@@ -22,11 +31,14 @@ function ScorePill({ score }) {
   );
 }
 
+const INITIAL_FILTERS = {
+  search: '', brand: '', categoryId: '', flaggedOnly: false,
+  source: '', scoreMin: '', scoreMax: '', barcode: '', hasBarcode: '',
+};
+
 export default function AdminProductList() {
-  const [search, setSearch] = useState('');
-  const [brand, setBrand] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [flaggedOnly, setFlaggedOnly] = useState(false);
+  const [filters, setFilters] = useState(INITIAL_FILTERS);
+  const setFilter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));
 
   const [rows, setRows] = useState([]);
   const [count, setCount] = useState(0);
@@ -34,20 +46,23 @@ export default function AdminProductList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const load = async (filters, pageValue) => {
+  const load = async (f, pageValue) => {
     setLoading(true);
     setError('');
     try {
       let lookupKeys = null;
-      if (filters.flaggedOnly) {
-        lookupKeys = await adminOpenFlaggedLookupKeys();
-      }
-      const category = CATEGORY_KEYWORDS.find((c) => c.id === filters.categoryId);
+      if (f.flaggedOnly) lookupKeys = await adminOpenFlaggedLookupKeys();
+      const category = CATEGORY_KEYWORDS.find((c) => c.id === f.categoryId);
       const { rows: r, count: c } = await adminListProducts({
-        search: filters.search,
-        brand: filters.brand,
+        search: f.search,
+        brand: f.brand,
         categoryKeywords: category?.keywords || null,
         lookupKeys,
+        source: f.source,
+        scoreMin: f.scoreMin !== '' ? Number(f.scoreMin) : null,
+        scoreMax: f.scoreMax !== '' ? Number(f.scoreMax) : null,
+        barcode: f.barcode,
+        hasBarcode: f.hasBarcode,
         limit: PAGE_SIZE,
         offset: pageValue * PAGE_SIZE,
       });
@@ -60,33 +75,26 @@ export default function AdminProductList() {
     }
   };
 
-  const currentFilters = () => ({ search, brand, categoryId, flaggedOnly });
-
-  useEffect(() => { load(currentFilters(), page); }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleFilterSubmit = (e) => {
-    e.preventDefault();
+  // One debounce for every filter -- typing in Product name/Brand/
+  // Barcode "auto fetches" (re-queries as you type) without a separate
+  // Apply button; a select/checkbox change waits the same short beat,
+  // which is unnoticeable for a click but avoids a double-fetch when
+  // several filters change together.
+  useEffect(() => {
     setPage(0);
-    load(currentFilters(), 0);
-  };
+    const timer = setTimeout(() => load(filters, 0), FILTER_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [filters]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleFlaggedToggle = (checked) => {
-    setFlaggedOnly(checked);
-    setPage(0);
-    load({ ...currentFilters(), flaggedOnly: checked }, 0);
-  };
-
-  const handleCategoryChange = (value) => {
-    setCategoryId(value);
-    setPage(0);
-    load({ ...currentFilters(), categoryId: value }, 0);
-  };
+  useEffect(() => {
+    if (page > 0) load(filters, page);
+  }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDelete = async (id, name) => {
     if (!window.confirm(`Delete "${name || 'this product'}"? This can't be undone.`)) return;
     try {
       await adminDeleteProduct(id, name);
-      load(currentFilters(), page);
+      load(filters, page);
     } catch (err) {
       window.alert(err.message);
     }
@@ -109,44 +117,77 @@ export default function AdminProductList() {
         </Link>
       </div>
 
-      <form onSubmit={handleFilterSubmit} className="flex flex-wrap items-end gap-3 mb-4">
+      <div className="flex flex-wrap items-end gap-3 mb-2">
         <div className="flex-1 min-w-[200px]">
           <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--label-3)' }}>Product name</label>
           <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search…"
+            value={filters.search}
+            onChange={(e) => setFilter('search', e.target.value)}
+            placeholder="e.g. cad → Cadbury..."
             className="admin-field w-full px-3 py-2 rounded-[10px] text-[14px]"
           />
         </div>
         <div className="flex-1 min-w-[160px]">
           <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--label-3)' }}>Brand</label>
           <input
-            value={brand}
-            onChange={(e) => setBrand(e.target.value)}
+            value={filters.brand}
+            onChange={(e) => setFilter('brand', e.target.value)}
             placeholder="Any brand"
             className="admin-field w-full px-3 py-2 rounded-[10px] text-[14px]"
           />
         </div>
         <div className="min-w-[170px]">
           <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--label-3)' }}>Category</label>
-          <select
-            value={categoryId}
-            onChange={(e) => handleCategoryChange(e.target.value)}
-            className="admin-field w-full px-3 py-2 rounded-[10px] text-[14px]"
-          >
+          <select value={filters.categoryId} onChange={(e) => setFilter('categoryId', e.target.value)} className="admin-field w-full px-3 py-2 rounded-[10px] text-[14px]">
             <option value="">All categories</option>
             {CATEGORY_KEYWORDS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
           </select>
         </div>
+        <div className="min-w-[140px]">
+          <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--label-3)' }}>Source</label>
+          <select value={filters.source} onChange={(e) => setFilter('source', e.target.value)} className="admin-field w-full px-3 py-2 rounded-[10px] text-[14px]">
+            <option value="">Any source</option>
+            {SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3 mb-4">
+        <div className="min-w-[160px]">
+          <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--label-3)' }}>Score range</label>
+          <div className="flex items-center gap-1.5">
+            <input type="number" min="0" max="100" value={filters.scoreMin} onChange={(e) => setFilter('scoreMin', e.target.value)} placeholder="0" className="admin-field w-16 px-2 py-2 rounded-[10px] text-[14px]" />
+            <span style={{ color: 'var(--label-3)' }}>–</span>
+            <input type="number" min="0" max="100" value={filters.scoreMax} onChange={(e) => setFilter('scoreMax', e.target.value)} placeholder="100" className="admin-field w-16 px-2 py-2 rounded-[10px] text-[14px]" />
+          </div>
+        </div>
+        <div className="flex-1 min-w-[180px]">
+          <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--label-3)' }}>Barcode</label>
+          <input
+            value={filters.barcode}
+            onChange={(e) => setFilter('barcode', e.target.value)}
+            placeholder="Search by barcode number"
+            className="admin-field w-full px-3 py-2 rounded-[10px] text-[14px]"
+          />
+        </div>
+        <div className="min-w-[150px]">
+          <label className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--label-3)' }}>Barcode available</label>
+          <select value={filters.hasBarcode} onChange={(e) => setFilter('hasBarcode', e.target.value)} className="admin-field w-full px-3 py-2 rounded-[10px] text-[14px]">
+            <option value="">Any</option>
+            <option value="yes">Has barcode</option>
+            <option value="no">No barcode</option>
+          </select>
+        </div>
         <label className="flex items-center gap-2 px-3 py-2 rounded-[10px] text-[13px] font-semibold cursor-pointer" style={{ background: 'var(--fill)', color: 'var(--label-1)' }}>
-          <input type="checkbox" checked={flaggedOnly} onChange={(e) => handleFlaggedToggle(e.target.checked)} />
+          <input type="checkbox" checked={filters.flaggedOnly} onChange={(e) => setFilter('flaggedOnly', e.target.checked)} />
           Flagged only
         </label>
-        <button type="submit" className="tap-scale px-4 py-2 rounded-[10px] text-[13.5px] font-semibold" style={{ background: 'var(--tint-bg)', color: 'var(--tint)' }}>
-          Apply
-        </button>
-      </form>
+        {filters !== INITIAL_FILTERS && (
+          <button onClick={() => setFilters(INITIAL_FILTERS)} className="tap-scale text-[13px] font-semibold" style={{ color: 'var(--label-3)' }}>
+            Clear filters
+          </button>
+        )}
+      </div>
 
       {error && <p className="text-[13px] mb-3" style={{ color: 'var(--v-poor)' }}>{error}</p>}
       {loading && <p className="text-[13px]" style={{ color: 'var(--label-3)' }}>Loading…</p>}

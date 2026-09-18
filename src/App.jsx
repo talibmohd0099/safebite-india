@@ -107,7 +107,10 @@ function AppShell() {
 export default function App() {
   // Shown once per fresh load, like a native app's launch screen -- not
   // a one-time "first ever visit" flag, so it doesn't need localStorage.
-  const [showSplash, setShowSplash] = useState(true);
+  // Native-only: the web build has no equivalent "cold start" moment to
+  // paper over (Vite/the browser already shows its own loading state),
+  // so it would just be a few extra seconds of green screen for nothing.
+  const [showSplash, setShowSplash] = useState(() => Capacitor.isNativePlatform());
 
   // Unlike the splash screen, this genuinely is a one-time "first ever
   // visit" flag -- read once at startup so a returning user's very

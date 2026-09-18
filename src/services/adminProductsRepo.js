@@ -20,12 +20,22 @@ function requireSupabase() {
  * @param {string} [opts.brand] - matched against report->brand (case-insensitive contains)
  * @param {string[]} [opts.categoryKeywords] - OR-matched against product_name (see categoryKeywords.js)
  * @param {string[]} [opts.lookupKeys] - restrict to exactly these lookup_keys (the flagged-only filter)
+ * @param {string} [opts.source] - exact match on product_reports.source ('barcode'|'blinkit'|'search'|'image'|'text')
+ * @param {number} [opts.scoreMin]
+ * @param {number} [opts.scoreMax]
+ * @param {string} [opts.barcode] - matched against the digits inside a "barcode:..." lookup_key
+ * @param {'yes'|'no'} [opts.hasBarcode] - whether lookup_key starts with "barcode:" at all
  */
 export async function adminListProducts({
   search = '',
   brand = '',
   categoryKeywords = null,
   lookupKeys = null,
+  source = '',
+  scoreMin = null,
+  scoreMax = null,
+  barcode = '',
+  hasBarcode = '',
   limit = 30,
   offset = 0,
 } = {}) {
@@ -50,6 +60,16 @@ export async function adminListProducts({
     if (lookupKeys.length === 0) return { rows: [], count: 0 }; // nothing is flagged -- an empty IN() would match everything instead
     query = query.in('lookup_key', lookupKeys);
   }
+
+  if (source) query = query.eq('source', source);
+  if (typeof scoreMin === 'number') query = query.gte('report->overallScore', scoreMin);
+  if (typeof scoreMax === 'number') query = query.lte('report->overallScore', scoreMax);
+
+  const cleanedBarcode = barcode.trim();
+  if (cleanedBarcode) query = query.ilike('lookup_key', `barcode:%${cleanedBarcode}%`);
+
+  if (hasBarcode === 'yes') query = query.ilike('lookup_key', 'barcode:%');
+  else if (hasBarcode === 'no') query = query.not('lookup_key', 'ilike', 'barcode:%');
 
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);
