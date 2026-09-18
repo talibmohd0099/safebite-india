@@ -18,35 +18,6 @@ const FILTER_DEBOUNCE_MS = 400;
 // "off" option that doesn't already exist in the data.
 const SOURCES = ['barcode', 'blinkit', 'search', 'image', 'text'];
 
-// Opens Google's AI Mode (udm=50 -- a real, documented Google Search
-// parameter) with a barcode-finding QUESTION as the query, or Google
-// Lens's own "search by image URL" endpoint when this product has a
-// real (non-data:) photo URL -- a manual research aid for whatever
-// the automated fetches (barcode/photo extraction) couldn't find.
-// Lens's own upload-by-url endpoint has no text-query parameter, so
-// the same question is put on the clipboard either way, ready to
-// paste into Lens's search box (or as a follow-up in AI Mode) once
-// the page is open.
-function buildBarcodeCommand(row) {
-  const name = row.product_name || '';
-  const brand = row.report?.brand;
-  return `Find the barcode number (EAN/UPC/GTIN) for "${name}"${brand ? ` by ${brand}` : ''}`;
-}
-
-function searchOnGoogleAi(row) {
-  const command = buildBarcodeCommand(row);
-  const imageUrl = row.report?.imageUrl;
-  const isRealUrl = typeof imageUrl === 'string' && /^https?:\/\//i.test(imageUrl);
-  const url = isRealUrl
-    ? `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(imageUrl)}`
-    : `https://www.google.com/search?q=${encodeURIComponent(command)}&udm=50`;
-  // Open first, synchronously in direct response to the click -- some
-  // browsers treat a window.open after an awaited clipboard call as no
-  // longer "in response to a user gesture" and silently block it.
-  window.open(url, '_blank', 'noopener,noreferrer');
-  navigator.clipboard?.writeText(command).catch(() => {});
-}
-
 function ScorePill({ score }) {
   if (typeof score !== 'number') return <span style={{ color: 'var(--label-3)' }}>—</span>;
   const { label, color, bg } = getScoreColor(score);
@@ -270,7 +241,7 @@ export default function AdminProductList() {
         <div className="rounded-[14px] overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--separator)' }}>
           <div
             className="grid gap-3 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
-            style={{ gridTemplateColumns: '48px 2.2fr 1fr 1fr 1fr 100px 205px', color: 'var(--label-3)', borderBottom: '1px solid var(--separator)' }}
+            style={{ gridTemplateColumns: '48px 2.2fr 1fr 1fr 1fr 100px 175px', color: 'var(--label-3)', borderBottom: '1px solid var(--separator)' }}
           >
             <span></span>
             <span>Product</span>
@@ -286,7 +257,7 @@ export default function AdminProductList() {
               <div
                 key={row.id}
                 className="grid gap-3 px-4 py-2.5 items-center text-[13.5px]"
-                style={{ gridTemplateColumns: '48px 2.2fr 1fr 1fr 1fr 100px 205px', borderBottom: '1px solid var(--separator)' }}
+                style={{ gridTemplateColumns: '48px 2.2fr 1fr 1fr 1fr 100px 175px', borderBottom: '1px solid var(--separator)' }}
               >
                 <div className="w-9 h-9 rounded-[8px] overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: 'var(--fill)' }}>
                   {r.imageUrl ? <img src={r.imageUrl} alt="" className="w-full h-full object-cover" /> : <span style={{ fontSize: 16 }}>🍽️</span>}
@@ -302,14 +273,6 @@ export default function AdminProductList() {
                   {row.updated_at ? new Date(row.updated_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
                 </span>
                 <div className="flex items-center gap-2.5 justify-end">
-                  <button
-                    onClick={() => searchOnGoogleAi(row)}
-                    title="Copy a 'find the barcode' question & search on Google AI Mode / Lens"
-                    className="tap-scale text-[15px]"
-                    style={{ color: 'var(--label-3)' }}
-                  >
-                    🔍
-                  </button>
                   <Link to={`/admin/products/${row.id}/history`} title="History" className="tap-scale text-[15px]" style={{ color: 'var(--label-3)' }}>🕐</Link>
                   <Link to={`/admin/products/${row.id}/edit`} className="tap-scale text-[13px] font-semibold" style={{ color: 'var(--tint)' }}>Edit</Link>
                   <button onClick={() => handleDelete(row.id, row.product_name)} className="tap-scale text-[13px] font-semibold" style={{ color: 'var(--v-poor)' }}>Delete</button>

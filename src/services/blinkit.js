@@ -306,6 +306,16 @@ export async function scrapeProduct(url, category, { useAI = false, useImageFall
     if (attributes[field]) nutrition[field] = attributes[field];
   }
 
+  // "Unit (with options)" is the human-readable pack size shown to a
+  // shopper on the page itself (e.g. "500 g", "2 x 2 kg") -- falls back
+  // to the plain net weight when that specific attribute isn't there.
+  // Matters because different pack sizes of the same product have
+  // different real barcodes (see AdminProductForm.jsx's barcode-search
+  // helper) -- without this, nobody editing a Blinkit-scraped product
+  // (which never has a barcode of its own) can tell which size they're
+  // even looking at.
+  const packSize = attributes['Unit (with options)'] || attributes['Net Weight (Without Packaging)'] || null;
+
   return {
     viaAI,
     viaImage,
@@ -316,6 +326,7 @@ export async function scrapeProduct(url, category, { useAI = false, useImageFall
       category,
       image_url: jsonField(html, 'image_url'),
       nutrition,
+      pack_size: packSize,
       fssai_license: attributes['FSSAI License'] || null,
       source: 'blinkit',
       scraped_at: new Date().toISOString(),

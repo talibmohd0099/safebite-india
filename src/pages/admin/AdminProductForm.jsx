@@ -29,6 +29,32 @@ import { imageFileFromClipboard, compressImageToDataUrl } from '../../utils/admi
 const VERDICTS = ['Excellent', 'Good', 'Moderately Healthy', 'Poor', 'Very Poor'];
 const FIELD = 'admin-field w-full px-3.5 py-2.5 rounded-[12px] text-[15px]';
 
+// Opens Google's AI Mode (udm=50 -- a real, documented Google Search
+// parameter) with a barcode-finding QUESTION as the query, or Google
+// Lens's own "search by image URL" endpoint when there's a real
+// (non-data:) photo URL -- a manual research aid for whatever the
+// barcode/photo auto-fetch couldn't find. Lens's own upload-by-url
+// endpoint has no text-query parameter, so the same question also
+// goes on the clipboard, ready to paste into Lens's search box (or as
+// a follow-up in AI Mode) once the page is open. Pack size is
+// included whenever it's known, since different pack sizes of the
+// same product have different real barcodes -- without it, the
+// question (and whoever's reading the answer) can't tell which one
+// this product actually is.
+function searchBarcodeOnGoogleAi({ productName, brand, packSize, photoDataUrl }) {
+  const sizePart = packSize?.trim() ? ` (${packSize.trim()})` : '';
+  const command = `Find the barcode number (EAN/UPC/GTIN) for "${productName}"${sizePart}${brand?.trim() ? ` by ${brand.trim()}` : ''}`;
+  const isRealUrl = typeof photoDataUrl === 'string' && /^https?:\/\//i.test(photoDataUrl);
+  const url = isRealUrl
+    ? `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(photoDataUrl)}`
+    : `https://www.google.com/search?q=${encodeURIComponent(command)}&udm=50`;
+  // Open first, synchronously in direct response to the click -- some
+  // browsers treat a window.open after an awaited clipboard call as no
+  // longer "in response to a user gesture" and silently block it.
+  window.open(url, '_blank', 'noopener,noreferrer');
+  navigator.clipboard?.writeText(command).catch(() => {});
+}
+
 // The 4 keys analyzeText.js's nutrientsInfo actually scores against
 // (dailyHabitCheck.js's NUTRIENT_LIMITS), plus the rest kept purely for
 // a complete, displayable nutrition record -- same fields Blinkit
@@ -160,6 +186,12 @@ export default function AdminProductForm() {
   const [productName, setProductName] = useState('');
   const [brand, setBrand] = useState('');
   const [barcode, setBarcode] = useState('');
+  // "500 g", "2 x 2 kg" -- as printed on the pack. Auto-filled going
+  // forward for Blinkit-scraped products (blinkit.js), typeable by
+  // hand otherwise. See searchBarcodeOnGoogleAi's own comment for why
+  // this matters: different pack sizes of the same product have
+  // different real barcodes.
+  const [packSize, setPackSize] = useState('');
   const [ingredientsText, setIngredientsText] = useState('');
 
   // The hero/display photo -- what actually gets saved as report.imageUrl.
@@ -193,6 +225,7 @@ export default function AdminProductForm() {
         setProductName(row.product_name || r.productName || '');
         setBrand(r.brand || '');
         setBarcode(row.lookup_key?.startsWith('barcode:') ? row.lookup_key.slice('barcode:'.length) : '');
+        setPackSize(r.packSize || '');
         setIngredientsText(row.ingredients_text || '');
         setExistingSource(row.source || null);
         if (r.imageUrl) setPhotoDataUrl(r.imageUrl);
@@ -412,7 +445,8 @@ export default function AdminProductForm() {
         brand.trim() || undefined,
         null,
         photoDataUrl || undefined,
-        buildNutrientsInfo()
+        buildNutrientsInfo(),
+        packSize.trim() || undefined
       );
       setReport(result.report);
     } catch (err) {
@@ -449,6 +483,7 @@ export default function AdminProductForm() {
       productName: productName.trim(),
       brand: brand.trim() || null,
       imageUrl: photoDataUrl || null,
+      packSize: packSize.trim() || null,
     });
     setReport({ ...report, ...recalculated });
   };
@@ -467,6 +502,7 @@ export default function AdminProductForm() {
         productName: productName.trim(),
         brand: brand.trim() || null,
         imageUrl: photoDataUrl || null,
+        packSize: packSize.trim() || null,
         nutritionPanel: buildNutritionPanel(),
       };
       const lookupKey = barcode.trim() ? barcodeKey(barcode.trim()) : textKey(ingredientsText.trim());
@@ -520,12 +556,33 @@ export default function AdminProductForm() {
                 <input value={brand} onChange={(e) => setBrand(e.target.value)} className={FIELD} />
               </div>
               <div>
+                <label className="block text-[12px] font-semibold mb-1" style={{ color: 'var(--label-3)' }}>Pack size</label>
+                <input value={packSize} onChange={(e) => setPackSize(e.target.value)} placeholder="e.g. 500 g, 2 x 2 kg" className={FIELD} />
+              </div>
+            </div>
+
+            <div className="flex items-end gap-2 mt-3 mb-1">
+              <div className="flex-1">
                 <label className="block text-[12px] font-semibold mb-1" style={{ color: 'var(--label-3)' }}>
                   Barcode (optional) {fetchingBarcode && <span style={{ color: 'var(--tint)' }}>— checking Open Food Facts…</span>}
                 </label>
                 <input value={barcode} onChange={(e) => setBarcode(e.target.value)} onBlur={handleBarcodeBlur} placeholder="Type or scan — auto-fills from Open Food Facts if known" className={FIELD} />
               </div>
+              <button
+                type="button"
+                onClick={() => searchBarcodeOnGoogleAi({ productName: productName.trim() || '(unnamed)', brand, packSize, photoDataUrl })}
+                title="Copy a 'find the barcode' question & search on Google AI Mode / Lens"
+                className="tap-scale flex-shrink-0 px-3 rounded-[12px]"
+                style={{ background: 'var(--fill)', height: 46 }}
+              >
+                🔍
+              </button>
             </div>
+            {packSize.trim() && (
+              <p className="text-[11.5px] mb-1" style={{ color: 'var(--v-moderate)' }}>
+                ⚠ Different pack sizes have different real barcodes — make sure whatever you enter matches "{packSize.trim()}", not another size.
+              </p>
+            )}
             <DuplicateWarning match={barcodeDuplicate} label="This barcode is already used by" blocking />
 
             <label className="block text-[12px] font-semibold mb-1 mt-3" style={{ color: 'var(--label-3)' }}>Ingredients text *</label>

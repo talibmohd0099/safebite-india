@@ -75,7 +75,8 @@ async function generateWithRetry(product) {
         product.brand,
         product.off_ingredients,
         product.image_url,
-        product.nutrients_info
+        product.nutrients_info,
+        product.pack_size
       );
       return { report, transient: false };
     } catch (err) {
@@ -114,6 +115,7 @@ function normalizeBlinkitProduct(row) {
     off_ingredients: null,
     image_url: row.image_url,
     nutrients_info: extractNutrientsForHabitCheck(row.nutrition),
+    pack_size: row.pack_size || null,
     markGenerated: () => markBlinkitReportGenerated(row.id),
   };
 }

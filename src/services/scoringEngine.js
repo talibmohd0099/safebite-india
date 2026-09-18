@@ -156,7 +156,7 @@ function recommendationFor(score) {
  * Build a full product report from resolved ingredients (the output of
  * ingredientLibrary.resolveIngredients). No AI call.
  */
-export function buildReport(ingredients, { productName, brand, imageUrl } = {}) {
+export function buildReport(ingredients, { productName, brand, imageUrl, packSize } = {}) {
   const score = computeScore(ingredients);
   const verdict = verdictFor(score);
 
@@ -198,6 +198,7 @@ export function buildReport(ingredients, { productName, brand, imageUrl } = {}) 
     productName: productName || 'Unknown Product',
     brand: brand || null,
     imageUrl: imageUrl || null,
+    packSize: packSize || null,
     overallScore: score,
     verdict,
     summary: buildSummary({ verdict, harmful, concerning, ingredients, plural }),

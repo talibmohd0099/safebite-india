@@ -33,8 +33,16 @@ import { buildDailyHabitCheck, isSmallPortionFood } from './dailyHabitCheck.js';
  * caller has no real numbers for a product (e.g. pasted/photographed
  * text with no nutrition panel), it's simply omitted and that section
  * doesn't appear.
+ *
+ * packSize (optional) -- the human-readable pack size as printed on
+ * the pack ("500 g", "2 x 2 kg"), when the caller happens to know it
+ * (currently only Blinkit's scraper, see blinkit.js). Purely
+ * descriptive -- stored on the report so it's visible when someone's
+ * trying to find/verify this exact product's real barcode later,
+ * since different pack sizes of the same product have different
+ * barcodes.
  */
-export async function analyzeText(rawText, productName, brand, offIngredients, imageUrl, nutrientsInfo) {
+export async function analyzeText(rawText, productName, brand, offIngredients, imageUrl, nutrientsInfo, packSize) {
   // Only for parsing -- the caller keeps showing the user their real,
   // original scanned/typed text regardless of what happens here.
   let textToParse = rawText;
@@ -120,7 +128,7 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
     throw new Error(`This doesn't look like a real ingredients list — a large share of what was found (${examples}) isn't a recognized food ingredient. Please check the text and try again.`);
   }
 
-  const report = buildReport(ingredients, { productName, brand, imageUrl });
+  const report = buildReport(ingredients, { productName, brand, imageUrl, packSize });
   report.allergens = allergens;
 
   // Real, already-published nutrition-panel numbers (Open Food Facts or
