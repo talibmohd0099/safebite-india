@@ -1,5 +1,5 @@
 // src/pages/admin/AdminProductList.jsx
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AdminLayout from './AdminLayout';
 import { adminListProducts, adminDeleteProduct } from '../../services/adminProductsRepo';
@@ -36,15 +36,42 @@ const INITIAL_FILTERS = {
   source: '', scoreMin: '', scoreMax: '', barcode: '', hasBarcode: '',
 };
 
+// Persisted across navigating to Edit and back, or closing the tab
+// entirely -- without this, every trip to edit one product from a
+// filtered list meant re-typing the same filters again on return.
+// localStorage rather than the URL: simpler, and this page is never
+// meant to be shared/bookmarked with a particular filter baked in.
+const FILTERS_STORAGE_KEY = 'foodguard-admin-product-filters';
+
+function loadStoredFilterState() {
+  try {
+    const raw = localStorage.getItem(FILTERS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return { filters: { ...INITIAL_FILTERS, ...parsed.filters }, page: Number(parsed.page) || 0 };
+  } catch {
+    return null;
+  }
+}
+
 export default function AdminProductList() {
-  const [filters, setFilters] = useState(INITIAL_FILTERS);
+  const [filters, setFilters] = useState(() => loadStoredFilterState()?.filters || INITIAL_FILTERS);
   const setFilter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));
 
   const [rows, setRows] = useState([]);
   const [count, setCount] = useState(0);
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(() => loadStoredFilterState()?.page || 0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({ filters, page }));
+    } catch {
+      // Private-mode/blocked storage -- filters just won't survive a
+      // navigation in that case, same as before this feature existed.
+    }
+  }, [filters, page]);
 
   const load = async (f, pageValue) => {
     setLoading(true);
@@ -79,16 +106,31 @@ export default function AdminProductList() {
   // Barcode "auto fetches" (re-queries as you type) without a separate
   // Apply button; a select/checkbox change waits the same short beat,
   // which is unnoticeable for a click but avoids a double-fetch when
-  // several filters change together.
-  useEffect(() => {
-    setPage(0);
-    const timer = setTimeout(() => load(filters, 0), FILTER_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [filters]); // eslint-disable-line react-hooks/exhaustive-deps
+  // several filters change together. A page-only change (Prev/Next)
+  // fetches immediately, no debounce. The very first run (mount, with
+  // filters/page possibly restored from localStorage) also fetches
+  // immediately, at whatever page was restored, instead of resetting.
+  const prevFiltersRef = useRef(filters);
+  const mountedRef = useRef(false);
 
   useEffect(() => {
-    if (page > 0) load(filters, page);
-  }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
+    const filtersChanged = prevFiltersRef.current !== filters;
+    prevFiltersRef.current = filters;
+
+    // A genuine filter change while deeper than page 1 -- reset to
+    // page 0 first (the effect re-runs from the `page` dependency
+    // below) rather than fetching page 5 of a completely different
+    // filtered set.
+    if (filtersChanged && mountedRef.current && page !== 0) {
+      setPage(0);
+      return;
+    }
+
+    const delay = mountedRef.current && filtersChanged ? FILTER_DEBOUNCE_MS : 0;
+    const timer = setTimeout(() => load(filters, page), delay);
+    mountedRef.current = true;
+    return () => clearTimeout(timer);
+  }, [filters, page]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDelete = async (id, name) => {
     if (!window.confirm(`Delete "${name || 'this product'}"? This can't be undone.`)) return;

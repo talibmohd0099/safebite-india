@@ -650,7 +650,11 @@ export default function AdminProductForm() {
                   Recalculate score
                 </button>
               </div>
-              <div className="rounded-[10px] overflow-hidden" style={{ border: '1px solid var(--separator)' }}>
+              {/* Capped height + internal scroll rather than letting the
+                  page itself grow -- a product with 20+ ingredients
+                  (real examples run past 30) would otherwise push the
+                  photo/nutrition/save button far down the page. */}
+              <div className="rounded-[10px] overflow-y-auto" style={{ border: '1px solid var(--separator)', maxHeight: 420 }}>
                 {report.ingredients.map((ing, i) => (
                   <div key={i} className="grid gap-2 px-3 py-2" style={{ gridTemplateColumns: '1.4fr 1fr 70px 1.6fr', borderBottom: i < report.ingredients.length - 1 ? '1px solid var(--separator)' : 'none' }}>
                     <span className="text-[12.5px] font-semibold truncate self-center" style={{ color: 'var(--label-1)' }}>{ing.name}</span>
