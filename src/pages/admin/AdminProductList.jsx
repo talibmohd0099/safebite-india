@@ -199,7 +199,7 @@ export default function AdminProductList() {
         <div className="rounded-[14px] overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--separator)' }}>
           <div
             className="grid gap-3 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
-            style={{ gridTemplateColumns: '48px 2.2fr 1fr 1fr 1fr 100px 130px', color: 'var(--label-3)', borderBottom: '1px solid var(--separator)' }}
+            style={{ gridTemplateColumns: '48px 2.2fr 1fr 1fr 1fr 100px 175px', color: 'var(--label-3)', borderBottom: '1px solid var(--separator)' }}
           >
             <span></span>
             <span>Product</span>
@@ -215,7 +215,7 @@ export default function AdminProductList() {
               <div
                 key={row.id}
                 className="grid gap-3 px-4 py-2.5 items-center text-[13.5px]"
-                style={{ gridTemplateColumns: '48px 2.2fr 1fr 1fr 1fr 100px 130px', borderBottom: '1px solid var(--separator)' }}
+                style={{ gridTemplateColumns: '48px 2.2fr 1fr 1fr 1fr 100px 175px', borderBottom: '1px solid var(--separator)' }}
               >
                 <div className="w-9 h-9 rounded-[8px] overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: 'var(--fill)' }}>
                   {r.imageUrl ? <img src={r.imageUrl} alt="" className="w-full h-full object-cover" /> : <span style={{ fontSize: 16 }}>🍽️</span>}
@@ -231,6 +231,7 @@ export default function AdminProductList() {
                   {row.updated_at ? new Date(row.updated_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
                 </span>
                 <div className="flex items-center gap-3 justify-end">
+                  <Link to={`/admin/products/${row.id}/history`} title="History" className="tap-scale text-[15px]" style={{ color: 'var(--label-3)' }}>🕐</Link>
                   <Link to={`/admin/products/${row.id}/edit`} className="tap-scale text-[13px] font-semibold" style={{ color: 'var(--tint)' }}>Edit</Link>
                   <button onClick={() => handleDelete(row.id, row.product_name)} className="tap-scale text-[13px] font-semibold" style={{ color: 'var(--v-poor)' }}>Delete</button>
                 </div>

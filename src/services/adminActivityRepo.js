@@ -35,3 +35,16 @@ export async function adminListActivity({ limit = 60 } = {}) {
   if (error) throw new Error(error.message);
   return data || [];
 }
+
+/** Every logged change for one product, oldest first -- the "History" page (see AdminProductHistory.jsx). */
+export async function adminListActivityForProduct(targetId) {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase
+    .from('admin_activity_log')
+    .select('*')
+    .eq('target_type', 'product')
+    .eq('target_id', String(targetId))
+    .order('created_at', { ascending: true });
+  if (error) throw new Error(error.message);
+  return data || [];
+}

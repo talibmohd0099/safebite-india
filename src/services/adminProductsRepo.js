@@ -123,12 +123,39 @@ export async function adminCreateProduct({ lookupKey, source, productName, ingre
     .select('id')
     .single();
   if (error) rethrowFriendly(error);
-  logActivity({ action: 'create', targetType: 'product', targetId: data.id, productName });
+  logActivity({
+    action: 'create',
+    targetType: 'product',
+    targetId: data.id,
+    productName,
+    details: { score: report?.overallScore ?? null, verdict: report?.verdict ?? null },
+  });
   return data.id;
+}
+
+/**
+ * Field-by-field [before, after] pairs for whatever actually changed --
+ * this is what makes the history page useful ("Score: 45 → 60"),
+ * rather than just "someone edited this at some point".
+ */
+function diffProductChange(before, after) {
+  const changes = {};
+  const add = (key, beforeVal, afterVal) => {
+    if (beforeVal !== afterVal) changes[key] = [beforeVal ?? null, afterVal ?? null];
+  };
+  add('productName', before.product_name, after.productName);
+  add('barcode', before.lookup_key, after.lookupKey);
+  add('score', before.report?.overallScore, after.report?.overallScore);
+  add('verdict', before.report?.verdict, after.report?.verdict);
+  add('brand', before.report?.brand, after.report?.brand);
+  if (before.ingredients_text !== after.ingredientsText) changes.ingredientsText = 'changed';
+  return changes;
 }
 
 export async function adminUpdateProduct(id, { lookupKey, source, productName, ingredientsText, report }) {
   requireSupabase();
+  const { data: before } = await supabase.from('product_reports').select('product_name, lookup_key, ingredients_text, report').eq('id', id).maybeSingle();
+
   const { error } = await supabase
     .from('product_reports')
     .update({
@@ -141,14 +168,23 @@ export async function adminUpdateProduct(id, { lookupKey, source, productName, i
     })
     .eq('id', id);
   if (error) rethrowFriendly(error);
-  logActivity({ action: 'update', targetType: 'product', targetId: id, productName });
+
+  const changes = before ? diffProductChange(before, { productName, lookupKey, ingredientsText, report }) : null;
+  logActivity({ action: 'update', targetType: 'product', targetId: id, productName, details: changes && Object.keys(changes).length ? { changes } : null });
 }
 
 export async function adminDeleteProduct(id, productName = null) {
   requireSupabase();
+  const { data: before } = await supabase.from('product_reports').select('report').eq('id', id).maybeSingle();
   const { error } = await supabase.from('product_reports').delete().eq('id', id);
   if (error) throw new Error(error.message);
-  logActivity({ action: 'delete', targetType: 'product', targetId: id, productName });
+  logActivity({
+    action: 'delete',
+    targetType: 'product',
+    targetId: id,
+    productName,
+    details: before ? { score: before.report?.overallScore ?? null } : null,
+  });
 }
 
 /**
