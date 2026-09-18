@@ -30,6 +30,10 @@ import Browse from './pages/Browse';
 import Category from './pages/Category';
 import PopularSearches from './pages/PopularSearches';
 import News from './pages/News';
+import AdminLogin from './pages/admin/AdminLogin';
+import AdminGuard from './pages/admin/AdminGuard';
+import AdminProductList from './pages/admin/AdminProductList';
+import AdminProductForm from './pages/admin/AdminProductForm';
 
 // The Android app's hardware/gesture back button doesn't do anything by
 // default in a Capacitor WebView -- without this, it would just sit
@@ -57,6 +61,41 @@ function AndroidBackButton() {
   return null;
 }
 
+// The admin panel is a separate internal tool sharing this same app
+// shell for convenience (one deploy, one build) -- it gets its own
+// plain layout, not the consumer app's header/bottom tab bar, and
+// isn't linked from anywhere in the public UI.
+function AppShell() {
+  const location = useLocation();
+  const isAdmin = location.pathname.startsWith('/admin');
+
+  return (
+    <div className="min-h-screen" style={{ background: 'var(--bg-grouped)' }}>
+      {!isAdmin && <Header />}
+      <main>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/result/:id" element={<Result />} />
+          <Route path="/result/:id/personal" element={<PersonalScore />} />
+          <Route path="/p/:reportId" element={<SharedProduct />} />
+          <Route path="/history" element={<History />} />
+          <Route path="/family" element={<Family />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/browse" element={<Browse />} />
+          <Route path="/category/:id" element={<Category />} />
+          <Route path="/popular" element={<PopularSearches />} />
+          <Route path="/news" element={<News />} />
+          <Route path="/admin" element={<AdminLogin />} />
+          <Route path="/admin/products" element={<AdminGuard><AdminProductList /></AdminGuard>} />
+          <Route path="/admin/products/new" element={<AdminGuard><AdminProductForm /></AdminGuard>} />
+          <Route path="/admin/products/:id/edit" element={<AdminGuard><AdminProductForm /></AdminGuard>} />
+        </Routes>
+      </main>
+      {!isAdmin && <BottomTabBar />}
+    </div>
+  );
+}
+
 export default function App() {
   // Shown once per fresh load, like a native app's launch screen -- not
   // a one-time "first ever visit" flag, so it doesn't need localStorage.
@@ -71,7 +110,7 @@ export default function App() {
   // three intro slides in front of it is a good way to lose them. They
   // still get onboarding the next time they open the app on its own.
   const [showOnboarding, setShowOnboarding] = useState(() => {
-    if (window.location.hash.startsWith('#/p/')) return false;
+    if (window.location.hash.startsWith('#/p/') || window.location.hash.startsWith('#/admin')) return false;
     try { return !localStorage.getItem(ONBOARDING_KEY); } catch { return false; }
   });
 
@@ -80,25 +119,7 @@ export default function App() {
       <FamilyProvider>
         <HashRouter>
           <AndroidBackButton />
-          <div className="min-h-screen" style={{ background: 'var(--bg-grouped)' }}>
-            <Header />
-            <main>
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/result/:id" element={<Result />} />
-                <Route path="/result/:id/personal" element={<PersonalScore />} />
-                <Route path="/p/:reportId" element={<SharedProduct />} />
-                <Route path="/history" element={<History />} />
-                <Route path="/family" element={<Family />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/browse" element={<Browse />} />
-                <Route path="/category/:id" element={<Category />} />
-                <Route path="/popular" element={<PopularSearches />} />
-                <Route path="/news" element={<News />} />
-              </Routes>
-            </main>
-            <BottomTabBar />
-          </div>
+          <AppShell />
           {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
           {!showSplash && showOnboarding && <Onboarding onDone={() => setShowOnboarding(false)} />}
         </HashRouter>
