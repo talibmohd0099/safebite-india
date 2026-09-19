@@ -71,6 +71,10 @@ async function fetchPubMedResearch() {
       link: `https://pubmed.ncbi.nlm.nih.gov/${id}/`,
       source: doc.fulljournalname || doc.source || 'PubMed',
       published_at: doc.sortpubdate ? new Date(doc.sortpubdate).toISOString() : null,
+      // esummary doesn't include the abstract (only esearch/esummary
+      // metadata) -- explicit null, not just an absent key, so every
+      // upserted row has the same column set regardless of type.
+      source_excerpt: null,
     });
   }
   return items;
@@ -102,6 +106,10 @@ async function fetchIndiaFoodNews() {
         link: article.link,
         source: article.source_id || null,
         published_at: article.pubDate ? new Date(article.pubDate).toISOString() : null,
+        // NewsData already includes this snippet in the same response --
+        // summarize-news.js uses it as extra context for a better summary
+        // than the bare headline alone would give.
+        source_excerpt: article.description || null,
       });
     }
     await new Promise((r) => setTimeout(r, 400));

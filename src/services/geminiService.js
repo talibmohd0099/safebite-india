@@ -653,6 +653,75 @@ export async function generateDailyFact(avoidTopics = []) {
   }
 }
 
+const NEWS_SUMMARY_PROMPT = `You are writing short, plain-language summaries for FoodGuard India's News & Research page, for Indian consumers who are not scientists or journalists. This page is specifically about Indian packaged food safety, adulteration, recalls, nutrition and food regulation -- NOT general news.
+
+You will get a JSON array of real items pulled from a keyword search, which sometimes matches something unrelated that just happens to contain one of the search words (e.g. a general current-affairs roundup that mentions "FDA" in passing). For EACH item, decide:
+
+"relevant" -- true if this item is genuinely about food safety, food adulteration, nutrition, a food product/recall/regulation, or food-safety research -- India-focused or globally relevant to an Indian packaged-food audience. false if it's about something else entirely that just matched the search terms incidentally (general politics/economy/exams/crime/entertainment, etc, even if a food-adjacent word appears once).
+
+"summary" -- ONLY when relevant is true: ONE short, plain-language sentence (25 words max) explaining what it's actually about and why it matters to someone eating packaged food in India -- not just rephrasing the title with simpler words. When relevant is false, set summary to an empty string.
+
+Rules for the summary:
+- Base it ONLY on the given title and excerpt -- never invent a specific number, finding, brand name, or outcome that isn't stated in them.
+- For a research title with no excerpt: describe what the study looked at/its topic, not a result it never stated (e.g. "Looks at how much ultra-processed food urban Indian teenagers eat and how it relates to their health" -- NOT "Found that 60% of teenagers eat too much" unless that number is actually given).
+- For a news item with an excerpt: you may use specific facts from the excerpt, but still nothing beyond what it says.
+- No medical claims and no alarmist framing beyond what the source itself says.
+- Plain conversational language -- explain any technical term inline (INS numbers, FSSAI, adulteration, etc.) instead of using it bare.
+
+Return ONLY a valid JSON array, no markdown, one entry per input item, "id" copied exactly as given:
+[{"id": "same id string as given", "relevant": true, "summary": "the one-sentence summary, or empty string if relevant is false"}]`;
+
+/**
+ * Batches every given item into ONE Gemini call (not one call per item --
+ * keeps this within the free-tier per-day request quota even as the
+ * research/news table grows) and returns plain-language summaries.
+ * Called by scripts/summarize-news.js for whatever news_items rows don't
+ * have a summary yet; the app itself never calls this directly, same
+ * separation as generateDailyFact.
+ *
+ * @param {{id: string, type: string, title: string, source: ?string, source_excerpt: ?string}[]} items
+ * @returns {Promise<{id: string, relevant: boolean, summary: string}[]>} only
+ *   the items Gemini actually returned a usable verdict for -- callers
+ *   should leave any missing id unprocessed rather than treat this as a
+ *   hard failure. `summary` is '' when `relevant` is false.
+ */
+export async function summarizeNewsItems(items) {
+  if (GEMINI_API_KEYS.length === 0 || items.length === 0) return [];
+
+  const payload = items.map((item) => ({
+    id: item.id,
+    type: item.type,
+    title: item.title,
+    source: item.source || null,
+    excerpt: item.source_excerpt || null,
+  }));
+
+  const requestBody = {
+    contents: [{ parts: [{ text: `${NEWS_SUMMARY_PROMPT}\n\nItems:\n${JSON.stringify(payload)}` }] }],
+    generationConfig: {
+      temperature: 0.3,
+      maxOutputTokens: Math.min(2048, 200 + items.length * 90),
+      thinkingConfig: { thinkingLevel: 'low' },
+    },
+  };
+
+  try {
+    const { text, finishReason } = await callGemini(requestBody);
+    if (!text) return [];
+
+    const parsed = extractJson(text, finishReason, 'array');
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter((r) => r && typeof r.id === 'string' && typeof r.relevant === 'boolean')
+      .map((r) => ({ id: r.id, relevant: r.relevant, summary: r.relevant && typeof r.summary === 'string' ? r.summary.trim() : '' }))
+      .filter((r) => !r.relevant || r.summary); // relevant=true with an empty summary is a malformed response, not usable either way
+  } catch (err) {
+    console.error('summarizeNewsItems failed:', err.message);
+    return [];
+  }
+}
+
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

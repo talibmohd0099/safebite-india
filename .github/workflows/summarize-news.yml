@@ -1,0 +1,38 @@
+name: Summarize News
+
+# Gives every news_items row without a summary yet a short, plain-language
+# AI summary via Gemini (see scripts/summarize-news.js). Runs after Fetch
+# News so there's something new to summarize, and after Generate Daily
+# Fact so the three don't compete for the same Gemini-key quota at the
+# same minute.
+
+on:
+  schedule:
+    - cron: '0 4 * * *' # once a day
+  workflow_dispatch:
+
+jobs:
+  summarize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Summarize pending news items
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+          VITE_GEMINI_API_KEY_2: ${{ secrets.VITE_GEMINI_API_KEY_2 }}
+          VITE_GEMINI_API_KEY_3: ${{ secrets.VITE_GEMINI_API_KEY_3 }}
+          VITE_GEMINI_API_KEY_4: ${{ secrets.VITE_GEMINI_API_KEY_4 }}
+          VITE_GEMINI_API_KEY_5: ${{ secrets.VITE_GEMINI_API_KEY_5 }}
+        run: node scripts/summarize-news.js

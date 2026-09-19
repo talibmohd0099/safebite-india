@@ -10,8 +10,9 @@ export async function getNewsItems(type, limit = 20) {
 
   const { data, error } = await supabase
     .from('news_items')
-    .select('id, title, link, source, published_at')
+    .select('id, title, link, source, published_at, summary')
     .eq('type', type)
+    .eq('is_relevant', true)
     .order('published_at', { ascending: false, nullsFirst: false })
     .limit(limit);
 
@@ -44,7 +45,8 @@ export async function getRelatedNews({ brand, flaggedIngredientNames = [], limit
 
   const { data, error } = await supabase
     .from('news_items')
-    .select('id, type, title, link, source, published_at')
+    .select('id, type, title, link, source, published_at, summary')
+    .eq('is_relevant', true)
     .or(orFilter)
     .order('published_at', { ascending: false, nullsFirst: false })
     .limit(limit);
