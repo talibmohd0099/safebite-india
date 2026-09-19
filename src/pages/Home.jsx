@@ -84,6 +84,48 @@ export default function Home() {
   const [reviewText, setReviewText] = useState('');
   const [reviewProductName, setReviewProductName] = useState('');
 
+  // Shopping Mode -- "scan, quick result, ready for the next one" for a
+  // real trip up and down the aisles, instead of scan -> full Result
+  // page -> back -> scan again. Feeds the EXISTING Compare feature
+  // rather than inventing a second comparison flow: "Compare selected"
+  // below navigates to the same /compare/result Compare.jsx already
+  // renders, passing full report objects it already accepts.
+  const [shoppingMode, setShoppingMode] = useState(() => {
+    try { return localStorage.getItem('foodguard-shopping-mode') === '1'; } catch { return false; }
+  });
+  const [shoppingSession, setShoppingSession] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('foodguard-shopping-session') || '[]'); } catch { return []; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('foodguard-shopping-mode', shoppingMode ? '1' : '0'); } catch { /* private mode etc */ }
+  }, [shoppingMode]);
+  useEffect(() => {
+    try { localStorage.setItem('foodguard-shopping-session', JSON.stringify(shoppingSession)); } catch { /* private mode etc */ }
+  }, [shoppingSession]);
+
+  const addToShoppingSession = (result, historyId) => {
+    setShoppingSession((prev) => [{ historyId, addedAt: Date.now(), report: result }, ...prev]);
+  };
+  const removeFromShoppingSession = (historyId) =>
+    setShoppingSession((prev) => prev.filter((item) => item.historyId !== historyId));
+  const clearShoppingSession = () => setShoppingSession([]);
+
+  // Clears everything about THIS scan (text/photo/barcode input, any
+  // open review) while leaving `mode` untouched -- Shopping Mode stays
+  // on the same scan method (e.g. still ready for the next photo)
+  // rather than dropping back to the mode-picker after every item.
+  const resetForNextScan = () => {
+    setText('');
+    setTextProductName('');
+    setImageFile(null);
+    setImagePreview(null);
+    setBarcodeInput('');
+    setReview(null);
+    setReviewText('');
+    setReviewProductName('');
+    setError('');
+  };
+
   // Type-ahead search. Debounced so a fast typist doesn't fire a request
   // per keystroke, and cancellable so a slow earlier response can't
   // overwrite the results for what the user has since typed.
@@ -258,6 +300,12 @@ export default function Home() {
         if (textProductName.trim()) result.productName = textProductName.trim();
         result.lookupKey = key;
         const id = saveToHistory(result, mode);
+        if (shoppingMode) {
+          addToShoppingSession(result, id);
+          resetForNextScan();
+          setLoading(false);
+          return;
+        }
         navigate(`/result/${id}`);
         return;
       }
@@ -282,6 +330,12 @@ export default function Home() {
         if (cached) {
           cached.lookupKey = key;
           const id = saveToHistory(cached, mode);
+          if (shoppingMode) {
+            addToShoppingSession(cached, id);
+            resetForNextScan();
+            setLoading(false);
+            return;
+          }
           navigate(`/result/${id}`);
           return;
         }
@@ -352,6 +406,12 @@ export default function Home() {
       result.lookupKey = key;
 
       const id = saveToHistory(result, mode);
+      if (shoppingMode) {
+        addToShoppingSession(result, id);
+        resetForNextScan();
+        setLoading(false);
+        return;
+      }
       navigate(`/result/${id}`);
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
@@ -365,6 +425,77 @@ export default function Home() {
     setReviewProductName('');
     setError('');
   };
+
+  // The running session list -- shared across the search view, the
+  // active scan forms (text/image/barcode) and the review screen, so
+  // it stays visible for the whole "scan, quick result, ready for the
+  // next one" loop instead of only on the home screen. resetForNextScan
+  // deliberately keeps `mode` on the same scan method between items, so
+  // this can't live inside a mode === 'search' block.
+  const shoppingSessionPanel = shoppingMode && shoppingSession.length > 0 && (
+    <div className="mb-5">
+      <div className="flex items-center justify-between mb-2 px-0.5">
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+          Shopping Session ({shoppingSession.length})
+        </p>
+        <button onClick={clearShoppingSession} className="tap-scale text-xs font-semibold text-red-400 hover:text-red-600 transition-colors">
+          Clear
+        </button>
+      </div>
+      <div className="space-y-2 mb-3">
+        {shoppingSession.map((item) => {
+          const r = item.report;
+          const colors = typeof r.overallScore === 'number' ? getScoreColor(r.overallScore) : null;
+          return (
+            <div
+              key={item.historyId}
+              className="flex items-center gap-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-800 px-3 py-2"
+            >
+              <ProductImage src={r.imageUrl} size={40} expandable={false} />
+              <button
+                onClick={() => navigate(`/result/${item.historyId}`)}
+                className="tap-scale flex-1 min-w-0 text-left text-sm text-slate-700 dark:text-slate-200 truncate"
+              >
+                {r.productName || 'Unknown Product'}
+              </button>
+              {r.isInfantFormula ? (
+                <span
+                  className="flex-shrink-0 text-[10px] font-bold rounded-full px-2 py-0.5"
+                  style={{ background: 'var(--v-moderate-bg)', color: 'var(--v-moderate)' }}
+                >
+                  Specialized
+                </span>
+              ) : (
+                colors && (
+                  <span
+                    className="flex-shrink-0 text-xs font-bold rounded-full px-2 py-0.5"
+                    style={{ background: colors.bg, color: colors.color }}
+                  >
+                    {r.overallScore}/100
+                  </span>
+                )
+              )}
+              <button
+                onClick={() => removeFromShoppingSession(item.historyId)}
+                aria-label="Remove"
+                className="tap-scale flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-slate-400 hover:text-red-500 bg-slate-100 dark:bg-slate-700 transition-colors"
+              >
+                ×
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      {shoppingSession.length >= 2 && (
+        <button
+          onClick={() => navigate('/compare/result', { state: { products: shoppingSession.map((s) => s.report) } })}
+          className="tap-scale w-full py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white text-sm font-bold transition-colors"
+        >
+          ⚖️ Compare selected ({shoppingSession.length})
+        </button>
+      )}
+    </div>
+  );
 
   if (loading) {
     return (
@@ -385,6 +516,8 @@ export default function Home() {
         >
           ← Start over
         </button>
+
+        {shoppingSessionPanel}
 
         <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-1">Check before we analyze</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
@@ -531,6 +664,35 @@ export default function Home() {
               </button>
             </div>
           )}
+
+          {/* Shopping Mode -- "scan, quick result, ready for the next
+              one" instead of scan -> full Result page -> back -> scan
+              again. The toggle just flips how the SAME scan flow above
+              ends (see resetForNextScan/addToShoppingSession): normally
+              it navigates to /result/:id, in Shopping Mode it adds to
+              the running list below and resets for another scan. */}
+          {searchQuery.trim().length === 0 && (
+            <div className="mb-5">
+              <button
+                onClick={() => setShoppingMode((v) => !v)}
+                className={`tap-scale w-full flex items-center justify-between gap-2 px-4 py-3 rounded-2xl border transition-colors ${
+                  shoppingMode
+                    ? 'bg-green-600 border-green-600 text-white'
+                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                }`}
+              >
+                <span className="text-sm font-bold">🛒 Shopping Mode</span>
+                <span className="text-xs font-semibold">{shoppingMode ? 'ON — tap to end' : 'OFF — tap to start'}</span>
+              </button>
+              {shoppingMode && (
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5 px-1">
+                  Every scan adds to your list below and gets you ready for the next one straight away.
+                </p>
+              )}
+            </div>
+          )}
+
+          {searchQuery.trim().length === 0 && shoppingSessionPanel}
 
           {/* Personal FoodGuard -- pick who you're checking food for
               BEFORE scanning, instead of only after landing on the
@@ -910,6 +1072,8 @@ export default function Home() {
           ← Back to search
         </button>
       )}
+
+      {mode !== 'search' && shoppingSessionPanel}
 
       {/* Text Mode */}
       {mode === 'text' && (
