@@ -655,22 +655,42 @@ function stripBoilerplate(text) {
 /**
  * Pull "CONTAINS: WHEAT, MILK" style allergen declarations out of the
  * label, returning them separately so they aren't parsed as ingredients.
+ *
+ * Each returned allergen carries a `severity`: 'contains' for a plain
+ * "Contains ..." declaration (the manufacturer confirms this is
+ * actually in the product) vs. 'may_contain' for a "May [also]
+ * contain ..." cross-contamination warning (a shared-line/factory risk,
+ * not a confirmed ingredient) -- the Allergen Center (Family profiles)
+ * needs this distinction to show "⚠ Contains X" vs. the meaningfully
+ * weaker "⚠ May contain X", not treat both the same.
  */
 function extractAllergens(text) {
   const allergens = [];
   let remaining = text;
 
   // Stop the clause at the next trigger word so an earlier non-allergen
-  // "CONTAINS ADDED FLAVOUR (...)" doesn't swallow the real allergen line.
-  // "May contain" (trace/cross-contamination warnings) is just as common
-  // on Indian labels as "contains" itself, so both are matched.
-  const TRIGGER = '(?:may\\s+(?:also\\s+)?contain|contains?)';
-  const re = new RegExp(`\\b${TRIGGER}\\b\\s*:?\\s*((?:(?!\\b${TRIGGER}\\b)[^.\\n\\r])*)`, 'gi');
+  // "CONTAINS ADDED FLAVOUR (...)" doesn't swallow the real allergen
+  // line. "May contain" (trace/cross-contamination warnings) is just as
+  // common on Indian labels as "contains" itself, so both are matched --
+  // captured in its own group so which one fired can be told apart.
+  // "contains?" on its own, without an optional 's' on the "may ..."
+  // branch too, meant "May contains" (a real, common label typo/style --
+  // both this test's real product and plenty of others use it) failed
+  // the trailing \b boundary check on the "may contain" alternative
+  // (its trailing "s" is still part of the same word), so the regex
+  // engine fell through to matching the bare "contains?" alternative
+  // instead -- silently discarding the "may" and misreading a
+  // cross-contamination warning as a confirmed "contains". Caught by
+  // the severity test below actually asserting on the value, not just
+  // that extraction happened at all.
+  const TRIGGER_ALT = 'may\\s+(?:also\\s+)?contains?|contains?';
+  const re = new RegExp(`\\b(${TRIGGER_ALT})\\b\\s*:?\\s*((?:(?!\\b(?:${TRIGGER_ALT})\\b)[^.\\n\\r])*)`, 'gi');
   let match;
   const toRemove = [];
 
   while ((match = re.exec(text)) !== null) {
-    const clause = match[1];
+    const severity = /^may\b/i.test(match[1]) ? 'may_contain' : 'contains';
+    const clause = match[2];
     const words = clause
       .split(/[,&]|\band\b/i)
       .map((w) => w.trim().toLowerCase().replace(FOOTNOTE_MARKERS, '').trim())
@@ -682,7 +702,7 @@ function extractAllergens(text) {
     // otherwise it's something like "CONTAINS ADDED FLAVOUR (...)".
     const allAllergens = words.every((w) => ALLERGEN_WORDS.includes(w));
     if (allAllergens) {
-      allergens.push(...words);
+      for (const word of words) allergens.push({ word, severity });
       toRemove.push(match[0]);
     }
   }
@@ -691,7 +711,18 @@ function extractAllergens(text) {
     remaining = remaining.replace(clause, ' ');
   }
 
-  return { remaining, allergens: [...new Set(allergens)] };
+  // Dedup by word -- a word declared both ways on the same label (rare,
+  // but not impossible on a real messy label) keeps the more certain
+  // 'contains' reading rather than the weaker 'may_contain' one.
+  const bySeverity = new Map();
+  for (const { word, severity } of allergens) {
+    const existing = bySeverity.get(word);
+    if (!existing || (existing === 'may_contain' && severity === 'contains')) {
+      bySeverity.set(word, severity);
+    }
+  }
+
+  return { remaining, allergens: [...bySeverity.entries()].map(([word, severity]) => ({ word, severity })) };
 }
 
 /**

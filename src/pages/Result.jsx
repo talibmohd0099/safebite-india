@@ -18,6 +18,7 @@ import {
   calculatePersonalAssessment,
   getPersonalEatAnswerKey,
 } from '../services/personalAssessment';
+import { getAllergenWarnings, ALLERGEN_CATEGORY_LABEL_KEY } from '../services/allergenCenter';
 import ScoreCircle from '../components/ScoreCircle';
 import IngredientCard from '../components/IngredientCard';
 import ProductImage from '../components/ProductImage';
@@ -414,6 +415,10 @@ export default function Result() {
   // hook call here would run after the early return above on some
   // renders, violating the Rules of Hooks.
   const personalAssessment = activeProfile ? calculatePersonalAssessment(result, activeProfile) : null;
+  // Checked against EVERY family profile with an allergy set, not just
+  // whoever's currently active -- a hard safety constraint, unlike
+  // Personal FoodGuard above (see services/allergenCenter.js).
+  const allergenWarnings = getAllergenWarnings(result, profiles);
   const openFlagModal = () => {
     setFlagReason('');
     setFlagRemarks('');
@@ -656,6 +661,37 @@ export default function Result() {
           )}
         </div>
       </div>
+
+      {/* Allergen Center -- deliberately OUTSIDE the score card below (a
+          different card, different colour language, ahead of it in
+          reading order) since an allergy warning is a hard safety fact,
+          not part of "how healthy is this ingredient list". Checked
+          against every family profile with an allergy set regardless of
+          who's active (allergenWarnings above), so it can never be
+          missed just because a different profile happens to be
+          selected right now. */}
+      {allergenWarnings.length > 0 && (
+        <div className="mx-4 mb-3 rounded-[16px] p-4" style={{ background: 'var(--v-poor-bg)', border: '1.5px solid var(--v-poor)' }}>
+          <div className="space-y-2">
+            {allergenWarnings.map((w) => {
+              const label = w.custom ? w.category : t(ALLERGEN_CATEGORY_LABEL_KEY[w.category]);
+              const names = w.profiles.map((p) => p.nickname).join(', ');
+              return (
+                <div key={w.custom ? `custom:${w.category}` : w.category} className="flex items-start gap-2.5">
+                  <span className="text-[16px] leading-none mt-0.5 flex-shrink-0">⚠</span>
+                  <p className="text-[13.5px] leading-relaxed" style={{ color: 'var(--v-poor)' }}>
+                    <span className="font-bold">
+                      {t(w.severity === 'contains' ? 'allergenContainsLabel' : 'allergenMayContainLabel', { allergen: label })}
+                    </span>
+                    {' — '}
+                    <span style={{ color: 'var(--label-2)' }}>{t('allergenWarningFor', { names })}</span>
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Infant formula is a specially regulated category (FSSAI Infant
           Milk Substitutes Act, Codex Standard for Infant Formula) -- a

@@ -233,7 +233,7 @@ test('strips manufacturer/address boilerplate that names itself with a trigger w
   const names = ingredients.map((i) => i.displayName);
 
   assert.deepEqual(names, ['Wheat Flour', 'Sugar', 'Palm Oil', 'Salt', 'Raising Agent (INS 503(ii))']);
-  assert.deepEqual(allergens, ['wheat']);
+  assert.deepEqual(allergens, [{ word: 'wheat', severity: 'contains' }]);
 });
 
 test('drops a manufacturer/address block that has no attribution verb in front of it', () => {
@@ -296,7 +296,17 @@ test('extracts a "Contains" allergen declaration separately even with markdown e
 
   const { ingredients, allergens } = parseLabel(label);
 
-  assert.deepEqual([...allergens].sort(), ['milk', 'mustard', 'nut', 'oats', 'soy', 'wheat']);
+  assert.deepEqual(
+    [...allergens].sort((a, b) => a.word.localeCompare(b.word)),
+    [
+      { word: 'milk', severity: 'may_contain' },
+      { word: 'mustard', severity: 'may_contain' },
+      { word: 'nut', severity: 'contains' },
+      { word: 'oats', severity: 'may_contain' },
+      { word: 'soy', severity: 'may_contain' },
+      { word: 'wheat', severity: 'contains' },
+    ]
+  );
   for (const fake of ['Contains _wheat_', '_nut_', 'May Contains _milk_', '_mustard_', '_oats_', '_soy_']) {
     assert.ok(!byName(ingredients, fake), `"${fake}" must not appear as a fake ingredient`);
   }

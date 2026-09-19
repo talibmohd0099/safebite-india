@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { useFamily, RELATION_EMOJI } from '../contexts/FamilyContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { PRIORITIES, PRIORITY_LABEL_KEY } from '../services/personalAssessment';
+import { ALLERGEN_CATEGORIES, ALLERGEN_CATEGORY_LABEL_KEY } from '../services/allergenCenter';
 
 const RELATIONS = ['me', 'partner', 'child', 'parent', 'other'];
 const RELATION_LABEL_KEY = {
@@ -25,9 +26,24 @@ function ProfileForm({ initial, onSave, onCancel }) {
   const [nickname, setNickname] = useState(initial?.nickname || '');
   const [relation, setRelation] = useState(initial?.relation || 'me');
   const [priorities, setPriorities] = useState(initial?.priorities || []);
+  const [allergies, setAllergies] = useState(initial?.allergies || []);
+  const [customAllergies, setCustomAllergies] = useState(initial?.customAllergies || []);
+  const [customAllergyInput, setCustomAllergyInput] = useState('');
 
   const togglePriority = (key) =>
     setPriorities((prev) => (prev.includes(key) ? prev.filter((p) => p !== key) : [...prev, key]));
+
+  const toggleAllergy = (key) =>
+    setAllergies((prev) => (prev.includes(key) ? prev.filter((a) => a !== key) : [...prev, key]));
+
+  const addCustomAllergy = () => {
+    const clean = customAllergyInput.trim();
+    if (!clean || customAllergies.some((a) => a.toLowerCase() === clean.toLowerCase())) return;
+    setCustomAllergies((prev) => [...prev, clean]);
+    setCustomAllergyInput('');
+  };
+
+  const removeCustomAllergy = (term) => setCustomAllergies((prev) => prev.filter((a) => a !== term));
 
   return (
     <div className="rounded-[16px] p-4 mb-4 item-in" style={{ background: 'var(--bg-card)' }}>
@@ -86,6 +102,70 @@ function ProfileForm({ initial, onSave, onCancel }) {
         })}
       </div>
 
+      {/* Allergen Center -- deliberately styled in the app's warning red
+          (not the tint-blue priorities use above) so it reads as a hard
+          safety constraint, not a soft preference. Checked against
+          every scan for every profile that has one set, regardless of
+          who's currently active (see services/allergenCenter.js). */}
+      <p className="text-[15px] font-bold mb-1" style={{ color: 'var(--label-1)' }}>
+        ⚠ {t('familyAllergiesTitle')}
+      </p>
+      <p className="text-[12px] mb-3" style={{ color: 'var(--label-3)' }}>
+        {t('familyAllergiesHint')}
+      </p>
+      <div className="flex flex-wrap gap-2 mb-3">
+        {ALLERGEN_CATEGORIES.map((a) => {
+          const active = allergies.includes(a);
+          return (
+            <button
+              key={a}
+              onClick={() => toggleAllergy(a)}
+              className="tap-scale px-3 py-2 rounded-full text-[13px] font-semibold"
+              style={{
+                background: active ? 'var(--v-poor-bg)' : 'var(--fill)',
+                color: active ? 'var(--v-poor)' : 'var(--label-1)',
+              }}
+            >
+              {active ? '✓ ' : ''}{t(ALLERGEN_CATEGORY_LABEL_KEY[a])}
+            </button>
+          );
+        })}
+      </div>
+
+      {customAllergies.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-3">
+          {customAllergies.map((term) => (
+            <button
+              key={term}
+              onClick={() => removeCustomAllergy(term)}
+              className="tap-scale px-3 py-2 rounded-full text-[13px] font-semibold flex items-center gap-1.5"
+              style={{ background: 'var(--v-poor-bg)', color: 'var(--v-poor)' }}
+            >
+              ✓ {term} <span aria-hidden="true">×</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="flex gap-2 mb-4">
+        <input
+          value={customAllergyInput}
+          onChange={(e) => setCustomAllergyInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomAllergy(); } }}
+          placeholder={t('familyCustomAllergyPlaceholder')}
+          className="flex-1 min-w-0 px-3.5 py-2.5 rounded-[12px] text-[14px] outline-none"
+          style={{ background: 'var(--fill)', color: 'var(--label-1)' }}
+        />
+        <button
+          onClick={addCustomAllergy}
+          disabled={!customAllergyInput.trim()}
+          className="tap-scale px-4 py-2.5 rounded-[12px] text-[13px] font-semibold"
+          style={{ background: 'var(--fill)', color: 'var(--v-poor)', opacity: customAllergyInput.trim() ? 1 : 0.5 }}
+        >
+          {t('familyCustomAllergyAdd')}
+        </button>
+      </div>
+
       <p className="text-[11.5px] leading-relaxed mb-4" style={{ color: 'var(--label-3)' }}>
         {t('familyExplainer')}
       </p>
@@ -99,7 +179,7 @@ function ProfileForm({ initial, onSave, onCancel }) {
           {t('familyCancel')}
         </button>
         <button
-          onClick={() => nickname.trim() && onSave({ nickname: nickname.trim(), relation, priorities })}
+          onClick={() => nickname.trim() && onSave({ nickname: nickname.trim(), relation, priorities, allergies, customAllergies })}
           disabled={!nickname.trim()}
           className="tap-scale flex-1 py-3 rounded-[12px] text-[15px] font-semibold text-white"
           style={{ background: 'var(--tint)', opacity: nickname.trim() ? 1 : 0.5 }}
@@ -180,6 +260,11 @@ export default function Family() {
                     ? p.priorities.map((k) => t(PRIORITY_LABEL_KEY[k])).join(' · ')
                     : t('familyNoPrioritiesTitle')}
                 </span>
+                {(p.allergies?.length > 0 || p.customAllergies?.length > 0) && (
+                  <span className="block text-[12px] truncate mt-0.5 font-semibold" style={{ color: 'var(--v-poor)' }}>
+                    ⚠ {[...(p.allergies || []).map((k) => t(ALLERGEN_CATEGORY_LABEL_KEY[k])), ...(p.customAllergies || [])].join(' · ')}
+                  </span>
+                )}
               </div>
             </div>
             <div className="flex gap-4 mt-3 pt-3" style={{ borderTop: '1px solid var(--separator)' }}>

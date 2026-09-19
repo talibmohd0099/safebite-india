@@ -60,6 +60,13 @@ export function FamilyProvider({ children }) {
       relation: data.relation || 'other',
       avatarEmoji: data.avatarEmoji || RELATION_EMOJI[data.relation] || RELATION_EMOJI.other,
       priorities: data.priorities || [],
+      // Allergen Center -- kept deliberately separate from `priorities`
+      // (nutrition preferences): an allergy is a hard safety constraint
+      // checked against every product regardless of which profile is
+      // "active" (see services/allergenCenter.js), not a personalization
+      // preference that only applies when selected.
+      allergies: data.allergies || [],
+      customAllergies: data.customAllergies || [],
       isDefault: false,
     };
     setProfiles((prev) => {

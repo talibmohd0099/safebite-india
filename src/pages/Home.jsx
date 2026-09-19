@@ -835,9 +835,17 @@ export default function Home() {
 
           {!searching && !searchError && searchQuery.trim().length >= 2 &&
             suggestions.cached.length === 0 && suggestions.off.length === 0 && (
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 px-1">
-              No products found with a readable ingredients list. Try a different spelling, or use Paste / Photo to enter the ingredients yourself.
-            </p>
+            <div className="mt-2 mx-1 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                Can't find "{searchQuery.trim()}"? Scan the label and FoodGuard will analyze and add it.
+              </p>
+              <button
+                onClick={() => { setMode('image'); setError(''); setSearchQuery(''); }}
+                className="tap-scale w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition-colors"
+              >
+                📷 Scan label
+              </button>
+            </div>
           )}
 
           {(suggestions.cached.length > 0 || suggestions.off.length > 0) && (
