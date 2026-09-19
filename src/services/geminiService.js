@@ -252,7 +252,9 @@ Each array element must be exactly this shape:
   "healthEffects": "One short sentence on known health effects. If genuinely harmless, say so plainly rather than inventing risk.",
   "commonlyFoundIn": ["2-4 other common foods containing this"],
   "synonyms": ["other names/spellings this appears under on labels, lowercase"],
-  "penalty": 0
+  "penalty": 0,
+  "confidence": "high | medium | low",
+  "evidenceType": "regulatory | scientific_consensus | limited_evidence | heuristic"
 }
 
 Set "recognized" to false ONLY when the given name is not a real food ingredient, additive, or edible substance at all -- a person's name, a random word, a typo, or gibberish (e.g. "Talib", "asdfgh", "xyz123"). Stay true for any real ingredient you're simply not fully certain about, obscure regional ingredients, or unusual INS codes -- research those normally. When recognized is false, still fill in every other field with your best-effort placeholder guess (the app will not score or display these, but every field must still be valid JSON).
@@ -263,6 +265,14 @@ Set "recognized" to false ONLY when the given name is not a real food ingredient
 - 9-18: refined/processed staples and notable concerns — this includes REFINED FLOUR / MAIDA (low fiber, high glycemic index, nutritionally stripped compared to whole grain — this is a real, common penalty case, not a harmless one), palm oil, MSG, artificial sweeteners, artificial colors, carrageenan
 - 19-30: serious concerns (TBHQ/BHA/BHT, high fructose corn syrup, trans fats)
 - 31-40: FSSAI-banned or seriously harmful (potassium bromate INS 924, brominated vegetable oil, metanil yellow, rhodamine B)
+
+"evidenceType" is WHAT KIND of basis backs your status/penalty for this specific ingredient -- pick exactly one:
+- "regulatory": an explicit FSSAI/EU permitted/restricted/banned classification is the main reason (e.g. potassium bromate is banned, so this is regulatory)
+- "scientific_consensus": no specific regulatory ban/restriction, but the nutritional concern is well-established and broadly agreed (e.g. refined flour's low fiber and high glycemic impact, trans fat)
+- "limited_evidence": the concern is real but based on emerging, mixed, or still-debated research (e.g. some long-term artificial sweetener studies)
+- "heuristic": a general nutritional-quality judgment with no specific regulatory ruling or study behind THIS ingredient (e.g. a default "mildly processed" penalty for an ordinary thickener)
+
+"confidence" is how sure you are that your status/penalty for THIS ingredient is correct, given the evidenceType above -- "high" for regulatory or well-established scientific_consensus cases, "medium" for limited_evidence or a scientific_consensus call you're less certain generalizes to this exact ingredient, "low" for a heuristic guess or an obscure/unusual ingredient you have limited information on. Confidence is about YOUR certainty, not about how severe the ingredient is -- a "safe" whole food can still be "high" confidence.
 
 Be accurate and honest — this data is stored permanently and reused for every future scan, so a wrong answer here becomes a wrong answer forever. Your own "reason" and "healthEffects" text must be consistent with the penalty you assign — if you write that something is nutritionally poor, its penalty must reflect that, not sit near 0.
 Return exactly one array element per ingredient given, in the same order.`;

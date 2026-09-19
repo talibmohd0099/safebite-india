@@ -74,6 +74,27 @@ const NUTRITION_TABLE_ROWS = [
 // on the main result page already covers what's fine about a product.
 const TIER_RANK = { Harmful: 0, Concerning: 1, 'Highly processed': 2 };
 
+const CONFIDENCE_KEY = { high: 'confidenceHigh', medium: 'confidenceMedium', low: 'confidenceLow' };
+const EVIDENCE_TYPE_KEY = {
+  regulatory: 'evidenceTypeRegulatory',
+  scientific_consensus: 'evidenceTypeScientificConsensus',
+  limited_evidence: 'evidenceTypeLimitedEvidence',
+  heuristic: 'evidenceTypeHeuristic',
+};
+
+// "Why did this score X?" only ever showed the CLAIM (reason/health
+// effects), never how sure we are of it -- this renders the one-line
+// confidence + basis text (geminiService.js's RESEARCH_PROMPT is the
+// only thing that sets these). null for anything researched before
+// this field existed, so the row just quietly omits the line instead
+// of showing "undefined confidence" -- no backfill needed.
+function evidenceLineText(ing, t) {
+  const confidenceKey = CONFIDENCE_KEY[ing.confidence];
+  const evidenceKey = EVIDENCE_TYPE_KEY[ing.evidenceType];
+  if (!confidenceKey || !evidenceKey) return null;
+  return t('evidenceLine', { confidence: t(confidenceKey), evidenceType: t(evidenceKey) });
+}
+
 // Only the first few, worst-first -- everything past this is one tap
 // away behind "+N other factors" instead of always on screen. Keeps
 // this a quick "why" explainer instead of turning into a second
@@ -1415,7 +1436,8 @@ export default function Result() {
                     const tier = factor.tier;
                     const rowKey = `main-${i}`;
                     const expanded = expandedBreakdownRows.has(rowKey);
-                    const hasDetail = Boolean(ing.reason || ing.healthEffects);
+                    const evidenceLine = evidenceLineText(ing, t);
+                    const hasDetail = Boolean(ing.reason || ing.healthEffects || evidenceLine);
                     return (
                       <div key={rowKey} className="rounded-[12px] p-2.5" style={{ background: 'var(--fill)' }}>
                         <button
@@ -1467,6 +1489,12 @@ export default function Result() {
                               <div>
                                 <p className="text-[10.5px] font-semibold" style={{ color: 'var(--label-3)' }}>{t('healthEffectsLabel')}</p>
                                 <p className="text-[12.5px] leading-relaxed" style={{ color: 'var(--label-2)' }}>{ing.healthEffects}</p>
+                              </div>
+                            )}
+                            {evidenceLine && (
+                              <div>
+                                <p className="text-[10.5px] font-semibold" style={{ color: 'var(--label-3)' }}>{t('evidenceLabel')}</p>
+                                <p className="text-[12.5px] leading-relaxed" style={{ color: 'var(--label-2)' }}>{evidenceLine}</p>
                               </div>
                             )}
                           </div>

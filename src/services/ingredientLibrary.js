@@ -61,6 +61,8 @@ function rowToIngredient(row, parsedItem) {
     insCode: row.ins_code,
     scientificName: row.scientific_name,
     penalty: row.penalty,
+    confidence: row.confidence,
+    evidenceType: row.evidence_type,
     percentage: parsedItem.percentage,
     estimatedPercentage: parsedItem.estimatedPercentage,
     recognized: row.recognized !== false,
@@ -87,6 +89,8 @@ async function saveResearched(records) {
     commonly_found_in: r.commonlyFoundIn || [],
     synonyms: r.synonyms || [],
     penalty: typeof r.penalty === 'number' ? r.penalty : 0,
+    confidence: r.confidence || null,
+    evidence_type: r.evidenceType || null,
     recognized: r.recognized !== false,
   }));
 
@@ -166,6 +170,8 @@ export async function resolveIngredients(parsed) {
         insCode: record.insCode || item.insCode,
         scientificName: record.scientificName,
         penalty: record.penalty,
+        confidence: record.confidence,
+        evidenceType: record.evidenceType,
         percentage: item.percentage,
         estimatedPercentage: item.estimatedPercentage,
         recognized: record.recognized !== false,

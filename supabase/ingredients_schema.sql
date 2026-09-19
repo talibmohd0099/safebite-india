@@ -26,6 +26,13 @@ create table if not exists public.ingredients (
   health_effects text,
   commonly_found_in jsonb default '[]'::jsonb,
 
+  -- How sure we are about status/penalty, and what kind of basis backs
+  -- it -- shown in the "Why did this score X?" breakdown so a claim and
+  -- our confidence in it are never presented as the same thing. See
+  -- ingredients_add_confidence_evidence_migration.sql for existing DBs.
+  confidence text,                         -- 'high' | 'medium' | 'low'
+  evidence_type text,                      -- 'regulatory' | 'scientific_consensus' | 'limited_evidence' | 'heuristic'
+
   -- Alternate spellings/names this ingredient is written as on labels,
   -- e.g. ['e955','sucralose (955)','trichlorogalactosucrose'].
   synonyms jsonb default '[]'::jsonb,
