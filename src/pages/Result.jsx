@@ -282,7 +282,9 @@ export default function Result() {
   // plain discovery) -- so the Result page always has something to
   // keep browsing to instead of dead-ending after a good score.
   useEffect(() => {
-    if (!result) {
+    // Never rendered for infant formula (see the render guard below) --
+    // skip the fetch itself too, not just the display.
+    if (!result || result.isInfantFormula) {
       setAlternatives([]);
       return;
     }
@@ -655,12 +657,46 @@ export default function Result() {
         </div>
       </div>
 
-      {/* Score hero -- the single most important thing on this page, so
+      {/* Infant formula is a specially regulated category (FSSAI Infant
+          Milk Substitutes Act, Codex Standard for Infant Formula) -- a
+          real reported case (Furilac Advance Stage 1) showed a plain
+          "78/100 · Good" score, which reads as "healthy for a baby" even
+          though it's a general-food scale being applied to a product
+          formulated to meet mandated infant-nutrition requirements, not
+          judged by "less processed is better". This replaces the ENTIRE
+          score hero below with a category explainer + disclaimer instead
+          of a numeric score -- deliberately no ScoreCircle, no verdict,
+          no "should I eat it?" answer here at all. */}
+      {result.isInfantFormula ? (
+        <div className="mx-4 rounded-[20px] p-5" style={{ background: 'var(--bg-card)' }}>
+          <div className="flex items-center gap-3">
+            <span className="text-[32px] leading-none flex-shrink-0">🍼</span>
+            <div className="min-w-0">
+              <p className="text-[13px] font-semibold" style={{ color: 'var(--label-2)' }}>
+                {t('infantFormulaSubtitle')}
+              </p>
+              <p className="text-[19px] font-bold tracking-tight" style={{ color: 'var(--v-moderate)' }}>
+                {t('infantFormulaTitle')}
+              </p>
+            </div>
+          </div>
+          <p className="text-[13.5px] leading-relaxed mt-3" style={{ color: 'var(--label-1)' }}>
+            {t('infantFormulaBody')}
+          </p>
+          <div className="flex gap-2.5 items-start mt-4 pt-4" style={{ borderTop: '1px solid var(--separator)' }}>
+            <span className="text-[16px] leading-none mt-0.5 flex-shrink-0">⚠️</span>
+            <p className="text-[12.5px] leading-relaxed" style={{ color: 'var(--label-2)' }}>
+              {t('infantFormulaDisclaimer')}
+            </p>
+          </div>
+        </div>
+      ) : (
+      /* Score hero -- the single most important thing on this page, so
           it gets the biggest visual weight: an enlarged score circle,
           then "should I eat it?" answered directly underneath (instead
           of just repeating the verdict as a sentence), and a link into
           the real, ingredient-by-ingredient reason for this exact
-          number. */}
+          number. */
       <div className="mx-4 rounded-[20px] p-5" style={{ background: 'var(--bg-card)' }}>
         <div className="flex items-center gap-5">
           <ScoreCircle score={score} size="xl" />
@@ -750,13 +786,20 @@ export default function Result() {
           </div>
         )}
       </div>
+      )}
 
       {/* Personal FoodGuard -- the same scanned product, re-evaluated
           against a specific family member's selected priorities. The
           general score/card above never changes; everything below is a
           second, clearly-separated layer on top of it (see
           services/personalAssessment.js). No profiles yet -> a small,
-          skippable prompt instead of forcing setup. */}
+          skippable prompt instead of forcing setup. Skipped entirely for
+          infant formula -- FoodGuard determining a personal "fit" for a
+          specific baby would be exactly the kind of individualized
+          feeding/medical judgment call the disclaimer above says it
+          doesn't make. */}
+      {!result.isInfantFormula && (
+      <>
       {profiles.length === 0 ? (
         <div className="mx-4 mt-3 rounded-[14px] px-4 py-3.5 flex items-center gap-3" style={{ background: 'var(--bg-card)' }}>
           <span className="text-[22px] flex-shrink-0">👪</span>
@@ -869,6 +912,8 @@ export default function Result() {
             {t('personalSeeBreakdown')} ›
           </Link>
         </div>
+      )}
+      </>
       )}
 
       {/* A plain ingredient score can't say WHY a product exists -- an
@@ -995,8 +1040,11 @@ export default function Result() {
       )}
 
       {/* Flags + Positives — side by side when both exist, so "at a
-          glance" actually reads as one glance rather than two scrolls */}
-      {view === 'overview' && (result.flags?.length > 0 || result.positives?.length > 0) && (
+          glance" actually reads as one glance rather than two scrolls.
+          Skipped for infant formula -- this is "what pulled the general
+          food score up/down" framing, which doesn't apply once that
+          score isn't being shown at all. */}
+      {view === 'overview' && !result.isInfantFormula && (result.flags?.length > 0 || result.positives?.length > 0) && (
         <>
           <SectionHeader>{t('sectionAtAGlance')}</SectionHeader>
           <div className={`grid gap-2.5 mx-4 ${result.flags?.length > 0 && result.positives?.length > 0 ? 'grid-cols-2' : 'grid-cols-1'}`}>
@@ -1092,8 +1140,12 @@ export default function Result() {
           match Category.jsx browses by -- a real, already-verified
           product either way, never something a model guessed at. Keeps
           the Result page from dead-ending after a good score instead of
-          only ever nudging away from a bad one. */}
-      {view === 'overview' && rankedAlternatives.length > 0 && (
+          only ever nudging away from a bad one. Skipped for infant
+          formula -- suggesting a "safer"/"similar" swap implies a
+          winner/loser comparison between regulated infant-nutrition
+          products, exactly the kind of general-food judgment this
+          category is deliberately kept out of. */}
+      {view === 'overview' && !result.isInfantFormula && rankedAlternatives.length > 0 && (
         <>
           <SectionHeader>
             {activeProfile

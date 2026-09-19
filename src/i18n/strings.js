@@ -171,6 +171,13 @@ export const STRINGS = {
     seasoningNote: 'Used in small amounts — this score reflects the seasoning itself, not the dish you add it to.',
     estimatedQtyNote: "This label doesn't state an exact percentage for every ingredient, so part of this score is a reasonable estimate rather than the product's exact measured composition.",
 
+    infantFormulaTitle: 'Specialized nutrition product',
+    infantFormulaSubtitle: 'Infant formula',
+    infantFormulaBody: "This is a regulated infant nutrition product. Its ingredients and nutrition have been reviewed, but they aren't scored on FoodGuard's usual 0-100 scale — that scale is built for everyday packaged food, not a product formulated to meet mandated infant-nutrition requirements.",
+    infantFormulaDisclaimer: "FoodGuard does not determine whether an infant formula is appropriate for a particular baby. Always follow the label's preparation and age/stage instructions, and consult a pediatrician or qualified health professional for individual feeding advice.",
+    infantFormulaCompareTitle: 'Not directly comparable',
+    infantFormulaCompareBody: 'Infant formula is a specialized infant-nutrition product and should not be compared against general food using the same score-based criteria.',
+
     saferAlternatives: 'Safer alternatives in this category',
     betterOptionsFor: 'Better options for {name}',
     similarProducts: 'Similar products in this category',
@@ -405,6 +412,13 @@ export const STRINGS = {
     usefulContextTitle: 'यह असल में कब काम आता है',
     seasoningNote: 'थोड़ी मात्रा में इस्तेमाल होता है — यह स्कोर सिर्फ इस मसाले का है, जिस डिश में मिलाया जाए उसका नहीं।',
     estimatedQtyNote: 'इस लेबल पर हर सामग्री की सटीक मात्रा नहीं दी गई है, इसलिए स्कोर का कुछ हिस्सा सही अंदाज़े पर आधारित है, पक्के आंकड़ों पर नहीं।',
+
+    infantFormulaTitle: 'विशेष पोषण प्रोडक्ट',
+    infantFormulaSubtitle: 'इन्फैंट फॉर्मूला',
+    infantFormulaBody: 'यह एक नियमित (regulated) इन्फैंट न्यूट्रिशन प्रोडक्ट है। इसकी सामग्री और पोषण की जांच की गई है, लेकिन इसे FoodGuard के सामान्य 0-100 स्केल पर स्कोर नहीं किया जाता — वह स्केल रोज़मर्रा के पैक्ड फूड के लिए बना है, किसी ऐसे प्रोडक्ट के लिए नहीं जो तय इन्फैंट-न्यूट्रिशन ज़रूरतों को पूरा करने के लिए बनाया गया है।',
+    infantFormulaDisclaimer: 'FoodGuard यह तय नहीं करता कि कोई इन्फैंट फॉर्मूला किसी खास बच्चे के लिए सही है या नहीं। हमेशा लेबल पर दिए गए तैयार करने और उम्र/स्टेज के निर्देशों का पालन करें, और व्यक्तिगत फीडिंग सलाह के लिए किसी बाल रोग विशेषज्ञ (pediatrician) या योग्य स्वास्थ्य विशेषज्ञ से सलाह लें।',
+    infantFormulaCompareTitle: 'सीधे तुलना योग्य नहीं',
+    infantFormulaCompareBody: 'इन्फैंट फॉर्मूला एक विशेष इन्फैंट-न्यूट्रिशन प्रोडक्ट है और इसे सामान्य फूड के साथ उसी स्कोर-आधारित मापदंड से नहीं आंका जाना चाहिए।',
 
     saferAlternatives: 'इस कैटेगरी में बेहतर विकल्प',
     similarProducts: 'इस कैटेगरी के अन्य प्रोडक्ट्स',

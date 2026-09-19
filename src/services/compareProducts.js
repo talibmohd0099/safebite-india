@@ -85,6 +85,7 @@ export function buildComparisonRows(products, activeProfile = null) {
       productName: p.productName || 'Unknown Product',
       brand: p.brand || null,
       imageUrl: p.imageUrl || null,
+      isInfantFormula: p.isInfantFormula === true,
       overallScore: numberOrNull(p.overallScore),
       personalScore: assessment ? assessment.personalScore : null,
       matchedConcerns: assessment ? assessment.matchedConcerns.map((c) => c.priorityKey) : [],

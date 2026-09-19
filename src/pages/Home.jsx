@@ -603,7 +603,7 @@ export default function Home() {
                 {recentScans.map((entry, i) => (
                   <ProductStripCard
                     key={entry.id}
-                    item={{ productName: entry.productName, imageUrl: entry.imageUrl, score: entry.overallScore }}
+                    item={{ productName: entry.productName, imageUrl: entry.imageUrl, score: entry.overallScore, isInfantFormula: entry.isInfantFormula }}
                     onClick={() => navigate(`/result/${entry.id}`)}
                     style={{ animationDelay: `${i * 30}ms` }}
                   />

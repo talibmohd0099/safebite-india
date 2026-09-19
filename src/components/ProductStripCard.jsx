@@ -24,13 +24,26 @@ export default function ProductStripCard({ item, onClick, style }) {
       <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 mt-1.5 leading-tight line-clamp-2">
         {item.productName}
       </p>
-      {colors && (
+      {/* Infant formula never shows a numeric score here either -- the
+          whole reason Result.jsx stops showing one is defeated if the
+          same 0-100 badge still shows up wherever this card is reused
+          (homepage strips, alternatives). */}
+      {item.isInfantFormula ? (
         <span
           className="inline-block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-          style={{ background: colors.bg, color: colors.color }}
+          style={{ background: 'var(--v-moderate-bg)', color: 'var(--v-moderate)' }}
         >
-          {hasPersonal ? `${item.score} / ${item.personalScore}` : `${item.score}/100`}
+          Specialized
         </span>
+      ) : (
+        colors && (
+          <span
+            className="inline-block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+            style={{ background: colors.bg, color: colors.color }}
+          >
+            {hasPersonal ? `${item.score} / ${item.personalScore}` : `${item.score}/100`}
+          </span>
+        )
       )}
     </button>
   );

@@ -168,6 +168,9 @@ export async function getRecentlyAddedProducts(limit = 10) {
       imageUrl: row.report?.imageUrl || null,
       score: typeof row.report?.overallScore === 'number' ? row.report.overallScore : null,
       verdict: row.report?.verdict || null,
+      // So the homepage strip can show "Specialized" instead of a raw
+      // score badge for infant formula -- see ProductStripCard.jsx.
+      isInfantFormula: row.report?.isInfantFormula === true,
     }));
 }
 
@@ -193,13 +196,17 @@ export async function getDailySpotlight() {
 
   const { data, error } = await supabase
     .from('product_reports')
-    .select('lookup_key, product_name, score:report->>overallScore, verdict:report->>verdict, brand:report->>brand, imageUrl:report->>imageUrl, flags:report->flags, positives:report->positives')
+    .select('lookup_key, product_name, score:report->>overallScore, verdict:report->>verdict, brand:report->>brand, imageUrl:report->>imageUrl, flags:report->flags, positives:report->positives, isInfantFormula:report->>isInfantFormula')
     .limit(1000);
 
   if (error || !data?.length) return { best: null, worst: null };
 
+  // Infant formula is excluded from the pool entirely, not just relabelled
+  // -- "today's pick" is exactly the kind of "this is our best/healthiest"
+  // framing a specially regulated infant-nutrition product shouldn't be
+  // used to illustrate (see Result.jsx's isInfantFormula branch for why).
   const withScore = data
-    .filter((row) => row.product_name && row.score !== null)
+    .filter((row) => row.product_name && row.score !== null && row.isInfantFormula !== 'true')
     .map((row) => ({ ...row, score: Number(row.score) }))
     .filter((row) => Number.isFinite(row.score));
   if (!withScore.length) return { best: null, worst: null };

@@ -162,14 +162,25 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
     if (insights?.summary) report.summary = insights.summary;
     if (insights?.recommendation) report.recommendation = insights.recommendation;
     if (insights?.isCondimentOrSeasoning) report.isCondimentOrSeasoning = true;
+    // Infant formula is a specially regulated category (FSSAI Infant Milk
+    // Substitutes Act, Codex Standard for Infant Formula) -- Result.jsx
+    // stops showing the normal 0-100 "78/Good" score presentation
+    // entirely for these, so it never reads as "this is healthy for a
+    // baby" (a real reported case: Furilac Advance Stage 1 showing
+    // 78/Good). See Result.jsx's own isInfantFormula branch.
+    if (insights?.isInfantFormula) report.isInfantFormula = true;
     if (insights?.usefulContext) report.usefulContext = insights.usefulContext;
     if (insights?.story) report.story = insights.story;
 
     // A masala scoring 95 isn't eaten by the spoonful -- the same reason
     // isCondimentOrSeasoning already changes how the score itself reads
     // means a "here's what a daily habit of this looks like" framing
-    // would be actively misleading for one, so it's skipped entirely.
-    if (nutrientsInfo && !report.isCondimentOrSeasoning && !isSmallPortionFood(report.productName, nutrientsInfo.servingGrams)) {
+    // would be actively misleading for one. Infant formula skips this for
+    // a related but distinct reason: the WHO daily limits it's built on
+    // are an ADULT 2000-kcal reference diet -- applying an adult daily
+    // habit projection to a baby's feed would be wrong on two counts at
+    // once (wrong population, wrong framing), not just one.
+    if (nutrientsInfo && !report.isCondimentOrSeasoning && !report.isInfantFormula && !isSmallPortionFood(report.productName, nutrientsInfo.servingGrams)) {
       const habitCheck = buildDailyHabitCheck(nutrientsInfo.nutrients, nutrientsInfo.servingGrams);
       if (habitCheck) {
         report.dailyHabitCheck = habitCheck;

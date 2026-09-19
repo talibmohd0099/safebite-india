@@ -80,6 +80,57 @@ export default function Compare() {
     );
   }
 
+  // Infant formula is a specially regulated infant-nutrition category --
+  // comparing it against general food (or even another infant formula)
+  // on the same score-based criteria would imply a "which is
+  // healthier" judgment this category deliberately doesn't make (see
+  // Result.jsx's isInfantFormula branch for the same reasoning). Blocks
+  // the WHOLE comparison rather than just hiding the score rows, since
+  // the nutrient table itself invites exactly that judgment.
+  if (products.some((p) => p.isInfantFormula)) {
+    return (
+      <div className="page-in max-w-2xl mx-auto px-4 py-6 pb-24">
+        <button
+          onClick={() => navigate('/compare')}
+          className="tap-scale inline-flex items-center gap-1.5 text-[15px] mb-3"
+          style={{ color: 'var(--tint)' }}
+        >
+          ← Compare Products
+        </button>
+        <div className="rounded-[20px] p-5 text-center" style={{ background: 'var(--bg-card)' }}>
+          <div className="text-5xl mb-3">🍼</div>
+          <p className="text-[18px] font-bold mb-1" style={{ color: 'var(--label-1)' }}>Not directly comparable</p>
+          <p className="text-[13.5px] leading-relaxed mb-4" style={{ color: 'var(--label-2)' }}>
+            Infant formula is a specialized infant-nutrition product and shouldn't be compared using the same general-food criteria.
+          </p>
+          <div className="flex flex-col gap-2">
+            {products.map((p, i) => (
+              <button
+                key={p.lookupKey || i}
+                onClick={() => openProduct(p)}
+                className="tap-scale flex items-center gap-3 p-2.5 rounded-[12px] text-left"
+                style={{ background: 'var(--fill)' }}
+              >
+                <ProductImage src={p.imageUrl} size={44} expandable={false} />
+                <span className="text-[13.5px] font-semibold flex-1 min-w-0 truncate" style={{ color: 'var(--label-1)' }}>
+                  {p.productName}
+                </span>
+                {p.isInfantFormula && (
+                  <span
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                    style={{ background: 'var(--v-moderate-bg)', color: 'var(--v-moderate)' }}
+                  >
+                    Infant Formula
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const rows = buildComparisonRows(products, activeProfile);
   const { bullets, take } = describeDifferences(rows, activeProfile);
   const scoreLabels = scoreFitLabels(rows);

@@ -381,6 +381,7 @@ Return ONLY valid JSON, no markdown, no preamble:
   "summary": "...",
   "recommendation": "...",
   "isCondimentOrSeasoning": false,
+  "isInfantFormula": false,
   "usefulContext": null,
   "story": null
 }
@@ -391,14 +392,19 @@ Return ONLY valid JSON, no markdown, no preamble:
 - Sound like a knowledgeable friend, not a warning label. Vary your opening every time -- never reuse the same stock phrase across different products.
 - Describe what is going on with this product. Do NOT give advice here -- "recommendation" covers that.
 - Do NOT invent ingredients or facts not given below.
+- EXCEPTION for infant formula (isInfantFormula true below): never react to the score or call it healthy/unhealthy/good/concerning -- write one neutral, factual sentence describing what the product is (e.g. its stage/intended age if the name states one) instead.
 
 "recommendation" -- ONE short sentence (25 words max) of practical advice for THIS specific product:
 - Say what someone should actually do: how often, in what quantity, what to watch for, or what to look for instead.
 - Tie it to what is actually in THIS product. "Fine occasionally" could describe thousands of products -- be specific about why.
 - Never alarmist, never preachy, never medical advice.
+- EXCEPTION for infant formula: never give feeding/frequency advice -- write one sentence pointing to following the label's preparation/age instructions and a pediatrician for individual feeding decisions.
 
 "isCondimentOrSeasoning" -- true ONLY if this product is normally used in small amounts as part of another dish rather than eaten on its own: spice blends and masalas, seasonings, stock cubes, food colours and essences, baking powder, pickles and chutneys eaten as a side relish, ketchup and sauces used as condiments.
 false for anything eaten as a food in its own right -- biscuits, noodles, chips, namkeen, drinks, dairy, bread, chocolates. Also false for cooking oils, flours, rice and sugar: those are bulk ingredients eaten in real quantity, not small-quantity seasonings.
+
+"isInfantFormula" -- true ONLY for infant formula / infant milk substitute products explicitly intended as a complete or partial substitute for breast milk for infants (e.g. named "Infant Formula", "Stage 1/2", "Follow-up Formula" for the under-1 stage, branded infant milk powders like Similac, Nan, Lactogen, Enfamil, Furilac). This is a specially regulated product category (FSSAI Infant Milk Substitutes Act, Codex Standard for Infant Formula) whose ingredient-based score should not be read the way an ordinary food's score is -- it is formulated to meet mandated nutritional requirements, not judged by "less processed is better".
+false for: regular milk and milk powder, toddler/growing-up milk marketed for children over 2 years, general baby food and cereals (e.g. Cerelac) unless the specific product is itself labelled as an infant formula/infant milk substitute, and anything for adults or general consumption.
 
 "usefulContext" -- null for ordinary everyday foods. A product's ingredient score alone can't say WHY it exists, and some products genuinely have a real, specific purpose that a low or middling score would otherwise hide -- oral rehydration salts and electrolyte drinks, glucose/dextrose energy powders, protein or meal-replacement supplements. For exactly these, ONE short sentence (25 words max) naming the actual real-world situation this product is genuinely useful for (e.g. "During dehydration, heat exhaustion, or after intense exercise, for fast glucose and electrolyte replacement."). Never invent or guess at a use case that isn't well-established for this exact kind of product -- when in doubt, return null.
 
@@ -421,8 +427,12 @@ false for anything eaten as a food in its own right -- biscuits, noodles, chips,
  * value a plain ingredient score can't express (glucose powders, ORS,
  * protein supplements -- a middling score for "eaten as an everyday food"
  * doesn't mean it isn't exactly what it should be for its actual
- * purpose), and the long-form "Story" tab content (history/legacy, why
- * it's used, controversy, myth vs fact).
+ * purpose), whether it's an infant formula (a specially regulated
+ * category the Result page stops showing a normal 0-100 score for
+ * entirely -- see result.isInfantFormula in Result.jsx -- so a real
+ * report of "78/Good" never reads as "healthy for a baby"), and the
+ * long-form "Story" tab content (history/legacy, why it's used,
+ * controversy, myth vs fact).
  *
  * Called once per genuinely new product (the result gets cached in
  * product_reports forever after), never per repeat scan. Returns null on
@@ -489,6 +499,7 @@ Concerning ingredients: ${concerningNames.length ? concerningNames.join(', ') : 
       summary: clean(parsed?.summary),
       recommendation: clean(parsed?.recommendation),
       isCondimentOrSeasoning: parsed?.isCondimentOrSeasoning === true,
+      isInfantFormula: parsed?.isInfantFormula === true,
       usefulContext: clean(parsed?.usefulContext),
       story,
     };
