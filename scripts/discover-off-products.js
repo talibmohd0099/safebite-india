@@ -145,6 +145,50 @@ const CATEGORIES = [
   { category: 'Coconut oils', tag: 'en:coconut-oils' },
   { category: 'Milk powders', tag: 'en:milk-powders' },
   { category: 'Buttermilks', tag: 'en:buttermilks' },
+
+  // Added once all 102 of the above reached "exhausted" too (2026-09-18).
+  // Same discipline: live India-tagged counts checked before adding.
+  // Two are real near-misses from the batch above, worth calling out --
+  // OFF's actual taxonomy tag turned out to be the OTHER grammatical
+  // form of what was already tried: "vermicellis" (tried, zero) vs.
+  // "en:vermicelli" (this batch, real hits), and "ghees" (tried, zero)
+  // vs. "en:ghee" (this batch, real hits). Several other plausible ones
+  // (breakfast-drinks, black-teas, hot-chocolates, cooking-oils,
+  // chili-sauces, baking-powders, instant-mixes, seasonings, plant-milks,
+  // soy-milks, almond-milks, oat-milks, coconut-milks, meal-replacements,
+  // squashes, sports-drinks, pretzels, corn-snacks, bhujia, papad,
+  // parathas, rotis) returned zero and were left out, same as before --
+  // OFF's coverage of home-cooked/prepared Indian dishes (vs. packaged
+  // retail products) stays thin.
+  { category: 'Noodles', tag: 'en:noodles' },
+  { category: 'Tomato sauces', tag: 'en:tomato-sauces' },
+  { category: 'Instant coffees', tag: 'en:instant-coffees' },
+  { category: 'Dried fruits', tag: 'en:dried-fruits' },
+  { category: 'Ghee', tag: 'en:ghee' },
+  { category: 'Protein powders', tag: 'en:protein-powders' },
+  { category: 'Green teas', tag: 'en:green-teas' },
+  { category: 'Sugars', tag: 'en:sugars' },
+  { category: 'Herbal teas', tag: 'en:herbal-teas' },
+  { category: 'Cocoa and chocolate powders', tag: 'en:cocoa-and-chocolate-powders' },
+  { category: 'Salts', tag: 'en:salts' },
+  { category: 'Baby foods', tag: 'en:baby-foods' },
+  { category: 'Chocolate spreads', tag: 'en:chocolate-spreads' },
+  { category: 'Rice bran oils', tag: 'en:rice-bran-oils' },
+  { category: 'Hot sauces', tag: 'en:hot-sauces' },
+  { category: 'Pasta sauces', tag: 'en:pasta-sauces' },
+  { category: 'Frozen vegetables', tag: 'en:frozen-vegetables' },
+  { category: 'Infant formulas', tag: 'en:infant-formulas' },
+  { category: 'Soy sauces', tag: 'en:soy-sauces' },
+  { category: 'Salad dressings', tag: 'en:salad-dressings' },
+  { category: 'Baking mixes', tag: 'en:baking-mixes' },
+  { category: 'Fruit nectars', tag: 'en:fruit-nectars' },
+  { category: 'Banana chips', tag: 'en:banana-chips' },
+  { category: 'Sesame oils', tag: 'en:sesame-oils' },
+  { category: 'Iced teas', tag: 'en:iced-teas' },
+  { category: 'Groundnut oils', tag: 'en:groundnut-oils' },
+  { category: 'Peanut oils', tag: 'en:peanut-oils' },
+  { category: 'Vermicelli', tag: 'en:vermicelli' },
+  { category: 'Cake mixes', tag: 'en:cake-mixes' },
 ];
 
 // Being crowdsourced, some Open Food Facts entries have nutrition facts
