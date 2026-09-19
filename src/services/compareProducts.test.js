@@ -104,6 +104,31 @@ test('describeDifferences includes a personal-fit bullet naming a real concern o
   assert.match(fitBullet, /Sunfeast Yippee Noodles Magic Masala is a better fit due to fewer flagged additive-related concerns\./);
 });
 
+test('ourTake never credits a metric the profile never selected as a priority -- real bug found via live testing', () => {
+  // Ibbu's real profile: prioritize protein, fewer additives, more
+  // whole-food ingredients -- deliberately NOT lowerSugar or
+  // lowerSodium. Maggi wins personalScore (fewest matched AVOID
+  // concerns) while also happening to have the lowest sugar/sodium of
+  // the three -- ourTake must not cite sugar/sodium as "why", since
+  // Ibbu never asked to watch either one.
+  const profile = { nickname: 'Ibbu', priorities: ['higherProtein', 'fewerAdditives', 'moreWholeFood'] };
+  const rows = buildComparisonRows([MAGGI, YIPPEE, TOP_RAMEN], profile);
+  const { ourTake } = describeDifferences(rows, profile);
+  assert.doesNotMatch(ourTake, /sugar/);
+  assert.doesNotMatch(ourTake, /sodium/);
+});
+
+test('ourTake DOES credit a metric the profile explicitly selected', () => {
+  const profile = { nickname: 'Ibbu', priorities: ['lowerSugar', 'lowerSodium'] };
+  const rows = buildComparisonRows([MAGGI, YIPPEE, TOP_RAMEN], profile);
+  const { ourTake } = describeDifferences(rows, profile);
+  // Yippee is both the personal-score winner here and the real sugar/
+  // sodium winner -- now that those ARE selected priorities, citing
+  // them is correct, not a bug.
+  assert.match(ourTake, /Sunfeast Yippee Noodles Magic Masala/);
+  assert.match(ourTake, /sugar|sodium/);
+});
+
 test('describeDifferences never claims a metric the lower-scoring product is actually better on', () => {
   // Yippee scores higher overall but this time has MORE sodium than Maggi
   // -- the sodium bullet must not claim Yippee "has lower sodium".

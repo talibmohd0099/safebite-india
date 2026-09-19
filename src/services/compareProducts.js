@@ -145,11 +145,16 @@ export function personalFitLabels(rows) {
 // so strict that two genuinely similar products never get a bullet.
 const MIN_RELATIVE_DIFFERENCE = 0.2;
 
+// priorityKey ties each metric to the matching entry in
+// personalAssessment.js's PRIORITIES -- used below to keep a metric the
+// profile never asked to watch out of that SAME profile's "why is this
+// the better fit" reasoning, even when the top-ranked product happens
+// to also win on it.
 const NUMERIC_METRICS = [
-  { key: 'sugarG', unit: 'g', decimals: 1, lowerIsBetter: true, lowerLabel: 'lower sugar', higherLabel: 'more sugar' },
-  { key: 'sodiumMg', unit: 'mg', decimals: 0, lowerIsBetter: true, lowerLabel: 'lower sodium', higherLabel: 'more sodium' },
-  { key: 'saturatedFatG', unit: 'g', decimals: 1, lowerIsBetter: true, lowerLabel: 'less saturated fat', higherLabel: 'more saturated fat' },
-  { key: 'proteinG', unit: 'g', decimals: 1, lowerIsBetter: false, lowerLabel: 'less protein', higherLabel: 'more protein' },
+  { key: 'sugarG', unit: 'g', decimals: 1, lowerIsBetter: true, lowerLabel: 'lower sugar', higherLabel: 'more sugar', priorityKey: 'lowerSugar' },
+  { key: 'sodiumMg', unit: 'mg', decimals: 0, lowerIsBetter: true, lowerLabel: 'lower sodium', higherLabel: 'more sodium', priorityKey: 'lowerSodium' },
+  { key: 'saturatedFatG', unit: 'g', decimals: 1, lowerIsBetter: true, lowerLabel: 'less saturated fat', higherLabel: 'more saturated fat', priorityKey: 'lowerSatFat' },
+  { key: 'proteinG', unit: 'g', decimals: 1, lowerIsBetter: false, lowerLabel: 'less protein', higherLabel: 'more protein', priorityKey: 'higherProtein' },
 ];
 
 const CONCERN_ENGLISH_LABEL = {
@@ -207,7 +212,18 @@ export function describeDifferences(rows, activeProfile = null) {
         `${best.productName} has ${metric.lowerIsBetter ? metric.lowerLabel : metric.higherLabel} ` +
         `(${formatValue(best[metric.key], metric)} vs ${formatValue(worst[metric.key], metric)}) than ${worst.productName}.`
       );
-      if (topProduct && best.lookupKey === topProduct.lookupKey) winningMetrics.push(metric.lowerIsBetter ? metric.lowerLabel : metric.higherLabel);
+      if (topProduct && best.lookupKey === topProduct.lookupKey) {
+        // A metric the profile never selected must never explain why
+        // that SAME profile's top pick is the top pick, even when the
+        // top-ranked product also happens to win on it (real bug found
+        // via live testing: a profile with only "fewer additives" and
+        // "prioritize protein" selected got "largely due to lower sugar
+        // and lower sodium" in its own explanation -- neither was ever
+        // asked for). No active profile means general score reasoning,
+        // which has no priorities to restrict to.
+        const relevantToProfile = !activeProfile || (activeProfile.priorities || []).includes(metric.priorityKey);
+        if (relevantToProfile) winningMetrics.push(metric.lowerIsBetter ? metric.lowerLabel : metric.higherLabel);
+      }
     }
 
     const withProcessing = list.filter((r) => r.processing);
