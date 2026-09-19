@@ -28,7 +28,7 @@ export const STRINGS = {
     navScan: 'Scan',
     navHistory: 'History',
     navFamily: 'Family',
-    navNews: 'News',
+    navNews: 'Updates',
     navAbout: 'About',
 
     familyTitle: 'Family',
@@ -304,7 +304,7 @@ export const STRINGS = {
     navScan: 'स्कैन',
     navHistory: 'इतिहास',
     navFamily: 'परिवार',
-    navNews: 'खबरें',
+    navNews: 'अपडेट्स',
     navAbout: 'बारे में',
 
     familyTitle: 'परिवार',

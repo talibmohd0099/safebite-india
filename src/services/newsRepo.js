@@ -10,7 +10,7 @@ export async function getNewsItems(type, limit = 20) {
 
   const { data, error } = await supabase
     .from('news_items')
-    .select('id, title, link, source, published_at, summary')
+    .select('id, type, title, link, source, published_at, summary, event_key')
     .eq('type', type)
     .eq('is_relevant', true)
     .order('published_at', { ascending: false, nullsFirst: false })

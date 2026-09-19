@@ -49,8 +49,25 @@ async function main() {
     return;
   }
 
+  // Recent story clusters, so a new article continuing an already-tracked
+  // event reuses its key instead of only ever clustering within today's
+  // batch -- see the comment above CLUSTER_KEY param in summarizeNewsItems.
+  const { data: recentClustered } = await supabase
+    .from('news_items')
+    .select('event_key, title, fetched_at')
+    .not('event_key', 'is', null)
+    .order('fetched_at', { ascending: false })
+    .limit(50);
+  const existingClusters = [];
+  const seenKeys = new Set();
+  for (const row of recentClustered || []) {
+    if (seenKeys.has(row.event_key)) continue;
+    seenKeys.add(row.event_key);
+    existingClusters.push({ key: row.event_key, title: row.title });
+  }
+
   console.log(`Summarizing ${pending.length} item(s)...`);
-  const summaries = await summarizeNewsItems(pending);
+  const summaries = await summarizeNewsItems(pending, existingClusters);
 
   if (summaries.length === 0) {
     console.error("Gemini didn't return any usable summaries this run.");
@@ -60,17 +77,19 @@ async function main() {
 
   let saved = 0;
   let excluded = 0;
-  for (const { id, relevant, summary } of summaries) {
-    const { error } = await supabase.from('news_items').update({ summary, is_relevant: relevant }).eq('id', id);
+  let clustered = 0;
+  for (const { id, relevant, summary, eventKey } of summaries) {
+    const { error } = await supabase.from('news_items').update({ summary, is_relevant: relevant, event_key: eventKey }).eq('id', id);
     if (error) {
       console.error(`  Failed to save result for ${id}:`, error.message);
       continue;
     }
     saved += 1;
     if (!relevant) excluded += 1;
+    if (eventKey) clustered += 1;
   }
 
-  console.log(`Processed ${saved}/${pending.length} item(s), ${excluded} flagged not relevant and hidden.`);
+  console.log(`Processed ${saved}/${pending.length} item(s), ${excluded} flagged not relevant and hidden, ${clustered} clustered into a shared story.`);
   if (saved < pending.length) {
     console.log(`${pending.length - saved} item(s) left unprocessed -- will retry on the next run.`);
   }
