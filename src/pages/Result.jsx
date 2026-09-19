@@ -449,7 +449,14 @@ export default function Result() {
     { key: 'Fine', label: t('tierFine'), color: 'var(--v-good)', bg: 'var(--v-good-bg)', icon: '✓' },
   ].map((tier) => ({ ...tier, count: ingredients.filter((i) => severityOf(i) === tier.key).length }));
 
-  const flaggedCount = ingredients.filter((i) => ['Harmful', 'Concerning'].includes(severityOf(i))).length;
+  // Same "not Fine" definition the Ingredients tab's tier chips and the
+  // "Why did this score X?" breakdown (mainFactors, below) already use --
+  // this used to only count Harmful/Concerning, so a product with e.g. 2
+  // concerning + 2 highly-processed ingredients said "2 of 15 raise a
+  // flag" up top while the breakdown modal one tap away listed 4. Highly
+  // processed ingredients do pull the score down (see mainFactors), so
+  // they belong in this count too.
+  const flaggedCount = ingredients.filter((i) => severityOf(i) !== 'Fine').length;
   const filteredIngredients = filter === 'all' ? ingredients : ingredients.filter((i) => severityOf(i) === filter);
 
   // The Ingredients tab's "All" list, worst tier first -- every card
