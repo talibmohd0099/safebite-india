@@ -6,7 +6,8 @@
 // score/nutrients/additives/processing side by side, plus deterministic
 // "what differs" bullets and a closing summary (compareProducts.js --
 // never an AI call, never phrased as "buy X").
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { getScoreColor, saveToHistory } from '../utils/storage';
 import { useFamily } from '../contexts/FamilyContext';
 import { buildComparisonRows, describeDifferences, scoreFitLabels, personalFitLabels } from '../services/compareProducts';
@@ -40,8 +41,17 @@ const NUTRIENT_ROWS = [
 export default function Compare() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { profiles, activeProfileId } = useFamily();
-  const activeProfile = profiles.find((p) => p.id === activeProfileId) || null;
+  const { profiles, activeProfileId, setActiveProfile } = useFamily();
+  const [selectedProfileId, setSelectedProfileId] = useState(activeProfileId);
+  const activeProfile = profiles.find((p) => p.id === selectedProfileId) || null;
+
+  // Switching here also updates the app-wide active profile, same as
+  // Result.jsx's own switcher -- one "who am I checking for" setting,
+  // not a separate one just for this screen.
+  const selectProfile = (profileId) => {
+    setSelectedProfileId(profileId);
+    setActiveProfile(profileId);
+  };
 
   const products = location.state?.products || [];
 
@@ -71,7 +81,7 @@ export default function Compare() {
   }
 
   const rows = buildComparisonRows(products, activeProfile);
-  const { bullets, ourTake } = describeDifferences(rows, activeProfile);
+  const { bullets, take } = describeDifferences(rows, activeProfile);
   const scoreLabels = scoreFitLabels(rows);
   const personalLabels = personalFitLabels(rows);
   const colTemplate = `104px repeat(${rows.length}, 1fr)`;
@@ -87,7 +97,51 @@ export default function Compare() {
       </button>
 
       <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--label-1)' }}>Comparison Result</h1>
-      <p className="text-sm mb-5" style={{ color: 'var(--label-3)' }}>See differences and helpful insights.</p>
+      <p className="text-sm mb-4" style={{ color: 'var(--label-3)' }}>See differences and helpful insights.</p>
+
+      {/* Who this personalized comparison is for -- switching here also
+          updates the app's own active profile, so it stays in sync with
+          the Result page's own switcher instead of drifting separately. */}
+      {profiles.length > 0 && (
+        <div className="mb-5">
+          <p className="text-[12.5px] font-semibold mb-2" style={{ color: 'var(--label-2)' }}>Compare for</p>
+          <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            <button
+              onClick={() => selectProfile(null)}
+              className="tap-scale flex-shrink-0 px-3 py-2 rounded-full text-[13px] font-semibold"
+              style={{ background: !activeProfile ? 'var(--tint)' : 'var(--fill)', color: !activeProfile ? '#fff' : 'var(--label-1)' }}
+            >
+              General
+            </button>
+            {profiles.map((p) => {
+              const active = p.id === selectedProfileId;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => selectProfile(active ? null : p.id)}
+                  className="tap-scale flex-shrink-0 flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-full text-[13px] font-semibold"
+                  style={{ background: active ? 'var(--tint)' : 'var(--fill)', color: active ? '#fff' : 'var(--label-1)' }}
+                >
+                  <span
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-[13px] flex-shrink-0"
+                    style={{ background: active ? 'rgba(255,255,255,0.25)' : 'var(--bg-card)' }}
+                  >
+                    {p.avatarEmoji}
+                  </span>
+                  {p.nickname}
+                </button>
+              );
+            })}
+            <Link
+              to="/family"
+              className="tap-scale flex-shrink-0 flex items-center px-3 py-2 rounded-full text-[13px] font-semibold"
+              style={{ background: 'var(--fill)', color: 'var(--tint)' }}
+            >
+              + Add
+            </Link>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-[16px] overflow-hidden" style={{ background: 'var(--bg-card)' }}>
         {/* Product header -- image + name + brand, tap to open the full result. */}
@@ -120,7 +174,7 @@ export default function Compare() {
 
         {activeProfile && (
           <div className="grid gap-2 px-3 py-2.5 items-center" style={{ gridTemplateColumns: colTemplate, background: 'var(--fill)' }}>
-            <span className="text-[12px] font-semibold" style={{ color: 'var(--label-2)' }}>For {activeProfile.nickname}</span>
+            <span className="text-[12px] font-semibold" style={{ color: 'var(--label-2)' }}>Personal Fit · {activeProfile.nickname}</span>
             {rows.map((r) => (
               <span key={r.lookupKey} className="text-center">
                 <ScoreCell score={r.personalScore} relativeLabel={personalLabels[r.lookupKey]} />
@@ -181,10 +235,12 @@ export default function Compare() {
         </div>
       )}
 
-      {ourTake && (
+      {take && (
         <div className="mt-3 rounded-[14px] p-4" style={{ background: 'var(--v-good-bg)' }}>
-          <p className="text-[12px] font-bold mb-1" style={{ color: 'var(--v-good)' }}>✅ Our take</p>
-          <p className="text-[13px] leading-relaxed" style={{ color: 'var(--label-1)' }}>{ourTake}</p>
+          <p className="text-[12px] font-bold mb-1" style={{ color: 'var(--v-good)' }}>
+            {activeProfile ? '👪' : '✅'} {take.label}
+          </p>
+          <p className="text-[13px] leading-relaxed" style={{ color: 'var(--label-1)' }}>{take.text}</p>
         </div>
       )}
 
