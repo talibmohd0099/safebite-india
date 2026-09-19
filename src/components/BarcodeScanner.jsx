@@ -9,11 +9,18 @@
 // keeps working everywhere regardless.
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { hasValidChecksum } from '../services/barcodeChecksum';
 
 // EAN-13/EAN-8/UPC cover essentially every Indian packaged-food barcode;
 // keeping the format list narrow avoids the detector wasting cycles
 // matching QR codes some packs also carry (contest/offer codes).
 const FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e'];
+
+// Same reason as the checksum check (see barcodeChecksum.js): don't act on
+// one frame's read. A genuine barcode held steady reads the same value
+// repeatedly; a misread from blur/glare tends to change or fail its
+// checksum from frame to frame.
+const CONSECUTIVE_READS_REQUIRED = 2;
 
 export function isBarcodeScanSupported() {
   return typeof window !== 'undefined' && 'BarcodeDetector' in window && !!navigator.mediaDevices?.getUserMedia;
@@ -24,6 +31,7 @@ export default function BarcodeScanner({ onDetected, onClose }) {
   const streamRef = useRef(null);
   const rafRef = useRef(null);
   const doneRef = useRef(false);
+  const pendingRef = useRef({ value: null, count: 0 });
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -66,9 +74,21 @@ export default function BarcodeScanner({ onDetected, onClose }) {
           try {
             const codes = await detector.detect(videoRef.current);
             if (codes.length > 0 && !doneRef.current) {
-              doneRef.current = true;
-              onDetected(codes[0].rawValue);
-              return;
+              const { rawValue, format } = codes[0];
+              if (!hasValidChecksum(rawValue, format)) {
+                // Almost certainly a misread digit, not a real barcode --
+                // don't let it count towards a match streak either.
+                pendingRef.current = { value: null, count: 0 };
+              } else if (pendingRef.current.value === rawValue) {
+                pendingRef.current.count += 1;
+                if (pendingRef.current.count >= CONSECUTIVE_READS_REQUIRED) {
+                  doneRef.current = true;
+                  onDetected(rawValue);
+                  return;
+                }
+              } else {
+                pendingRef.current = { value: rawValue, count: 1 };
+              }
             }
           } catch {
             // A transient decode error on one frame isn't fatal -- keep scanning.
