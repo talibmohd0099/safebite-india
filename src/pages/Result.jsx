@@ -443,9 +443,10 @@ export default function Result() {
   // profile this is just the general-score order the catalog already
   // returned. With one, each candidate is re-scored against that
   // person's priorities and the row is rebuilt from the top of THAT
-  // order -- and the badge on each card switches to the personal score
-  // too, since a row sorted by one number while displaying another
-  // just looks broken.
+  // order -- but the card now shows BOTH numbers ("71 / 68") instead of
+  // replacing the general score with the personal one, since losing the
+  // general score entirely made it impossible to tell how much a
+  // priority actually cost a given alternative.
   const rankedAlternatives = activeProfile
     ? alternatives
         .map((item) => ({
@@ -457,7 +458,7 @@ export default function Result() {
         }))
         .sort((a, b) => b.personalScore - a.personalScore)
         .slice(0, ALTERNATIVES_SHOWN)
-        .map(({ item, personalScore }) => ({ ...item, score: personalScore }))
+        .map(({ item, personalScore }) => ({ ...item, personalScore }))
     : alternatives.slice(0, ALTERNATIVES_SHOWN);
 
   // Stats, dots and the filter all read from one severity scale, so the

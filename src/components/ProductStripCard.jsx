@@ -5,7 +5,14 @@ import ProductImage from './ProductImage';
 import { getScoreColor } from '../utils/storage';
 
 export default function ProductStripCard({ item, onClick, style }) {
-  const colors = typeof item.score === 'number' ? getScoreColor(item.score) : null;
+  // When a family profile is active, the card carries both scores --
+  // general first, personal second ("71 / 68") -- instead of only ever
+  // showing the personal one, so it's visible how much (if at all) this
+  // specific alternative differs for that person vs. everyone else.
+  // Coloured by the personal score when present, since that's the more
+  // actionable number for whoever's currently looking at this card.
+  const hasPersonal = typeof item.personalScore === 'number';
+  const colors = typeof item.score === 'number' ? getScoreColor(hasPersonal ? item.personalScore : item.score) : null;
 
   return (
     <button
@@ -22,7 +29,7 @@ export default function ProductStripCard({ item, onClick, style }) {
           className="inline-block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
           style={{ background: colors.bg, color: colors.color }}
         >
-          {item.score}/100
+          {hasPersonal ? `${item.score} / ${item.personalScore}` : `${item.score}/100`}
         </span>
       )}
     </button>
