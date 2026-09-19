@@ -25,6 +25,7 @@ import PersonalScore from './pages/PersonalScore';
 import SharedProduct from './pages/SharedProduct';
 import History from './pages/History';
 import Compare from './pages/Compare';
+import CompareManage from './pages/CompareManage';
 import Family from './pages/Family';
 import About from './pages/About';
 import Browse from './pages/Browse';
@@ -86,7 +87,8 @@ function AppShell() {
           <Route path="/result/:id/personal" element={<PersonalScore />} />
           <Route path="/p/:reportId" element={<SharedProduct />} />
           <Route path="/history" element={<History />} />
-          <Route path="/compare" element={<Compare />} />
+          <Route path="/compare" element={<CompareManage />} />
+          <Route path="/compare/result" element={<Compare />} />
           <Route path="/family" element={<Family />} />
           <Route path="/about" element={<About />} />
           <Route path="/browse" element={<Browse />} />

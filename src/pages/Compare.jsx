@@ -1,95 +1,105 @@
 // src/pages/Compare.jsx
 //
-// "Which of these fits me better" -- not just "is this one okay".
-// Takes 2-3 already-scanned products (picked on the History page) and
-// lays their scores/nutrients/additives side by side, plus one
-// deterministic sentence naming the real, meaningful differences (see
-// compareProducts.js -- never an AI call, never a "buy X").
+// "Which of these fits me better" -- not just "is this one okay". Reads
+// the 2-4 products picked on CompareManage.jsx (passed via router state,
+// already full buildReport() output -- no extra fetch needed) and lays
+// score/nutrients/additives/processing side by side, plus deterministic
+// "what differs" bullets and a closing summary (compareProducts.js --
+// never an AI call, never phrased as "buy X").
 import { useLocation, useNavigate } from 'react-router-dom';
-import { getHistoryById, getScoreColor } from '../utils/storage';
-import { useLanguage } from '../contexts/LanguageContext';
+import { getScoreColor, saveToHistory } from '../utils/storage';
 import { useFamily } from '../contexts/FamilyContext';
-import { buildComparisonRows, describeDifferences } from '../services/compareProducts';
+import { buildComparisonRows, describeDifferences, scoreFitLabels, personalFitLabels } from '../services/compareProducts';
 import ProductImage from '../components/ProductImage';
 
-function ScoreBadge({ score }) {
+function ScoreCell({ score, relativeLabel }) {
   if (typeof score !== 'number') {
     return <span className="text-[13px]" style={{ color: 'var(--label-3)' }}>—</span>;
   }
   const colors = getScoreColor(score);
   return (
-    <span
-      className="inline-block text-[13px] font-bold px-2 py-0.5 rounded-full"
-      style={{ background: colors.bg, color: colors.color }}
-    >
-      {score}
+    <span className="inline-flex flex-col items-center gap-0.5">
+      <span className="text-[13px] font-bold px-2 py-0.5 rounded-full" style={{ background: colors.bg, color: colors.color }}>
+        {score}
+      </span>
+      {relativeLabel && <span className="text-[9.5px] font-semibold" style={{ color: 'var(--label-3)' }}>{relativeLabel}</span>}
     </span>
   );
 }
 
+const NUTRIENT_ROWS = [
+  { key: 'energyKcal', label: 'Energy (kcal)', decimals: 0, unit: '' },
+  { key: 'proteinG', label: 'Protein (g)', decimals: 1, unit: 'g' },
+  { key: 'totalCarbG', label: 'Total Carbs (g)', decimals: 1, unit: 'g' },
+  { key: 'sugarG', label: 'Total Sugars (g)', decimals: 1, unit: 'g' },
+  { key: 'totalFatG', label: 'Total Fat (g)', decimals: 1, unit: 'g' },
+  { key: 'saturatedFatG', label: 'Saturated Fat (g)', decimals: 1, unit: 'g' },
+  { key: 'sodiumMg', label: 'Sodium (mg)', decimals: 0, unit: 'mg' },
+];
+
 export default function Compare() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { t } = useLanguage();
   const { profiles, activeProfileId } = useFamily();
   const activeProfile = profiles.find((p) => p.id === activeProfileId) || null;
 
-  const ids = location.state?.ids || [];
-  // History entries carry their own `id`, name, image, score, nutrients
-  // and ingredients already -- exactly buildReport()'s shape, so this
-  // needs no extra fetch of any kind.
-  const products = ids.map((id) => getHistoryById(id)).filter(Boolean);
+  const products = location.state?.products || [];
+
+  // Opens the full result for one compared product -- same "save a
+  // fresh history entry, then navigate" pattern Category.jsx's own
+  // openResult already uses, so this behaves like every other "open a
+  // product from a list" flow in the app rather than inventing a new one.
+  const openProduct = (product) => {
+    const historyId = saveToHistory(product, 'search');
+    navigate(`/result/${historyId}`);
+  };
 
   if (products.length < 2) {
     return (
       <div className="page-in max-w-2xl mx-auto px-4 py-16 pb-24 text-center">
         <div className="text-6xl mb-4">⚖️</div>
-        <h2 className="text-xl font-bold text-slate-700 dark:text-slate-200 mb-2">{t('compareEmptyTitle')}</h2>
-        <p className="text-slate-400 dark:text-slate-500 text-sm mb-6">{t('compareEmptyBody')}</p>
+        <h2 className="text-xl font-bold text-slate-700 dark:text-slate-200 mb-2">Nothing selected to compare</h2>
+        <p className="text-slate-400 dark:text-slate-500 text-sm mb-6">Search and add 2-4 products to compare them side by side.</p>
         <button
-          onClick={() => navigate('/history')}
+          onClick={() => navigate('/compare')}
           className="tap-scale bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-xl transition-colors"
         >
-          {t('compareBackToHistory')}
+          Add products to compare
         </button>
       </div>
     );
   }
 
   const rows = buildComparisonRows(products, activeProfile);
-  const differSentence = describeDifferences(rows);
-  const colTemplate = `92px repeat(${rows.length}, 1fr)`;
-
-  const METRIC_ROWS = [
-    { key: 'sugarG', label: t('compareMetricSugar'), unit: 'g' },
-    { key: 'sodiumMg', label: t('compareMetricSodium'), unit: 'mg' },
-    { key: 'proteinG', label: t('compareMetricProtein'), unit: 'g' },
-    { key: 'additives', label: t('compareMetricAdditives'), unit: '' },
-  ];
+  const { bullets, ourTake } = describeDifferences(rows, activeProfile);
+  const scoreLabels = scoreFitLabels(rows);
+  const personalLabels = personalFitLabels(rows);
+  const colTemplate = `104px repeat(${rows.length}, 1fr)`;
 
   return (
     <div className="page-in max-w-2xl mx-auto px-4 py-6 pb-24">
       <button
-        onClick={() => navigate('/history')}
+        onClick={() => navigate('/compare')}
         className="tap-scale inline-flex items-center gap-1.5 text-[15px] mb-3"
         style={{ color: 'var(--tint)' }}
       >
-        ← {t('navHistory')}
+        ← Compare Products
       </button>
 
-      <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--label-1)' }}>{t('compareTitle')}</h1>
-      <p className="text-sm mb-5" style={{ color: 'var(--label-3)' }}>{t('compareSubtitle')}</p>
+      <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--label-1)' }}>Comparison Result</h1>
+      <p className="text-sm mb-5" style={{ color: 'var(--label-3)' }}>See differences and helpful insights.</p>
 
       <div className="rounded-[16px] overflow-hidden" style={{ background: 'var(--bg-card)' }}>
-        {/* Product header -- image + name, tap to open that product's full result. */}
+        {/* Product header -- image + name + brand, tap to open the full result. */}
         <div className="grid gap-2 p-3" style={{ gridTemplateColumns: colTemplate }}>
           <div />
-          {products.map((p, i) => (
-            <button key={p.id} onClick={() => navigate(`/result/${p.id}`)} className="tap-scale text-center">
-              <ProductImage src={rows[i].imageUrl} size={56} expandable={false} />
+          {rows.map((r, i) => (
+            <button key={r.lookupKey} onClick={() => openProduct(products[i])} className="tap-scale text-center">
+              <ProductImage src={r.imageUrl} size={56} expandable={false} />
               <p className="text-[10.5px] font-semibold mt-1 leading-tight line-clamp-2" style={{ color: 'var(--label-1)' }}>
-                {rows[i].productName}
+                {r.productName}
               </p>
+              {r.brand && <p className="text-[9.5px] mt-0.5" style={{ color: 'var(--label-3)' }}>{r.brand}</p>}
             </button>
           ))}
         </div>
@@ -97,54 +107,90 @@ export default function Compare() {
         <div className="h-px" style={{ background: 'var(--separator)' }} />
 
         {/* Score row (+ personal score row when a profile is active). */}
-        <div className="grid gap-2 px-3 py-2.5 items-center" style={{ gridTemplateColumns: colTemplate }}>
-          <span className="text-[12px] font-semibold" style={{ color: 'var(--label-2)' }}>{t('compareMetricScore')}</span>
-          {rows.map((r) => (
-            <span key={r.lookupKey || r.productName} className="text-center"><ScoreBadge score={r.overallScore} /></span>
-          ))}
+        <div className="grid gap-2 px-3 py-2.5 items-center">
+          <div className="grid gap-2" style={{ gridTemplateColumns: colTemplate }}>
+            <span className="text-[12px] font-semibold" style={{ color: 'var(--label-2)' }}>Score</span>
+            {rows.map((r) => (
+              <span key={r.lookupKey} className="text-center">
+                <ScoreCell score={r.overallScore} relativeLabel={scoreLabels[r.lookupKey]} />
+              </span>
+            ))}
+          </div>
         </div>
 
         {activeProfile && (
           <div className="grid gap-2 px-3 py-2.5 items-center" style={{ gridTemplateColumns: colTemplate, background: 'var(--fill)' }}>
-            <span className="text-[12px] font-semibold" style={{ color: 'var(--label-2)' }}>
-              {t('compareMetricFor', { name: activeProfile.nickname })}
-            </span>
+            <span className="text-[12px] font-semibold" style={{ color: 'var(--label-2)' }}>For {activeProfile.nickname}</span>
             {rows.map((r) => (
-              <span key={r.lookupKey || r.productName} className="text-center"><ScoreBadge score={r.personalScore} /></span>
+              <span key={r.lookupKey} className="text-center">
+                <ScoreCell score={r.personalScore} relativeLabel={personalLabels[r.lookupKey]} />
+              </span>
             ))}
           </div>
         )}
 
-        {METRIC_ROWS.map((metric, i) => (
-          <div
-            key={metric.key}
-            className="grid gap-2 px-3 py-2.5 items-center"
-            style={{ gridTemplateColumns: colTemplate, borderTop: '1px solid var(--separator)' }}
-          >
+        <p className="text-[10.5px] font-bold uppercase tracking-wide px-3 pt-3 pb-1" style={{ color: 'var(--label-3)', borderTop: '1px solid var(--separator)' }}>
+          Key Nutrients (per 100g)
+        </p>
+
+        {NUTRIENT_ROWS.map((metric) => (
+          <div key={metric.key} className="grid gap-2 px-3 py-2 items-center" style={{ gridTemplateColumns: colTemplate }}>
             <span className="text-[12px] font-semibold" style={{ color: 'var(--label-2)' }}>{metric.label}</span>
             {rows.map((r) => {
               const value = r[metric.key];
               return (
-                <span key={r.lookupKey || r.productName + i} className="text-center text-[13px]" style={{ color: 'var(--label-1)' }}>
-                  {typeof value === 'number' ? `${value}${metric.unit}` : <span style={{ color: 'var(--label-3)' }}>—</span>}
+                <span key={r.lookupKey} className="text-center text-[13px]" style={{ color: 'var(--label-1)' }}>
+                  {typeof value === 'number' ? Number(value.toFixed(metric.decimals)) : <span style={{ color: 'var(--label-3)' }}>—</span>}
                 </span>
               );
             })}
           </div>
         ))}
+
+        <div className="grid gap-2 px-3 py-2.5 items-center" style={{ gridTemplateColumns: colTemplate, borderTop: '1px solid var(--separator)' }}>
+          <span className="text-[12px] font-semibold" style={{ color: 'var(--label-2)' }}>Additives</span>
+          {rows.map((r) => (
+            <span key={r.lookupKey} className="text-center text-[13px] font-semibold" style={{ color: 'var(--label-1)' }}>{r.additivesLabel}</span>
+          ))}
+        </div>
+
+        <div className="grid gap-2 px-3 py-2.5 items-center" style={{ gridTemplateColumns: colTemplate, borderTop: '1px solid var(--separator)' }}>
+          <span className="text-[12px] font-semibold" style={{ color: 'var(--label-2)' }}>Processing</span>
+          {rows.map((r) => (
+            <span key={r.lookupKey} className="text-center text-[13px] font-semibold" style={{ color: 'var(--label-1)' }}>{r.processing || '—'}</span>
+          ))}
+        </div>
       </div>
 
       {/* Deterministic, always-English computed text -- same convention
-          as report.summary (scoringEngine.js): describes the real
-          numbers, never phrased as a recommendation. */}
-      <div className="mt-4 rounded-[14px] p-4" style={{ background: 'var(--tint-bg)' }}>
-        <p className="text-[12px] font-bold mb-1" style={{ color: 'var(--tint)' }}>{t('compareWhatDiffers')}</p>
-        <p className="text-[13.5px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
-          {differSentence || t('compareNoRealDifference')}
-        </p>
-      </div>
+          as report.summary (scoringEngine.js): describes real numbers
+          only, never phrased as a command. */}
+      {bullets.length > 0 && (
+        <div className="mt-4 rounded-[14px] p-4" style={{ background: 'var(--tint-bg)' }}>
+          <p className="text-[12px] font-bold mb-2 flex items-center gap-1.5" style={{ color: 'var(--tint)' }}>
+            📋 What differs?
+          </p>
+          <ul className="space-y-1.5">
+            {bullets.map((b, i) => (
+              <li key={i} className="text-[13px] leading-relaxed flex gap-2" style={{ color: 'var(--label-1)' }}>
+                <span style={{ color: 'var(--tint)' }}>•</span>
+                <span>{b}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
-      <p className="text-[11px] mt-4 text-center" style={{ color: 'var(--label-3)' }}>{t('compareMissingDataNote')}</p>
+      {ourTake && (
+        <div className="mt-3 rounded-[14px] p-4" style={{ background: 'var(--v-good-bg)' }}>
+          <p className="text-[12px] font-bold mb-1" style={{ color: 'var(--v-good)' }}>✅ Our take</p>
+          <p className="text-[13px] leading-relaxed" style={{ color: 'var(--label-1)' }}>{ourTake}</p>
+        </div>
+      )}
+
+      <p className="text-[11px] mt-4 text-center" style={{ color: 'var(--label-3)' }}>
+        "—" means that product's label/scan didn't have a real number for this.
+      </p>
     </div>
   );
 }

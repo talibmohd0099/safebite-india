@@ -590,7 +590,15 @@ export default function Home() {
               trip to the History tab. Only for returning users. */}
           {searchQuery.trim().length === 0 && recentScans.length > 0 && (
             <div className="mb-6">
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">Continue where you left off</p>
+              <div className="flex items-center justify-between mb-2 px-0.5">
+                <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Continue where you left off</p>
+                <button
+                  onClick={() => navigate('/compare')}
+                  className="tap-scale text-xs font-semibold text-green-600 dark:text-green-400 flex-shrink-0"
+                >
+                  ⚖️ Compare
+                </button>
+              </div>
               <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
                 {recentScans.map((entry, i) => (
                   <ProductStripCard
