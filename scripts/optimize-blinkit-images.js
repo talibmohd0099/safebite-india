@@ -12,6 +12,14 @@
 import { optimizeAndUploadBlinkitImage } from '../src/services/blinkitImageOptimizer.js';
 import { supabase, isSupabaseConfigured } from '../src/services/supabaseClient.js';
 
+// A polite gap between products -- this hits Blinkit's own image CDN
+// once per product on top of whatever the concurrent scrape loop is
+// already doing, and a full backlog run is thousands of requests in a
+// row. No hard rate limit is documented for cdn.grofers.com (unlike
+// Gemini's vision API), so this is a courtesy pace, not a measured one.
+const REQUEST_GAP_MS = 300;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 async function main() {
   if (!isSupabaseConfigured) {
     console.error('Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY.');
@@ -71,6 +79,7 @@ async function main() {
     report.push(result.bytes);
     ok += 1;
     console.log(`  ok  ${row.product_name} -- ${(result.bytes / 1024).toFixed(1)}KB`);
+    await sleep(REQUEST_GAP_MS);
   }
 
   console.log(`\nDone: ${ok} succeeded, ${failed} failed.`);
