@@ -1,7 +1,7 @@
 // src/pages/History.jsx
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getHistory, clearHistory, getScoreColor } from '../utils/storage';
+import { getHistory, clearHistory, getScoreColor, productLayoutId } from '../utils/storage';
 import ScoreCircle from '../components/ScoreCircle';
 import ProductImage from '../components/ProductImage';
 
@@ -111,7 +111,7 @@ export default function History() {
               style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }}
               className="item-in tap-scale bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-3 flex items-center gap-3 cursor-pointer hover:shadow-md transition-all"
             >
-              <ProductImage src={entry.imageUrl} size={128} layoutId={`product-photo-${entry.id}`} />
+              <ProductImage src={entry.imageUrl} size={128} layoutId={productLayoutId(entry)} />
 
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-slate-800 dark:text-slate-100 text-[15px] leading-snug truncate">

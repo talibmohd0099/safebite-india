@@ -131,6 +131,25 @@ export function getScoreColor(score) {
   };
 }
 
+// A stable identity framer-motion's shared-element transition (see
+// ProductImage.jsx's layoutId prop) can match across two completely
+// different code paths for "the same product" -- lookupKey (the
+// product's real identity), when known, since that's available
+// synchronously wherever product data is already on screen (a home
+// screen strip, a category grid) AND on the eventual Result page (set
+// on the report the moment it's built, long before it's ever saved to
+// history) -- even for a cache-hit tile whose destination history row
+// doesn't exist yet at the moment it's tapped. Falls back to the
+// history id itself for the rare case neither scan has a lookupKey at
+// all (an ingredient-only text search, never cached as a "product").
+// Returns undefined (no layoutId at all, plain instant navigation) for
+// neither -- never invents an unstable one.
+export function productLayoutId(item) {
+  if (item?.lookupKey) return `product-photo-${item.lookupKey}`;
+  if (item?.id) return `product-photo-id-${item.id}`;
+  return undefined;
+}
+
 // An ingredient can be perfectly legal and non-toxic and still be one of
 // the biggest things dragging a score down — refined flour, hydrolyzed
 // vegetable protein, glucose syrup. Painting those the same green as a
