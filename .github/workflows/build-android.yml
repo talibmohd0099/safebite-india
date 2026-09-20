@@ -28,6 +28,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Secrets can't be referenced directly in a step's `if:` (GitHub
+    # rejects the whole workflow file at parse time if you try -- this
+    # broke every run since the release-AAB steps below were added,
+    # confirmed live via three straight 0-job "failure" runs). A
+    # job-level env var computed from the secret is the documented
+    # workaround: it IS readable from `if:` once steps start.
+    env:
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -84,11 +92,11 @@ jobs:
             --latest
 
       - name: Decode release keystore
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: env.HAS_KEYSTORE == 'true'
         run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
 
       - name: Build release AAB (signed, for Play Store)
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: env.HAS_KEYSTORE == 'true'
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -97,7 +105,7 @@ jobs:
         run: ./gradlew bundleRelease --no-daemon
 
       - name: Upload release AAB
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: env.HAS_KEYSTORE == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: foodguard-release-aab
