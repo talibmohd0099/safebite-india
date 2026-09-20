@@ -563,7 +563,7 @@ export default function Result() {
   const habitDisplay = result.dailyHabitCheck && (() => {
     const habit = result.dailyHabitCheck;
     const servingText = habit.servingGrams
-      ? t('habitServingPack', { grams: habit.servingGrams })
+      ? t('habitServingPack', { grams: habit.servingGrams, unit: habit.servingUnit || 'g' })
       : t('habitServingPer100g');
     return {
       ...habit,
@@ -1107,7 +1107,7 @@ export default function Result() {
             <div className="px-4 py-3.5">
               <p className="text-[12px] mb-3" style={{ color: 'var(--label-3)' }}>
                 {result.realNutrientsServingGrams
-                  ? t('nutritionPerServing', { grams: result.realNutrientsServingGrams })
+                  ? t('nutritionPerServing', { grams: result.realNutrientsServingGrams, unit: result.realNutrientsServingUnit || 'g' })
                   : t('nutritionPer100g')}
               </p>
               <div className="grid grid-cols-3 gap-3">

@@ -120,10 +120,13 @@ export function isSmallPortionFood(productName, servingGrams) {
  *   Returned as-is so the UI can phrase "a 70g pack" vs "every 100g" in
  *   whichever language it's displaying, rather than baking English
  *   grammar into this rule-based layer.
+ * @param {string} servingUnit - 'g' or 'ml' (a liquid pack's real unit
+ *   -- a 200ml can isn't a "200g pack"). Defaults to 'g', the only unit
+ *   this ever recorded before liquid products needed it too.
  * @returns the single most-over-limit nutrient's projection, or null if
  *   nothing is known or nothing clears the "worth mentioning" bar.
  */
-export function buildDailyHabitCheck(nutrients, servingGrams = null) {
+export function buildDailyHabitCheck(nutrients, servingGrams = null, servingUnit = 'g') {
   if (!nutrients) return null;
 
   const candidates = NUTRIENT_LIMITS
@@ -146,5 +149,6 @@ export function buildDailyHabitCheck(nutrients, servingGrams = null) {
     unit: top.unit,
     percent: Math.round(top.percent),
     servingGrams,
+    servingUnit,
   };
 }

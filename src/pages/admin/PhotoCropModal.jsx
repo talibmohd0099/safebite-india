@@ -73,11 +73,34 @@ export default function PhotoCropModal({ imageUrl, onCropped, onClose }) {
     const sh = Math.round(rect.h * scaleY);
 
     try {
-      const canvas = document.createElement('canvas');
-      canvas.width = sw;
-      canvas.height = sh;
-      canvas.getContext('2d').drawImage(imgRef.current, sx, sy, sw, sh, 0, 0, sw, sh);
-      onCropped(canvas.toDataURL('image/jpeg', 0.85));
+      const source = document.createElement('canvas');
+      source.width = sw;
+      source.height = sh;
+      source.getContext('2d').drawImage(imgRef.current, sx, sy, sw, sh, 0, 0, sw, sh);
+
+      // Same ~20KB target as the Blinkit optimize pipeline and the
+      // hero-photo upload (adminImage.js) -- a manual crop is still a
+      // real product photo, same size budget as every other one.
+      const MAX_BYTES = 20 * 1024;
+      const dataUrlBytes = (dataUrl) => Math.round((dataUrl.length - dataUrl.indexOf(',') - 1) * 0.75);
+      const widths = [500, 450, 400, 350, 300, 250];
+      const qualities = [0.75, 0.65, 0.55, 0.45, 0.35];
+      let result = null;
+
+      outer: for (const w of widths) {
+        const scale = Math.min(1, w / sw);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(sw * scale));
+        canvas.height = Math.max(1, Math.round(sh * scale));
+        canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height);
+
+        for (const q of qualities) {
+          const out = canvas.toDataURL('image/jpeg', q);
+          result = out;
+          if (dataUrlBytes(out) <= MAX_BYTES) break outer;
+        }
+      }
+      onCropped(result);
     } catch {
       // A tainted canvas throws here even when the <img> itself loaded
       // fine -- same cross-origin cause as handleImgError, just caught

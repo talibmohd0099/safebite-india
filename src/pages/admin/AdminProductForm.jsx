@@ -287,6 +287,14 @@ export default function AdminProductForm({ copyMode = false }) {
 
   const [nutrients, setNutrients] = useState({});
   const [servingGrams, setServingGrams] = useState('');
+  // 'g' for a solid/semi-solid pack, 'ml' for a liquid (a can/bottle) --
+  // real bug this fixes: the field only ever showed/saved "g", so a
+  // 200ml soda's own report told the reader "per 200g serving", wrong
+  // unit for something you drink. Defaults to 'g' for every product
+  // saved before this existed (see the report-load effect below), which
+  // was the only unit ever recorded, so it's the correct backward-
+  // compatible assumption, not a guess.
+  const [servingUnit, setServingUnit] = useState('g');
   const setNutrient = (key, value) => setNutrients((prev) => ({ ...prev, [key]: value }));
 
   const [report, setReport] = useState(null);
@@ -330,6 +338,7 @@ export default function AdminProductForm({ copyMode = false }) {
         if (r.nutritionPanel) setNutrients(r.nutritionPanel);
         else if (r.realNutrients) setNutrients(r.realNutrients);
         if (r.realNutrientsServingGrams) setServingGrams(r.realNutrientsServingGrams);
+        if (r.realNutrientsServingUnit) setServingUnit(r.realNutrientsServingUnit);
         setReport(r);
         // The copy starts with the source product's exact name, so it
         // WILL look like a duplicate -- surface that warning right away
@@ -461,7 +470,11 @@ export default function AdminProductForm({ copyMode = false }) {
   const applyHeroPhoto = async (file) => {
     if (!file) return;
     try {
-      setPhotoDataUrl(await compressImageToDataUrl(file));
+      // Same ~20KB target as the Blinkit optimize pipeline
+      // (blinkitImageOptimizer.js) -- a phone photo uploaded here is
+      // what a real user actually sees, so it belongs on the same size
+      // budget as every other product photo, not the ~150KB default.
+      setPhotoDataUrl(await compressImageToDataUrl(file, { maxBytes: 20 * 1024 }));
     } catch (err) {
       setError(err.message);
     }
@@ -541,7 +554,7 @@ export default function AdminProductForm({ copyMode = false }) {
       }
     }
     if (Object.keys(scored).length === 0) return undefined;
-    return { nutrients: scored, servingGrams: servingGrams !== '' ? Number(servingGrams) : undefined };
+    return { nutrients: scored, servingGrams: servingGrams !== '' ? Number(servingGrams) : undefined, servingUnit };
   };
 
   const buildNutritionPanel = () => {
@@ -975,7 +988,36 @@ export default function AdminProductForm({ copyMode = false }) {
                 <NutrientField key={f.key} label={f.label} unit={f.unit} scored={f.scored} value={nutrients[f.key] ?? ''} onChange={(v) => setNutrient(f.key, v)} />
               ))}
             </div>
-            <NutrientField label="Real serving size" unit="g" value={servingGrams} onChange={setServingGrams} />
+            <div>
+              <label className="block text-[11.5px] font-semibold mb-1" style={{ color: 'var(--label-3)' }}>
+                Real serving size
+              </label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={servingGrams}
+                  onChange={(e) => setServingGrams(e.target.value)}
+                  className="admin-field w-full px-3 py-2 rounded-[10px] text-[14px]"
+                />
+                {/* A liquid pack (a can, a bottle) is measured in ml, not
+                    g -- this used to be hardcoded to "g" always, so a
+                    200ml soda's own report said "per 200g serving". */}
+                <div className="flex flex-shrink-0 rounded-[8px] overflow-hidden" style={{ border: '1px solid var(--separator)' }}>
+                  {['g', 'ml'].map((u) => (
+                    <button
+                      key={u}
+                      type="button"
+                      onClick={() => setServingUnit(u)}
+                      className="tap-scale px-2.5 py-2 text-[12px] font-semibold"
+                      style={{ background: servingUnit === u ? 'var(--tint)' : 'transparent', color: servingUnit === u ? '#fff' : 'var(--label-3)' }}
+                    >
+                      {u}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

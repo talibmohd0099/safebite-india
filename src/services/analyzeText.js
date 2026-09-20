@@ -141,6 +141,10 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
   if (nutrientsInfo?.nutrients) {
     report.realNutrients = nutrientsInfo.nutrients;
     report.realNutrientsServingGrams = nutrientsInfo.servingGrams ?? null;
+    // 'g' for every product before this existed (the only unit ever
+    // recorded) -- see the "Per Xg serving" -> "Per X{unit} serving"
+    // fix in Result.jsx/strings.js.
+    report.realNutrientsServingUnit = nutrientsInfo.servingUnit || 'g';
   }
 
   // Single-ingredient lookups don't need "product" text at all -- only
@@ -181,7 +185,7 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
     // habit projection to a baby's feed would be wrong on two counts at
     // once (wrong population, wrong framing), not just one.
     if (nutrientsInfo && !report.isCondimentOrSeasoning && !report.isInfantFormula && !isSmallPortionFood(report.productName, nutrientsInfo.servingGrams)) {
-      const habitCheck = buildDailyHabitCheck(nutrientsInfo.nutrients, nutrientsInfo.servingGrams);
+      const habitCheck = buildDailyHabitCheck(nutrientsInfo.nutrients, nutrientsInfo.servingGrams, nutrientsInfo.servingUnit || 'g');
       if (habitCheck) {
         report.dailyHabitCheck = habitCheck;
         // A real nutrient number worth showing in the Quick Health
