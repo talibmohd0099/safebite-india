@@ -17,6 +17,14 @@ import BarcodeScanner, { isBarcodeScanSupported } from '../components/BarcodeSca
 import ScanBadge from '../components/ScanBadge';
 import { useFamily } from '../contexts/FamilyContext';
 
+// A plain pulsing placeholder block -- shared shape for every home
+// screen section's skeleton, so a section always reserves the same
+// space its real content will take up (no layout jump once the real
+// data replaces it).
+function SkeletonBlock({ className }) {
+  return <div className={`animate-pulse rounded-xl bg-slate-200/70 dark:bg-slate-700/50 ${className || ''}`} />;
+}
+
 function BarcodeIcon() {
   return (
     <svg viewBox="0 0 24 24" className="w-4 h-4">
@@ -48,6 +56,14 @@ export default function Home() {
   const [recentlyAdded, setRecentlyAdded] = useState([]);
   const [spotlight, setSpotlight] = useState({ best: null, worst: null });
   const [stats, setStats] = useState(null);
+  // True until ALL of the home screen's discovery sections have their
+  // real data, not just the first one to resolve -- these are 4
+  // independent Supabase queries, and letting each section render the
+  // moment its OWN query finished (the previous behaviour) made them pop
+  // in one at a time at different moments, a real reported "looks odd"
+  // complaint. Waiting for all of them and revealing together, with a
+  // skeleton in the meantime, reads as one clean load instead.
+  const [sectionsLoading, setSectionsLoading] = useState(true);
   const [recentScans] = useState(() => getHistory().slice(0, 5));
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Analyzing ingredients...');
@@ -72,10 +88,18 @@ export default function Home() {
   // each loaded once, not worth the type-ahead effect's debounce/
   // cancellation machinery.
   useEffect(() => {
-    getPopularSearchTerms(8).then(setPopularTerms);
-    getRecentlyAddedProducts(10).then(setRecentlyAdded);
-    getDailySpotlight().then(setSpotlight);
-    getCatalogStats().then(setStats);
+    Promise.all([
+      getPopularSearchTerms(8),
+      getRecentlyAddedProducts(10),
+      getDailySpotlight(),
+      getCatalogStats(),
+    ]).then(([popular, recent, spot, catStats]) => {
+      setPopularTerms(popular);
+      setRecentlyAdded(recent);
+      setSpotlight(spot);
+      setStats(catStats);
+      setSectionsLoading(false);
+    });
   }, []);
 
   // Review step: set after an image is read or a barcode is looked up,
@@ -83,6 +107,13 @@ export default function Home() {
   const [review, setReview] = useState(null); // { productName, ingredientsText, notes, readable }
   const [reviewText, setReviewText] = useState('');
   const [reviewProductName, setReviewProductName] = useState('');
+
+  // Set when a scanned barcode isn't in the catalog -- shows a "Submit
+  // this product" CTA (see SubmitProduct.jsx) instead of leaving the
+  // person with only the plain error text and no next step. Cleared
+  // whenever the barcode field changes, so the CTA doesn't linger for a
+  // barcode the person has since edited or replaced.
+  const [notFoundBarcode, setNotFoundBarcode] = useState('');
 
   // Shopping Mode -- "scan, quick result, ready for the next one" for a
   // real trip up and down the aisles, instead of scan -> full Result
@@ -124,6 +155,7 @@ export default function Home() {
     setReviewText('');
     setReviewProductName('');
     setError('');
+    setNotFoundBarcode('');
   };
 
   // Type-ahead search. Debounced so a fast typist doesn't fire a request
@@ -344,6 +376,7 @@ export default function Home() {
         const found = await lookupBarcode(barcodeValue);
         if (!found.found) {
           setError("This product isn't in the product database yet. Try pasting the ingredients or uploading a photo instead.");
+          setNotFoundBarcode(barcodeValue);
           setLoading(false);
           return;
         }
@@ -588,7 +621,12 @@ export default function Home() {
               <ScanBadge size={40} />
             </div>
 
-            {stats && (
+            {sectionsLoading ? (
+              <div className="relative flex items-center gap-2 mt-2.5">
+                <div className="flex-1 h-8 rounded-xl bg-white/15 animate-pulse" />
+                <div className="flex-1 h-8 rounded-xl bg-white/15 animate-pulse" />
+              </div>
+            ) : stats && (
               <div className="relative flex items-center gap-2 mt-2.5">
                 <div className="flex-1 flex items-center gap-1.5 bg-white/15 backdrop-blur-sm rounded-xl px-2.5 py-1.5 min-w-0">
                   <span className="text-xs flex-shrink-0">📊</span>
@@ -768,6 +806,7 @@ export default function Home() {
                     item={{ productName: entry.productName, imageUrl: entry.imageUrl, score: entry.overallScore, isInfantFormula: entry.isInfantFormula }}
                     onClick={() => navigate(`/result/${entry.id}`)}
                     style={{ animationDelay: `${i * 30}ms` }}
+                    layoutId={`product-photo-${entry.id}`}
                   />
                 ))}
               </div>
@@ -784,7 +823,17 @@ export default function Home() {
               already computed by scoringEngine.js), so the homepage
               teaches by example instead of asserting "worth a closer
               look" with nothing to back it up. */}
-          {searchQuery.trim().length === 0 && (spotlight.best || spotlight.worst) && (
+          {searchQuery.trim().length === 0 && sectionsLoading && (
+            <div className="mb-6">
+              <SkeletonBlock className="h-4 w-40 mb-2 ml-0.5" />
+              <div className="grid grid-cols-2 gap-2.5">
+                <SkeletonBlock className="h-24" />
+                <SkeletonBlock className="h-24" />
+              </div>
+            </div>
+          )}
+
+          {searchQuery.trim().length === 0 && !sectionsLoading && (spotlight.best || spotlight.worst) && (
             <div className="mb-6">
               <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">Today's FoodGuard picks</p>
               <div className="grid grid-cols-2 gap-2.5">
@@ -839,7 +888,17 @@ export default function Home() {
           )}
 
           {/* Popular searches -- real scan-count data, not a guess. */}
-          {searchQuery.trim().length === 0 && popularTerms.length > 0 && (
+          {searchQuery.trim().length === 0 && sectionsLoading && (
+            <div className="mb-6">
+              <SkeletonBlock className="h-4 w-32 mb-2 ml-0.5" />
+              <div className="flex gap-2">
+                <SkeletonBlock className="h-9 w-20 rounded-full" />
+                <SkeletonBlock className="h-9 w-24 rounded-full" />
+                <SkeletonBlock className="h-9 w-16 rounded-full" />
+              </div>
+            </div>
+          )}
+          {searchQuery.trim().length === 0 && !sectionsLoading && popularTerms.length > 0 && (
             <div className="mb-6">
               <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">Popular searches</p>
               <div className="relative">
@@ -870,7 +929,17 @@ export default function Home() {
               never types a search. Named for what actually happened to
               these products (FoodGuard analyzed them), not "added" --
               which reads ambiguously as "added by whom, to what". */}
-          {searchQuery.trim().length === 0 && recentlyAdded.length > 0 && (
+          {searchQuery.trim().length === 0 && sectionsLoading && (
+            <div className="mb-6">
+              <SkeletonBlock className="h-4 w-36 mb-2 ml-0.5" />
+              <div className="flex gap-3">
+                <SkeletonBlock className="h-28 w-24 flex-shrink-0" />
+                <SkeletonBlock className="h-28 w-24 flex-shrink-0" />
+                <SkeletonBlock className="h-28 w-24 flex-shrink-0" />
+              </div>
+            </div>
+          )}
+          {searchQuery.trim().length === 0 && !sectionsLoading && recentlyAdded.length > 0 && (
             <div className="mb-6">
               <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">Recently analyzed</p>
               <div className="relative">
@@ -1164,7 +1233,7 @@ export default function Home() {
             type="text"
             inputMode="numeric"
             value={barcodeInput}
-            onChange={(e) => setBarcodeInput(e.target.value.replace(/[^0-9]/g, ''))}
+            onChange={(e) => { setBarcodeInput(e.target.value.replace(/[^0-9]/g, '')); setNotFoundBarcode(''); }}
             placeholder="e.g. 8901058851468"
             className="w-full p-4 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder:text-slate-400 dark:placeholder:text-slate-500 tracking-widest"
           />
@@ -1180,6 +1249,17 @@ export default function Home() {
           <span>⚠️</span>
           <span>{error}</span>
         </div>
+      )}
+
+      {/* Not-found CTA -- offer to submit the product instead of a dead
+          end, right under the error explaining why the lookup failed. */}
+      {mode === 'barcode' && notFoundBarcode && (
+        <button
+          onClick={() => navigate(`/submit-product?barcode=${notFoundBarcode}`)}
+          className="tap-scale w-full mb-4 py-3 rounded-xl border-2 border-dashed border-green-300 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-400 font-semibold text-sm flex items-center justify-center gap-2"
+        >
+          📷 Submit this product to FoodGuard
+        </button>
       )}
 
       {/* Analyze Button — search mode acts on picking a result instead */}

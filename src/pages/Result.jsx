@@ -605,7 +605,7 @@ export default function Result() {
         {result.imageUrl && (
           <div className="flex justify-center mb-4">
             <div className="rounded-[20px] p-3" style={{ background: 'var(--bg-card)', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-              <ProductImage src={result.imageUrl} size={132} />
+              <ProductImage src={result.imageUrl} size={132} layoutId={`product-photo-${id}`} />
             </div>
           </div>
         )}

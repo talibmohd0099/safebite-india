@@ -9,8 +9,9 @@
 // as the server is concerned. The tradeoff is a visible # in the URL.
 // It also happens to suit the Android app build just as well, since
 // Capacitor serves local files the same server-less way.
-import { useEffect, useState } from 'react';
-import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { HashRouter, Routes, Route, useNavigate, useLocation, useNavigationType } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { LanguageProvider } from './contexts/LanguageContext';
@@ -32,11 +33,13 @@ import Browse from './pages/Browse';
 import Category from './pages/Category';
 import PopularSearches from './pages/PopularSearches';
 import News from './pages/News';
+import SubmitProduct from './pages/SubmitProduct';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminGuard from './pages/admin/AdminGuard';
 import AdminProductList from './pages/admin/AdminProductList';
 import AdminProductForm from './pages/admin/AdminProductForm';
 import AdminFlagsList from './pages/admin/AdminFlagsList';
+import AdminSubmissionsList from './pages/admin/AdminSubmissionsList';
 import AdminDuplicates from './pages/admin/AdminDuplicates';
 import AdminImport from './pages/admin/AdminImport';
 import AdminActivityLog from './pages/admin/AdminActivityLog';
@@ -48,9 +51,21 @@ import AdminBarcodeCheck from './pages/admin/AdminBarcodeCheck';
 // there doing nothing instead of the "go back a screen" every Android
 // user expects. No-ops entirely on the web build (isNativePlatform is
 // false there), so this only ever runs inside the actual app.
+//
+// On the home screen specifically, a single back press used to exit the
+// app immediately -- a real, reported annoyance (one accidental tap on
+// the way to somewhere else on the screen closes the whole app). Now
+// mirrors the standard Android "press back again to exit" pattern: the
+// first press at home shows a toast and starts a 2s window: a second
+// press inside that window exits for real, anything else (letting it
+// time out, navigating away) just cancels it.
+const EXIT_CONFIRM_WINDOW_MS = 2000;
+
 function AndroidBackButton() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [showExitToast, setShowExitToast] = useState(false);
+  const exitTimerRef = useRef(null);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -58,13 +73,95 @@ function AndroidBackButton() {
     const listenerPromise = CapacitorApp.addListener('backButton', () => {
       if (location.pathname !== '/') {
         navigate(-1);
-      } else {
-        CapacitorApp.exitApp();
+        return;
       }
+
+      if (exitTimerRef.current) {
+        clearTimeout(exitTimerRef.current);
+        exitTimerRef.current = null;
+        setShowExitToast(false);
+        CapacitorApp.exitApp();
+        return;
+      }
+
+      setShowExitToast(true);
+      exitTimerRef.current = setTimeout(() => {
+        exitTimerRef.current = null;
+        setShowExitToast(false);
+      }, EXIT_CONFIRM_WINDOW_MS);
     });
 
     return () => { listenerPromise.then((listener) => listener.remove()); };
   }, [location, navigate]);
+
+  // Leaving the home screen (or the component unmounting) should cancel
+  // a pending exit confirmation rather than leave a stale timer armed.
+  useEffect(() => {
+    if (location.pathname !== '/' && exitTimerRef.current) {
+      clearTimeout(exitTimerRef.current);
+      exitTimerRef.current = null;
+      setShowExitToast(false);
+    }
+  }, [location.pathname]);
+
+  if (!showExitToast) return null;
+
+  return createPortal(
+    <div
+      className="fixed left-1/2 z-[9999] -translate-x-1/2 px-4 py-2.5 rounded-full text-white text-[13px] font-semibold shadow-lg"
+      style={{ bottom: 'calc(76px + env(safe-area-inset-bottom))', background: 'rgba(30,41,59,0.92)' }}
+    >
+      Press back again to exit
+    </div>,
+    document.body
+  );
+}
+
+// Keyed by react-router's own per-history-entry location.key (not
+// pathname -- the same route, e.g. /result/:id, can be visited more
+// than once with a different scroll position each time, and pathname
+// alone would conflate them). Module-level so it survives this
+// component's own remounts, only reset by a real app reload -- which is
+// exactly the lifetime scroll position should have.
+const scrollPositions = new Map();
+
+// React Router doesn't restore scroll position on its own -- going back
+// from a product's Result page used to always land back at the TOP of
+// Home/History/search results instead of wherever the person actually
+// was, a real reported annoyance. Records each page's own scroll
+// position continuously (a scroll listener, not a snapshot read on the
+// way out -- reading it lazily on unmount races with the next page
+// already being painted) and restores it on a POP (back/forward)
+// navigation; any other navigation (clicking into something new) always
+// starts at the top, same as every app already expects.
+function ScrollRestoration() {
+  const location = useLocation();
+  const navigationType = useNavigationType();
+
+  useEffect(() => {
+    const onScroll = () => scrollPositions.set(location.key, window.scrollY);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [location.key]);
+
+  useEffect(() => {
+    if (navigationType !== 'POP') {
+      window.scrollTo(0, 0);
+      return;
+    }
+    const saved = scrollPositions.get(location.key);
+    if (typeof saved !== 'number') {
+      window.scrollTo(0, 0);
+      return;
+    }
+    // The page being returned to may still be short (its own async data
+    // hasn't painted yet) on the very first frame -- one immediate
+    // attempt plus one short retry covers real content that grows in
+    // shortly after mount without a heavier "wait until stable" scheme.
+    window.scrollTo(0, saved);
+    const retry = setTimeout(() => window.scrollTo(0, saved), 120);
+    return () => clearTimeout(retry);
+  }, [location.key, navigationType]);
 
   return null;
 }
@@ -95,6 +192,7 @@ function AppShell() {
           <Route path="/category/:id" element={<Category />} />
           <Route path="/popular" element={<PopularSearches />} />
           <Route path="/news" element={<News />} />
+          <Route path="/submit-product" element={<SubmitProduct />} />
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/products" element={<AdminGuard><AdminProductList /></AdminGuard>} />
           <Route path="/admin/products/new" element={<AdminGuard><AdminProductForm /></AdminGuard>} />
@@ -102,6 +200,7 @@ function AppShell() {
           <Route path="/admin/products/:id/copy" element={<AdminGuard><AdminProductForm copyMode /></AdminGuard>} />
           <Route path="/admin/products/:id/history" element={<AdminGuard><AdminProductHistory /></AdminGuard>} />
           <Route path="/admin/flags" element={<AdminGuard><AdminFlagsList /></AdminGuard>} />
+          <Route path="/admin/submissions" element={<AdminGuard><AdminSubmissionsList /></AdminGuard>} />
           <Route path="/admin/duplicates" element={<AdminGuard><AdminDuplicates /></AdminGuard>} />
           <Route path="/admin/barcode-check" element={<AdminGuard><AdminBarcodeCheck /></AdminGuard>} />
           <Route path="/admin/import" element={<AdminGuard><AdminImport /></AdminGuard>} />
@@ -139,6 +238,7 @@ export default function App() {
       <FamilyProvider>
         <HashRouter>
           <AndroidBackButton />
+          <ScrollRestoration />
           <AppShell />
           {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
           {!showSplash && showOnboarding && <Onboarding onDone={() => setShowOnboarding(false)} />}

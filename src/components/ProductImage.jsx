@@ -17,16 +17,33 @@
 // navigating -- found by a click that resolved but never changed the URL.
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { motion } from 'framer-motion';
 
-export default function ProductImage({ src, size = 76, expandable = true }) {
+// `layoutId`, when given, is what makes the tap-to-open/back-to-close
+// shared-element effect happen at all: framer-motion tracks any element
+// that mounts with the SAME layoutId (a tile's thumbnail here, Result.jsx's
+// hero photo there) and automatically interpolates its position/size
+// across the swap, instead of a hard cut -- confirmed working live: the
+// tile grows into the hero on the way in, and shrinks back to the exact
+// same tile on the way back. Optional and backward compatible -- every
+// other caller of this component (the vast majority, where the
+// destination isn't known until the tap itself resolves an async
+// lookup) is completely unaffected by omitting it.
+export default function ProductImage({ src, size = 76, expandable = true, layoutId }) {
   const [failed, setFailed] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const showFallback = !src || failed;
   const canExpand = expandable && !showFallback;
+  // layoutId goes on the CONTAINER only, not the <img> too -- framer-
+  // motion animating both independently fought over the size/position
+  // interpolation instead of moving together. The <img> just fills it
+  // via object-cover as normal, no animation of its own needed.
+  const Container = layoutId ? motion.div : 'div';
 
   return (
     <>
-      <div
+      <Container
+        {...(layoutId ? { layoutId } : {})}
         className={`flex-shrink-0 rounded-2xl overflow-hidden flex items-center justify-center ${canExpand ? 'tap-scale cursor-zoom-in' : ''}`}
         style={{ width: size, height: size, background: 'var(--fill)' }}
         onClick={(e) => {
@@ -50,7 +67,7 @@ export default function ProductImage({ src, size = 76, expandable = true }) {
             onError={() => setFailed(true)}
           />
         )}
-      </div>
+      </Container>
 
       {/* Portalled straight to <body> -- a thumbnail can sit anywhere
           (a history row, a result header), and any of those ancestors

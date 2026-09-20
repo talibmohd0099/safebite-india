@@ -4,7 +4,7 @@
 import ProductImage from './ProductImage';
 import { getScoreColor } from '../utils/storage';
 
-export default function ProductStripCard({ item, onClick, style }) {
+export default function ProductStripCard({ item, onClick, style, layoutId }) {
   // When a family profile is active, the card carries both scores --
   // general first, personal second ("71 / 68") -- instead of only ever
   // showing the personal one, so it's visible how much (if at all) this
@@ -20,7 +20,7 @@ export default function ProductStripCard({ item, onClick, style }) {
       style={style}
       className="item-in tap-scale flex-shrink-0 w-28 text-left"
     >
-      <ProductImage src={item.imageUrl} size={112} expandable={false} />
+      <ProductImage src={item.imageUrl} size={112} expandable={false} layoutId={layoutId} />
       <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 mt-1.5 leading-tight line-clamp-2">
         {item.productName}
       </p>
