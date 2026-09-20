@@ -116,7 +116,10 @@ function normalizeBlinkitProduct(row) {
     ingredients_text: row.ingredients_text,
     off_ingredients: null,
     image_url: row.image_url,
-    nutrients_info: extractNutrientsForHabitCheck(row.nutrition, row.pack_size),
+    // The REAL per-serving amount (e.g. "200 ml"), not pack_size (the
+    // whole pack/bottle, e.g. "2.25 ltr") -- see extractNutrientsForHabitCheck's
+    // own doc comment for the real bug this fixes.
+    nutrients_info: extractNutrientsForHabitCheck(row.nutrition, row.serving_size),
     pack_size: row.pack_size || null,
     markGenerated: () => markBlinkitReportGenerated(row.id),
   };

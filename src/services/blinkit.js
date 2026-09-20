@@ -336,6 +336,16 @@ export async function scrapeProduct(url, category, { useAI = false, useImageFall
   // even looking at.
   const packSize = attributes['Unit (with options)'] || attributes['Net Weight (Without Packaging)'] || null;
 
+  // A REAL, separate "Standard Serve Size" attribute Blinkit prints
+  // right in the nutrition table (e.g. "200 ml" on a 2.25 LITRE Mountain
+  // Dew bottle) -- confirmed live on the actual page, and NOT the same
+  // thing as packSize above, which is the whole pack/bottle. Using
+  // packSize as a stand-in for this was a real bug this replaces: a
+  // "2.25 litre serving" of a soft drink is nonsense, nobody drinks the
+  // whole bottle in one sitting, while packSize is exactly correct for
+  // its own actual purpose (barcode lookups, telling pack sizes apart).
+  const servingSize = attributes['Standard Serve Size'] || null;
+
   return {
     viaAI,
     viaImage,
@@ -347,6 +357,7 @@ export async function scrapeProduct(url, category, { useAI = false, useImageFall
       image_url: jsonField(html, 'image_url'),
       nutrition,
       pack_size: packSize,
+      serving_size: servingSize,
       fssai_license: attributes['FSSAI License'] || null,
       source: 'blinkit',
       scraped_at: new Date().toISOString(),

@@ -43,15 +43,14 @@ function parseKcal(raw) {
   return match ? toNumber(match[1]) : null;
 }
 
-// pack_size is Blinkit's own printed size string -- "500 ml", "1 kg",
-// "2 x 250 ml" (a multipack: the PER-UNIT amount is what one serving is,
-// not the combined total -- someone drinking a juice box drinks 250ml,
-// not the whole pack of 2) -- confirmed against 20 real scraped rows
-// spanning solids and liquids before writing this. kg/l are normalized
-// to g/ml (the two units the rest of the app -- Result.jsx,
-// dailyHabitCheck.js -- actually knows how to display) rather than kept
-// as their own separate unit.
-export function parsePackSize(text) {
+// A generic "<number> <unit>" parser -- used for serving_size ("200 ml",
+// a REAL per-serving amount straight from Blinkit's own nutrition table,
+// see extractNutrientsForHabitCheck below) and, separately, for
+// pack_size text in a multipack shape ("2 x 250 ml") when something
+// needs the per-unit amount rather than the combined total. kg/l
+// normalize to g/ml (the two units the rest of the app -- Result.jsx,
+// dailyHabitCheck.js -- actually knows how to display).
+export function parseQuantityText(text) {
   if (!text) return null;
   // "ltr" is a real, common abbreviation on real scraped pack_size
   // values (21 of 831 populated rows use it, confirmed live) -- "l"
@@ -77,11 +76,18 @@ export function parsePackSize(text) {
 // FoodGuard's nutrition-priority matching (personalAssessment.js)
 // whenever it's available.
 //
-// @param {string|null} packSize - the row's own pack_size column, when
-//   known (see parsePackSize above). Falls back to "per 100g" -- the
-//   one figure FSSAI mandates every Indian label state -- when it isn't,
-//   same honest fallback openFoodFacts.js uses for the same reason.
-export function extractNutrientsForHabitCheck(nutrition, packSize = null) {
+// @param {string|null} servingSize - the row's own serving_size column
+//   (Blinkit's real "Standard Serve Size" attribute, e.g. "200 ml" --
+//   confirmed live on an actual page, printed right in the nutrition
+//   table). Deliberately NOT pack_size/packSize -- that's the whole
+//   pack/bottle (a 2.25 LITRE bottle's pack_size), a real bug this
+//   replaces: this function briefly (and wrongly) treated pack_size as
+//   the serving size, which produced nonsense like "if a 2.25 litre
+//   serving became a daily habit" for a product whose real serving is
+//   200ml. Falls back to "per 100g" -- the one figure FSSAI mandates
+//   every Indian label state -- when no real serving size is known, same
+//   honest fallback openFoodFacts.js uses for the same reason.
+export function extractNutrientsForHabitCheck(nutrition, servingSize = null) {
   if (!nutrition || Object.keys(nutrition).length === 0) return null;
 
   const toMg = (parsed) => (!parsed ? null : parsed.unit === 'g' ? parsed.value * 1000 : parsed.value);
@@ -122,11 +128,11 @@ export function extractNutrientsForHabitCheck(nutrition, packSize = null) {
   }
 
   if (Object.keys(nutrients).length === 0) return null;
-  const parsedPack = parsePackSize(packSize);
+  const parsedServing = parseQuantityText(servingSize);
   return {
     nutrients,
-    servingGrams: parsedPack?.value ?? null,
-    servingUnit: parsedPack?.unit || 'g',
+    servingGrams: parsedServing?.value ?? null,
+    servingUnit: parsedServing?.unit || 'g',
   };
 }
 
@@ -140,7 +146,7 @@ export async function getPendingBlinkitProducts(limit) {
 
   const { data, error } = await supabase
     .from('blinkit_products')
-    .select('id, source, product_name, brand, ingredients_text, image_url, nutrition, pack_size')
+    .select('id, source, product_name, brand, ingredients_text, image_url, nutrition, pack_size, serving_size')
     .is('report_generated_at', null)
     .order('scraped_at', { ascending: true })
     .limit(limit);
