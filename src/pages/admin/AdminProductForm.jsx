@@ -9,8 +9,9 @@
 // below, for the real correction cases this session kept running into
 // (a wrong AI verdict, a name that needs fixing).
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import AdminLayout from './AdminLayout';
+import PhotoCropModal from './PhotoCropModal';
 import { analyzeText } from '../../services/analyzeText';
 import { buildReport } from '../../services/scoringEngine';
 import { extractIngredientsFromImage } from '../../services/geminiService';
@@ -24,7 +25,8 @@ import {
   adminFindByName,
   adminFindByBarcode,
 } from '../../services/adminProductsRepo';
-import { imageFileFromClipboard, compressImageToDataUrl } from '../../utils/adminImage';
+import { adminMarkSubmissionApproved } from '../../services/adminSubmissionsRepo';
+import { imageFileFromClipboard, compressImageToDataUrl, dataUrlToFile } from '../../utils/adminImage';
 
 const VERDICTS = ['Excellent', 'Good', 'Moderately Healthy', 'Poor', 'Very Poor'];
 const FIELD = 'admin-field w-full px-3.5 py-2.5 rounded-[12px] text-[15px]';
@@ -255,7 +257,12 @@ export default function AdminProductForm({ copyMode = false }) {
   // product" decision below, a copy counts as NOT editing.
   const isEdit = Boolean(id) && !copyMode;
   const navigate = useNavigate();
+  const location = useLocation();
   const heroFileInputRef = useRef(null);
+  // Set when this form was opened from AdminSubmissionsList's "Create
+  // product ->" button -- prefills below, and marks the submission
+  // approved once the product is actually saved (see handleSave).
+  const fromSubmission = !id ? location.state?.fromSubmission : null;
 
   const [loadingExisting, setLoadingExisting] = useState(Boolean(id));
   const [error, setError] = useState('');
@@ -276,6 +283,7 @@ export default function AdminProductForm({ copyMode = false }) {
 
   // The hero/display photo -- what actually gets saved as report.imageUrl.
   const [photoDataUrl, setPhotoDataUrl] = useState('');
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
 
   // Up to 2 separate photos used ONLY to extract ingredients/nutrition
   // from (a pack's ingredients and nutrition table are often on
@@ -295,6 +303,14 @@ export default function AdminProductForm({ copyMode = false }) {
   const [fetchingBarcode, setFetchingBarcode] = useState(false);
   const [autoAnalyzeTrigger, setAutoAnalyzeTrigger] = useState(0);
   const [existingSource, setExistingSource] = useState(null);
+  // The name as loaded, for edit mode only -- checkNameDuplicate skips
+  // its query entirely while the field still matches this, so simply
+  // blurring an untouched name field never flags a product against
+  // itself. Real, pre-existing duplicate names elsewhere in the catalog
+  // do exist (confirmed live -- 28+ distinct names with 2+ rows each,
+  // e.g. "Maggi" x4) and the check correctly finds them, but that's only
+  // useful information when the admin is actively changing the name.
+  const [originalProductName, setOriginalProductName] = useState(null);
 
   useEffect(() => {
     if (!id) return;
@@ -304,6 +320,7 @@ export default function AdminProductForm({ copyMode = false }) {
         const r = row.report || {};
         const name = row.product_name || r.productName || '';
         setProductName(name);
+        if (!copyMode) setOriginalProductName(name);
         setBrand(r.brand || '');
         // Barcode, pack size and provenance are exactly the two things
         // that DO differ between pack sizes of the same product -- a
@@ -331,6 +348,35 @@ export default function AdminProductForm({ copyMode = false }) {
       .catch((err) => setError(err.message))
       .finally(() => setLoadingExisting(false));
   }, [id, copyMode]);
+
+  // Prefills a brand-new form from AdminSubmissionsList's "Create
+  // product ->" button: the barcode, the hero photo, and the
+  // ingredients/nutrition photos loaded into the SAME sourcePhotos
+  // slots a manually-picked file would use -- so "Extract from photo"
+  // below works unchanged, no separate extraction path needed.
+  useEffect(() => {
+    if (!fromSubmission) return;
+    setBarcode(fromSubmission.barcode || '');
+    if (fromSubmission.productName) setProductName(fromSubmission.productName);
+    if (fromSubmission.productPhoto) setPhotoDataUrl(fromSubmission.productPhoto);
+
+    (async () => {
+      const slots = [fromSubmission.ingredientsPhoto, fromSubmission.nutritionPhoto];
+      const loaded = await Promise.all(
+        slots.map(async (dataUrl, i) => {
+          if (!dataUrl) return null;
+          try {
+            const file = await dataUrlToFile(dataUrl, `submission-${i}.jpg`);
+            return { file, dataUrl };
+          } catch {
+            return null; // a bad/corrupt stored photo shouldn't block the rest of the form
+          }
+        }),
+      );
+      setSourcePhotos(loaded);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Every bracket-mismatch/missing-comma spot in the current text, with
   // exact character positions -- feeds both the highlight overlay below
@@ -372,6 +418,13 @@ export default function AdminProductForm({ copyMode = false }) {
 
   const checkNameDuplicate = async () => {
     if (!productName.trim()) { setNameDuplicate(null); return; }
+    // Editing an existing product and the name hasn't actually changed
+    // from what it was loaded as -- nothing new to warn about, even if
+    // this exact name happens to also exist on another row elsewhere.
+    if (isEdit && originalProductName !== null && productName.trim() === originalProductName.trim()) {
+      setNameDuplicate(null);
+      return;
+    }
     const match = await adminFindByName(productName.trim(), isEdit ? id : null);
     setNameDuplicate(match);
     if (!match) setNameDuplicateOverride(false);
@@ -628,6 +681,11 @@ export default function AdminProductForm({ copyMode = false }) {
         await adminUpdateProduct(id, payload);
       } else {
         await adminCreateProduct(payload);
+        if (fromSubmission) {
+          // Best-effort -- the product itself is already saved at this
+          // point, so a failure here shouldn't read as the save failing.
+          adminMarkSubmissionApproved(fromSubmission.submissionId, finalReport.productName).catch(() => {});
+        }
       }
       navigate('/admin/products');
     } catch (err) {
@@ -663,6 +721,10 @@ export default function AdminProductForm({ copyMode = false }) {
       {copyMode ? (
         <p className="text-[12.5px] mb-4 px-3 py-2 rounded-[10px]" style={{ background: 'var(--tint-bg)', color: 'var(--tint)' }}>
           Name, ingredients, nutrition and photo copied from the source product. Enter this pack size's own barcode below, then save — this creates a separate new product.
+        </p>
+      ) : fromSubmission ? (
+        <p className="text-[12.5px] mb-4 px-3 py-2 rounded-[10px]" style={{ background: 'var(--v-moderate-bg)', color: 'var(--v-moderate)' }}>
+          From a user submission — barcode and hero photo filled in, ingredients/nutrition photos loaded below. Click "Extract from photo" to pull the ingredients text, then Analyze as usual.
         </p>
       ) : (
         <div className="mb-3" />
@@ -902,7 +964,14 @@ export default function AdminProductForm({ copyMode = false }) {
               style={{ background: 'var(--bg-card)', border: '1px dashed var(--separator)' }}
             >
               {photoDataUrl ? (
-                <img src={photoDataUrl} alt="Product" className="w-16 h-16 rounded-[10px] object-cover flex-shrink-0" />
+                <button
+                  type="button"
+                  onClick={() => setShowPhotoModal(true)}
+                  title="Preview / crop"
+                  className="tap-scale w-16 h-16 rounded-[10px] flex-shrink-0 overflow-hidden"
+                >
+                  <img src={photoDataUrl} alt="Product" className="w-full h-full object-cover" />
+                </button>
               ) : (
                 <div className="w-16 h-16 rounded-[10px] flex items-center justify-center text-[24px] flex-shrink-0" style={{ background: 'var(--fill)' }}>
                   📷
@@ -912,19 +981,32 @@ export default function AdminProductForm({ copyMode = false }) {
                 <p className="text-[12.5px]" style={{ color: 'var(--label-2)' }}>
                   Click here and paste (Ctrl+V) a copied photo, or choose a file.
                 </p>
-                <div className="flex gap-3 mt-1.5">
+                <div className="flex gap-3 mt-1.5 flex-wrap">
                   <button type="button" onClick={() => heroFileInputRef.current?.click()} className="tap-scale text-[12.5px] font-semibold" style={{ color: 'var(--tint)' }}>
                     Choose file
                   </button>
                   {photoDataUrl && (
-                    <button type="button" onClick={() => setPhotoDataUrl('')} className="tap-scale text-[12.5px] font-semibold" style={{ color: 'var(--v-poor)' }}>
-                      Remove
-                    </button>
+                    <>
+                      <button type="button" onClick={() => setShowPhotoModal(true)} className="tap-scale text-[12.5px] font-semibold" style={{ color: 'var(--tint)' }}>
+                        Preview / crop
+                      </button>
+                      <button type="button" onClick={() => setPhotoDataUrl('')} className="tap-scale text-[12.5px] font-semibold" style={{ color: 'var(--v-poor)' }}>
+                        Remove
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
             </div>
             <input ref={heroFileInputRef} type="file" accept="image/*" onChange={(e) => applyHeroPhoto(e.target.files?.[0])} className="hidden" />
+
+            {showPhotoModal && photoDataUrl && (
+              <PhotoCropModal
+                imageUrl={photoDataUrl}
+                onCropped={(cropped) => { setPhotoDataUrl(cropped); setShowPhotoModal(false); }}
+                onClose={() => setShowPhotoModal(false)}
+              />
+            )}
           </div>
 
           <div className="rounded-[16px] p-4" style={{ background: 'var(--bg-card)' }}>
