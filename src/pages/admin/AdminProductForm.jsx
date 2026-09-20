@@ -9,7 +9,7 @@
 // below, for the real correction cases this session kept running into
 // (a wrong AI verdict, a name that needs fixing).
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import AdminLayout from './AdminLayout';
 import PhotoCropModal from './PhotoCropModal';
 import { analyzeText } from '../../services/analyzeText';
@@ -25,8 +25,7 @@ import {
   adminFindByName,
   adminFindByBarcode,
 } from '../../services/adminProductsRepo';
-import { adminMarkSubmissionApproved } from '../../services/adminSubmissionsRepo';
-import { imageFileFromClipboard, compressImageToDataUrl, dataUrlToFile } from '../../utils/adminImage';
+import { imageFileFromClipboard, compressImageToDataUrl } from '../../utils/adminImage';
 
 const VERDICTS = ['Excellent', 'Good', 'Moderately Healthy', 'Poor', 'Very Poor'];
 const FIELD = 'admin-field w-full px-3.5 py-2.5 rounded-[12px] text-[15px]';
@@ -257,12 +256,7 @@ export default function AdminProductForm({ copyMode = false }) {
   // product" decision below, a copy counts as NOT editing.
   const isEdit = Boolean(id) && !copyMode;
   const navigate = useNavigate();
-  const location = useLocation();
   const heroFileInputRef = useRef(null);
-  // Set when this form was opened from AdminSubmissionsList's "Create
-  // product ->" button -- prefills below, and marks the submission
-  // approved once the product is actually saved (see handleSave).
-  const fromSubmission = !id ? location.state?.fromSubmission : null;
 
   const [loadingExisting, setLoadingExisting] = useState(Boolean(id));
   const [error, setError] = useState('');
@@ -348,35 +342,6 @@ export default function AdminProductForm({ copyMode = false }) {
       .catch((err) => setError(err.message))
       .finally(() => setLoadingExisting(false));
   }, [id, copyMode]);
-
-  // Prefills a brand-new form from AdminSubmissionsList's "Create
-  // product ->" button: the barcode, the hero photo, and the
-  // ingredients/nutrition photos loaded into the SAME sourcePhotos
-  // slots a manually-picked file would use -- so "Extract from photo"
-  // below works unchanged, no separate extraction path needed.
-  useEffect(() => {
-    if (!fromSubmission) return;
-    setBarcode(fromSubmission.barcode || '');
-    if (fromSubmission.productName) setProductName(fromSubmission.productName);
-    if (fromSubmission.productPhoto) setPhotoDataUrl(fromSubmission.productPhoto);
-
-    (async () => {
-      const slots = [fromSubmission.ingredientsPhoto, fromSubmission.nutritionPhoto];
-      const loaded = await Promise.all(
-        slots.map(async (dataUrl, i) => {
-          if (!dataUrl) return null;
-          try {
-            const file = await dataUrlToFile(dataUrl, `submission-${i}.jpg`);
-            return { file, dataUrl };
-          } catch {
-            return null; // a bad/corrupt stored photo shouldn't block the rest of the form
-          }
-        }),
-      );
-      setSourcePhotos(loaded);
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Every bracket-mismatch/missing-comma spot in the current text, with
   // exact character positions -- feeds both the highlight overlay below
@@ -681,11 +646,6 @@ export default function AdminProductForm({ copyMode = false }) {
         await adminUpdateProduct(id, payload);
       } else {
         await adminCreateProduct(payload);
-        if (fromSubmission) {
-          // Best-effort -- the product itself is already saved at this
-          // point, so a failure here shouldn't read as the save failing.
-          adminMarkSubmissionApproved(fromSubmission.submissionId, finalReport.productName).catch(() => {});
-        }
       }
       navigate('/admin/products');
     } catch (err) {
@@ -721,10 +681,6 @@ export default function AdminProductForm({ copyMode = false }) {
       {copyMode ? (
         <p className="text-[12.5px] mb-4 px-3 py-2 rounded-[10px]" style={{ background: 'var(--tint-bg)', color: 'var(--tint)' }}>
           Name, ingredients, nutrition and photo copied from the source product. Enter this pack size's own barcode below, then save — this creates a separate new product.
-        </p>
-      ) : fromSubmission ? (
-        <p className="text-[12.5px] mb-4 px-3 py-2 rounded-[10px]" style={{ background: 'var(--v-moderate-bg)', color: 'var(--v-moderate)' }}>
-          From a user submission — barcode and hero photo filled in, ingredients/nutrition photos loaded below. Click "Extract from photo" to pull the ingredients text, then Analyze as usual.
         </p>
       ) : (
         <div className="mb-3" />
