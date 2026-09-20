@@ -71,6 +71,15 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      # Caches the Gradle distribution + dependencies across runs --
+      # without this, every single run downloaded the ~150MB Gradle
+      # distribution zip fresh from services.gradle.org, which is both
+      # slow and a real point of failure (confirmed live: a run failed
+      # outright on "Connection reset by peer" mid-download, nothing to
+      # do with this project's own code). A cached run skips that
+      # download entirely once it's warmed up once.
+      - uses: gradle/actions/setup-gradle@v6
+
       - name: Build debug APK
         working-directory: android
         # gradlew's executable bit is now set in git, but a defensive
