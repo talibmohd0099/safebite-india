@@ -43,16 +43,40 @@ function parseKcal(raw) {
   return match ? toNumber(match[1]) : null;
 }
 
+// pack_size is Blinkit's own printed size string -- "500 ml", "1 kg",
+// "2 x 250 ml" (a multipack: the PER-UNIT amount is what one serving is,
+// not the combined total -- someone drinking a juice box drinks 250ml,
+// not the whole pack of 2) -- confirmed against 20 real scraped rows
+// spanning solids and liquids before writing this. kg/l are normalized
+// to g/ml (the two units the rest of the app -- Result.jsx,
+// dailyHabitCheck.js -- actually knows how to display) rather than kept
+// as their own separate unit.
+export function parsePackSize(text) {
+  if (!text) return null;
+  const multi = String(text).match(/^\d+\s*[x×]\s*([\d.]+)\s*(ml|l|g|kg)\b/i);
+  const match = multi || String(text).match(/([\d.]+)\s*(ml|l|g|kg)\b/i);
+  if (!match) return null;
+
+  let value = toNumber(match[1]);
+  let unit = match[2].toLowerCase();
+  if (value === null) return null;
+  if (unit === 'kg') { value *= 1000; unit = 'g'; }
+  if (unit === 'l') { value *= 1000; unit = 'ml'; }
+  if (value <= 0) return null;
+  return { value: Math.round(value), unit };
+}
+
 // Real, already-scraped nutrition-panel numbers -- never estimated.
 // Originally built only for the "if this became a daily habit" feature
 // (dailyHabitCheck.js); also now the primary signal for Personal
 // FoodGuard's nutrition-priority matching (personalAssessment.js)
-// whenever it's available. No pack-size attribute is captured by the
-// scraper today, so this is always framed as "per 100g" -- the one
-// figure FSSAI mandates every Indian label state, so it's always a
-// safe, honest assumption here even without knowing the pack's actual
-// net weight.
-export function extractNutrientsForHabitCheck(nutrition) {
+// whenever it's available.
+//
+// @param {string|null} packSize - the row's own pack_size column, when
+//   known (see parsePackSize above). Falls back to "per 100g" -- the
+//   one figure FSSAI mandates every Indian label state -- when it isn't,
+//   same honest fallback openFoodFacts.js uses for the same reason.
+export function extractNutrientsForHabitCheck(nutrition, packSize = null) {
   if (!nutrition || Object.keys(nutrition).length === 0) return null;
 
   const toMg = (parsed) => (!parsed ? null : parsed.unit === 'g' ? parsed.value * 1000 : parsed.value);
@@ -93,10 +117,12 @@ export function extractNutrientsForHabitCheck(nutrition) {
   }
 
   if (Object.keys(nutrients).length === 0) return null;
-  // No pack-size attribute is captured by the scraper today, so
-  // servingGrams stays null -- the caller reads that as "these are the
-  // standard per-100g figures," which is always true here.
-  return { nutrients, servingGrams: null };
+  const parsedPack = parsePackSize(packSize);
+  return {
+    nutrients,
+    servingGrams: parsedPack?.value ?? null,
+    servingUnit: parsedPack?.unit || 'g',
+  };
 }
 
 export function blinkitLookupKey(source, brand, productName) {

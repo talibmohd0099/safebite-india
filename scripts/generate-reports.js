@@ -116,7 +116,7 @@ function normalizeBlinkitProduct(row) {
     ingredients_text: row.ingredients_text,
     off_ingredients: null,
     image_url: row.image_url,
-    nutrients_info: extractNutrientsForHabitCheck(row.nutrition),
+    nutrients_info: extractNutrientsForHabitCheck(row.nutrition, row.pack_size),
     pack_size: row.pack_size || null,
     markGenerated: () => markBlinkitReportGenerated(row.id),
   };
