@@ -9,6 +9,14 @@ name: Build Android APK
 #
 # Manual only (not on every push) -- an Android build takes real CI
 # minutes and isn't needed until you actually want a fresh APK.
+#
+# Also builds a signed release AAB (the format Play Store actually
+# requires) -- but ONLY once a signing keystore is added as the
+# ANDROID_KEYSTORE_BASE64 secret (see android/app/build.gradle's
+# signingConfigs.release for how it's read, and the repo's Play Store
+# setup notes for how to generate + add that secret). Until then this
+# step is skipped, not failed, so the debug APK above still builds and
+# publishes normally.
 
 on:
   workflow_dispatch:
@@ -74,3 +82,24 @@ jobs:
             --title "FoodGuard India -- latest Android build" \
             --notes "Automatically built from the current main branch. This is a debug build for installing on your own phone (not from the Play Store), so Android will warn about an unverified app -- that's expected. On your phone: download app-debug.apk below, open it, and allow \"install from unknown sources\" if asked." \
             --latest
+
+      - name: Decode release keystore
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+
+      - name: Build release AAB (signed, for Play Store)
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        working-directory: android
+        run: ./gradlew bundleRelease --no-daemon
+
+      - name: Upload release AAB
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: foodguard-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error

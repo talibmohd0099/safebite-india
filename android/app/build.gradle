@@ -16,10 +16,30 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Release signing config -- reads from environment variables rather
+    // than a committed keystore/properties file, so the actual keystore
+    // and its passwords never touch git (see .github/workflows/build-
+    // android.yml, which decodes a base64 keystore from a GitHub secret
+    // into release.keystore right before this build runs). Dormant until
+    // those env vars exist: `storeFile file(...)` only resolves at build
+    // time, so a plain local `./gradlew assembleDebug` (which never
+    // touches the release build type) is completely unaffected either way.
+    signingConfigs {
+        release {
+            def ksPassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+            if (ksPassword != null) {
+                storeFile file("release.keystore")
+                storePassword ksPassword
+                keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
     }
 }
