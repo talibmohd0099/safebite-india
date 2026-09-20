@@ -30,7 +30,8 @@ import { analyzeText } from '../src/services/analyzeText.js';
 import { saveReport } from '../src/services/productCache.js';
 import { getPendingProducts, markReportGenerated } from '../src/services/productsRepo.js';
 import { getPendingBlinkitProducts, markBlinkitReportGenerated, blinkitLookupKey, extractNutrientsForHabitCheck } from '../src/services/blinkitProductsRepo.js';
-import { isSupabaseConfigured } from '../src/services/supabaseClient.js';
+import { optimizeAndUploadBlinkitImage } from '../src/services/blinkitImageOptimizer.js';
+import { supabase, isSupabaseConfigured } from '../src/services/supabaseClient.js';
 
 const GEMINI_PACING_MS = 1500; // proactive spacing, not just reacting to 429s
 const RATE_LIMIT_RETRIES = 3;
@@ -107,6 +108,7 @@ function normalizeOffProduct(row) {
 
 function normalizeBlinkitProduct(row) {
   return {
+    id: row.id,
     lookup_key: blinkitLookupKey(row.source, row.brand, row.product_name),
     source: row.source,
     product_name: row.product_name,
@@ -118,6 +120,25 @@ function normalizeBlinkitProduct(row) {
     pack_size: row.pack_size || null,
     markGenerated: () => markBlinkitReportGenerated(row.id),
   };
+}
+
+// Blinkit's own photos are 1000x1000 with a lot of white padding -- crop
+// it away, compress, and upload to Storage BEFORE the report is built,
+// so report.imageUrl is the optimized one from the very first report
+// this product ever gets (see blinkitImageOptimizer.js; verified live
+// across a 50-product pilot, avg 78.9KB -> 18.4KB, 0 failures). Only
+// ever for Blinkit -- OFF/JioMart images are untouched. Best-effort: a
+// failure here just leaves the product with its original Blinkit image
+// URL, never blocks report generation.
+async function optimizeBlinkitImageInPlace(product) {
+  if (product.source !== 'blinkit' || !product.image_url || !product.id) return;
+  const result = await optimizeAndUploadBlinkitImage(product.image_url, product.id);
+  if (!result) return;
+  product.image_url = result.url;
+  await supabase
+    .from('blinkit_products')
+    .update({ optimized_image_url: result.url, optimized_image_bytes: result.bytes })
+    .eq('id', product.id);
 }
 
 async function main() {
@@ -148,6 +169,7 @@ async function main() {
       continue;
     }
 
+    await optimizeBlinkitImageInPlace(product);
     const { report, transient } = await generateWithRetry(product);
 
     if (report) {
