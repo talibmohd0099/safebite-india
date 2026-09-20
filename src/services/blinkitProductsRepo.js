@@ -53,15 +53,20 @@ function parseKcal(raw) {
 // as their own separate unit.
 export function parsePackSize(text) {
   if (!text) return null;
-  const multi = String(text).match(/^\d+\s*[x×]\s*([\d.]+)\s*(ml|l|g|kg)\b/i);
-  const match = multi || String(text).match(/([\d.]+)\s*(ml|l|g|kg)\b/i);
+  // "ltr" is a real, common abbreviation on real scraped pack_size
+  // values (21 of 831 populated rows use it, confirmed live) -- "l"
+  // alone would miss all of them, since \b fails between "l" and the
+  // "t" immediately after it.
+  const UNIT = 'ml|ltr|l|kg|g';
+  const multi = String(text).match(new RegExp(`^\\d+\\s*[x×]\\s*([\\d.]+)\\s*(${UNIT})\\b`, 'i'));
+  const match = multi || String(text).match(new RegExp(`([\\d.]+)\\s*(${UNIT})\\b`, 'i'));
   if (!match) return null;
 
   let value = toNumber(match[1]);
   let unit = match[2].toLowerCase();
   if (value === null) return null;
   if (unit === 'kg') { value *= 1000; unit = 'g'; }
-  if (unit === 'l') { value *= 1000; unit = 'ml'; }
+  if (unit === 'l' || unit === 'ltr') { value *= 1000; unit = 'ml'; }
   if (value <= 0) return null;
   return { value: Math.round(value), unit };
 }

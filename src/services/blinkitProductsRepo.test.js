@@ -20,6 +20,11 @@ test('normalizes l to ml', () => {
   assert.deepEqual(parsePackSize('750 ml'), { value: 750, unit: 'ml' });
 });
 
+test('normalizes the real "ltr" abbreviation to ml -- found live in 21 of 831 populated pack_size rows, missed entirely before this', () => {
+  assert.deepEqual(parsePackSize('1 ltr'), { value: 1000, unit: 'ml' });
+  assert.deepEqual(parsePackSize('6 x 1 ltr'), { value: 1000, unit: 'ml' });
+});
+
 test('a multipack uses the PER-UNIT amount, not the combined total -- drinking one juice box is 250ml, not the whole 2-pack', () => {
   assert.deepEqual(parsePackSize('2 x 250 ml'), { value: 250, unit: 'ml' });
   assert.deepEqual(parsePackSize('20 x 150 ml'), { value: 150, unit: 'ml' });
@@ -30,6 +35,9 @@ test('an unparseable or missing pack size returns null, not a guess', () => {
   assert.equal(parsePackSize(null), null);
   assert.equal(parsePackSize(''), null);
   assert.equal(parsePackSize('assorted'), null);
+  // A piece count isn't a weight/volume -- no per-piece weight is known,
+  // so returning null here (rather than guessing) is correct, not a gap.
+  assert.equal(parsePackSize('25 pcs'), null);
 });
 
 test('extractNutrientsForHabitCheck uses the real pack size and unit when given one', () => {
