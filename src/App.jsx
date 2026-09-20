@@ -33,13 +33,11 @@ import Browse from './pages/Browse';
 import Category from './pages/Category';
 import PopularSearches from './pages/PopularSearches';
 import News from './pages/News';
-import SubmitProduct from './pages/SubmitProduct';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminGuard from './pages/admin/AdminGuard';
 import AdminProductList from './pages/admin/AdminProductList';
 import AdminProductForm from './pages/admin/AdminProductForm';
 import AdminFlagsList from './pages/admin/AdminFlagsList';
-import AdminSubmissionsList from './pages/admin/AdminSubmissionsList';
 import AdminDuplicates from './pages/admin/AdminDuplicates';
 import AdminImport from './pages/admin/AdminImport';
 import AdminActivityLog from './pages/admin/AdminActivityLog';
@@ -192,7 +190,6 @@ function AppShell() {
           <Route path="/category/:id" element={<Category />} />
           <Route path="/popular" element={<PopularSearches />} />
           <Route path="/news" element={<News />} />
-          <Route path="/submit-product" element={<SubmitProduct />} />
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/products" element={<AdminGuard><AdminProductList /></AdminGuard>} />
           <Route path="/admin/products/new" element={<AdminGuard><AdminProductForm /></AdminGuard>} />
@@ -200,7 +197,6 @@ function AppShell() {
           <Route path="/admin/products/:id/copy" element={<AdminGuard><AdminProductForm copyMode /></AdminGuard>} />
           <Route path="/admin/products/:id/history" element={<AdminGuard><AdminProductHistory /></AdminGuard>} />
           <Route path="/admin/flags" element={<AdminGuard><AdminFlagsList /></AdminGuard>} />
-          <Route path="/admin/submissions" element={<AdminGuard><AdminSubmissionsList /></AdminGuard>} />
           <Route path="/admin/duplicates" element={<AdminGuard><AdminDuplicates /></AdminGuard>} />
           <Route path="/admin/barcode-check" element={<AdminGuard><AdminBarcodeCheck /></AdminGuard>} />
           <Route path="/admin/import" element={<AdminGuard><AdminImport /></AdminGuard>} />
