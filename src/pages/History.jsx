@@ -107,7 +107,7 @@ export default function History() {
           {filtered.map((entry, i) => (
             <div
               key={entry.id}
-              onClick={() => navigate(`/result/${entry.id}`)}
+              onClick={() => navigate(`/result/${entry.id}`, { state: { quiet: true } })}
               style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }}
               className="item-in tap-scale bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-3 flex items-center gap-3 cursor-pointer hover:shadow-md transition-all"
             >

@@ -1,7 +1,7 @@
 // src/pages/Result.jsx
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { getHistoryById, updateHistoryProductName, refreshHistoryEntry, saveToHistory, getScoreColor, getIngredientSeverity } from '../utils/storage';
 import { updateProductName, getCachedReport, getSaferAlternatives, getSimilarProducts, deleteReport, saveReport, getReportIdByLookupKey } from '../services/productCache';
 import { buildProductShareText, productShareUrl, whatsappShareUrl } from '../utils/share';
@@ -25,6 +25,7 @@ import ProductImage from '../components/ProductImage';
 import ProductStripCard from '../components/ProductStripCard';
 import NewsCard from '../components/NewsCard';
 import { toServing } from '../services/nutrientBasis';
+import ResultBurst, { shouldBurst } from '../components/ResultBurst';
 
 // Maps a dailyHabitCheck.js nutrientKey to the matching i18n string keys
 // (see src/i18n/strings.js) for its display name and its three
@@ -200,10 +201,12 @@ function ListCard({ title, dotColor, items }) {
 export default function Result() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { t, language } = useLanguage();
   const { profiles, activeProfileId, setActiveProfile } = useFamily();
   const [selectedProfileId, setSelectedProfileId] = useState(activeProfileId);
   const [result, setResult] = useState(null);
+  const [burst, setBurst] = useState(false);
   const [filter, setFilter] = useState('all');
   const [view, setView] = useState('overview');
   const [editingName, setEditingName] = useState(false);
@@ -232,7 +235,9 @@ export default function Result() {
       return;
     }
     setResult(data);
-  }, [id, navigate]);
+    // Celebrate a freshly opened report once; not when re-opening from History.
+    setBurst(!location.state?.quiet && shouldBurst(id));
+  }, [id, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Resolved up front, not when the share button is tapped -- a link
   // opened after an await is no longer a direct tap as far as a mobile
@@ -596,6 +601,7 @@ export default function Result() {
 
   return (
     <div className="page-in max-w-[560px] mx-auto pb-24" style={{ background: 'var(--bg-grouped)' }}>
+      {burst && <ResultBurst id={id} onDone={() => setBurst(false)} />}
 
       {/* Nav */}
       <button

@@ -64,7 +64,6 @@ export default function Home() {
   // skeleton in the meantime, reads as one clean load instead.
   const [sectionsLoading, setSectionsLoading] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('Analyzing ingredients...');
   const [error, setError] = useState('');
   const fileInputRef = useRef(null);
   const searchInputRef = useRef(null);
@@ -207,7 +206,6 @@ export default function Home() {
   const openCachedSuggestion = async (item) => {
     setError('');
     setLoading(true);
-    setLoadingMessage('Loading saved report...');
     try {
       const cached = await getCachedReport(item.lookupKey);
       if (!cached) {
@@ -228,7 +226,6 @@ export default function Home() {
     setError('');
     const key = barcodeKey(item.code);
     setLoading(true);
-    setLoadingMessage('Checking cache...');
     try {
       const cached = await getCachedReport(key);
       if (cached) {
@@ -309,11 +306,9 @@ export default function Home() {
     try {
       if (mode === 'text') {
         const key = textKey(text.trim());
-        setLoadingMessage('Checking cache...');
         let result = await getCachedReport(key);
 
         if (!result) {
-          setLoadingMessage('Looking up ingredients...');
           const analysis = await analyzeText(text.trim(), textProductName.trim());
           result = analysis.report;
           result.ingredientsText = text.trim();
@@ -345,7 +340,6 @@ export default function Home() {
       }
 
       if (mode === 'image') {
-        setLoadingMessage('Reading your food label...');
         const extracted = await extractIngredientsFromImage(imageFile);
         if (!extracted.readable && !extracted.ingredientsText) {
           setError(extracted.notes || "Couldn't read this photo clearly. Try a clearer, closer photo, or paste the ingredients instead.");
@@ -359,7 +353,6 @@ export default function Home() {
 
       if (mode === 'barcode') {
         const key = barcodeKey(barcodeValue);
-        setLoadingMessage('Checking cache...');
         const cached = await getCachedReport(key);
         if (cached) {
           cached.lookupKey = key;
@@ -374,7 +367,6 @@ export default function Home() {
           return;
         }
 
-        setLoadingMessage('Looking up product...');
         const found = await lookupBarcode(barcodeValue);
         if (!found.found) {
           setError("This product isn't in the product database yet. Try pasting the ingredients or uploading a photo instead.");
@@ -414,12 +406,10 @@ export default function Home() {
     try {
       let result = null;
       if (review.source !== 'barcode') {
-        setLoadingMessage('Checking cache...');
         result = await getCachedReport(key);
       }
 
       if (!result) {
-        setLoadingMessage('Looking up ingredients...');
         const analysis = await analyzeText(reviewText.trim(), reviewProductName.trim(), review.brand, review.offIngredients, review.imageUrl, review.nutrientsInfo);
         result = analysis.report;
         result.ingredientsText = reviewText.trim();
@@ -488,7 +478,7 @@ export default function Home() {
             >
               <ProductImage src={r.imageUrl} size={40} expandable={false} />
               <button
-                onClick={() => navigate(`/result/${item.historyId}`)}
+                onClick={() => navigate(`/result/${item.historyId}`, { state: { quiet: true } })}
                 className="tap-scale flex-1 min-w-0 text-left text-sm text-slate-700 dark:text-slate-200 truncate"
               >
                 {r.productName || 'Unknown Product'}
@@ -535,7 +525,7 @@ export default function Home() {
   if (loading) {
     return (
       <div className="page-in max-w-2xl mx-auto px-4 pb-24">
-        <LoadingScreen message={loadingMessage} />
+        <LoadingScreen />
       </div>
     );
   }
@@ -650,7 +640,7 @@ export default function Home() {
             <div className="flex gap-2 mb-4">
               <button
                 onClick={() => { setMode('barcode'); setError(''); }}
-                className="tap-scale flex-1 flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-green-600 hover:bg-green-700 text-white shadow-sm shadow-green-200 transition-colors"
+                className="tap-scale flex-1 flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 shadow-sm transition-colors"
               >
                 <BarcodeIcon />
                 <span className="text-sm font-bold">Scan Barcode</span>
