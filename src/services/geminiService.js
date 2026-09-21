@@ -25,22 +25,47 @@ function isQuotaError(message) {
   return /quota|rate limit|429/i.test(message || '');
 }
 
-// Free-tier quota is per-key and resets daily -- once the active key runs
-// out, every call would fail the same way, so remember which key last
-// worked and start there next time instead of re-trying an exhausted key
-// on every single call.
-let activeKeyIndex = 0;
+// Every call goes to the NEXT key in turn (round-robin) instead of using
+// key 1 until it runs dry: each key has its own free-tier quota AND its own
+// per-minute rate limit, so spreading calls evenly across all of them gives
+// roughly N times the throughput and uses every key's daily quota at the
+// same steady rate. A key that answers "quota exceeded" is put on a
+// cooldown and skipped -- a minute for a per-minute limit, an hour for a
+// daily cap -- rather than being retried on every call.
+let nextKey = 0;
+const cooldownUntil = new Map(); // key index -> timestamp (ms)
+const RATE_COOLDOWN_MS = 60 * 1000;
+const DAILY_COOLDOWN_MS = 60 * 60 * 1000;
 
 /**
- * POST one request to Gemini, rotating to the next configured key if the
- * active one is out of quota. Returns { text, finishReason } on success;
- * throws (with the real API error message) once every remaining key has
- * failed, so existing callers' try/catch and error handling still work
- * unchanged.
+ * The order in which to try the keys for one call: starting at `start`,
+ * wrapping around, with any key still cooling down moved to the back (so
+ * it is only tried when every healthy key has already failed). Pure --
+ * exported for testing.
+ */
+export function orderKeys(count, start, cooldowns, now) {
+  const order = [];
+  for (let n = 0; n < count; n++) order.push((start + n) % count);
+  const cooling = (i) => (cooldowns.get(i) || 0) > now;
+  return [...order.filter((i) => !cooling(i)), ...order.filter(cooling)];
+}
+
+/** How long to bench a key after a quota error, from the API's own wording. */
+export function cooldownFor(message) {
+  return /per\s?day|daily/i.test(message || '') ? DAILY_COOLDOWN_MS : RATE_COOLDOWN_MS;
+}
+
+/**
+ * POST one request to Gemini, round-robin across the configured keys and
+ * falling through to the next key when one is out of quota. Returns
+ * { text, finishReason } on success; throws (with the real API error
+ * message) once every key has failed, so existing callers' try/catch and
+ * error handling still work unchanged.
  */
 export async function callGemini(requestBody) {
   let lastMessage = 'API request failed';
-  for (let i = activeKeyIndex; i < GEMINI_API_KEYS.length; i++) {
+  const order = orderKeys(GEMINI_API_KEYS.length, nextKey, cooldownUntil, Date.now());
+  for (const [position, i] of order.entries()) {
     const response = await fetch(apiUrl(GEMINI_API_KEYS[i]), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -48,7 +73,8 @@ export async function callGemini(requestBody) {
     });
 
     if (response.ok) {
-      activeKeyIndex = i;
+      nextKey = (i + 1) % GEMINI_API_KEYS.length;
+      cooldownUntil.delete(i);
       const data = await response.json();
       return {
         text: data.candidates?.[0]?.content?.parts?.[0]?.text,
@@ -59,11 +85,13 @@ export async function callGemini(requestBody) {
     const error = await response.json().catch(() => null);
     lastMessage = error?.error?.message || 'API request failed';
 
-    if (isQuotaError(lastMessage) && i + 1 < GEMINI_API_KEYS.length) {
-      console.warn(`Gemini key ${i + 1}/${GEMINI_API_KEYS.length} is out of quota -- switching to the next key.`);
-      continue;
+    if (isQuotaError(lastMessage)) {
+      cooldownUntil.set(i, Date.now() + cooldownFor(lastMessage));
+      if (position + 1 < order.length) {
+        console.warn(`Gemini key ${i + 1}/${GEMINI_API_KEYS.length} is out of quota -- switching to the next key.`);
+        continue;
+      }
     }
-    activeKeyIndex = i;
     throw new Error(lastMessage);
   }
   throw new Error(lastMessage);

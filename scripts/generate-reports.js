@@ -28,13 +28,17 @@
 
 import { analyzeText } from '../src/services/analyzeText.js';
 import { isBundleListing } from '../src/services/bundleListing.js';
+import { GEMINI_API_KEYS } from '../src/services/geminiService.js';
 import { saveReport } from '../src/services/productCache.js';
 import { getPendingProducts, markReportGenerated } from '../src/services/productsRepo.js';
 import { getPendingBlinkitProducts, markBlinkitReportGenerated, blinkitLookupKey, extractNutrientsForHabitCheck } from '../src/services/blinkitProductsRepo.js';
 import { optimizeAndUploadBlinkitImage } from '../src/services/blinkitImageOptimizer.js';
 import { supabase, isSupabaseConfigured } from '../src/services/supabaseClient.js';
 
-const GEMINI_PACING_MS = 1500; // proactive spacing, not just reacting to 429s
+// Proactive spacing, not just reacting to 429s. Calls now rotate across every
+// configured key (see callGemini), so each key sees only 1/N of them -- the
+// gap between products can shrink by the same factor.
+const GEMINI_PACING_MS = Math.max(500, Math.round(1500 / Math.max(1, GEMINI_API_KEYS.length)));
 const RATE_LIMIT_RETRIES = 3;
 const RATE_LIMIT_WAIT_MS = 30000; // Gemini's free-tier window is per-minute; 30s reliably clears it
 
