@@ -392,6 +392,14 @@ export default function Result() {
 
   if (!result) return null;
 
+  // Shown per serving when the pack states one, else per 100 g/ml (the
+  // heading below says which). Built from the canonical per-100 figures
+  // when the report has them, so the label can never disagree with the
+  // numbers; older reports fall back to what they stored.
+  const displayNutrients = result.nutrientsPer100
+    ? toServing(result.nutrientsPer100, result.realNutrientsServingGrams)
+    : result.realNutrients;
+
   const score = result.overallScore || 0;
   const scoreColors = getScoreColor(score);
   // Always derived from the score, never read back from the stored
