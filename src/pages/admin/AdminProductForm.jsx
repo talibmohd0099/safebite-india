@@ -752,6 +752,17 @@ export default function AdminProductForm({ copyMode = false }) {
           {copyMode ? 'Copy product (as new)' : isEdit ? 'Edit product' : 'Add new product'}
         </p>
         {isEdit && (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <a
+              href={`#/p/${id}`}
+              target="_blank"
+              rel="noreferrer"
+              title="Open the saved report in the main app, as a user sees it (save first to see unsaved edits)"
+              className="tap-scale text-[12.5px] font-semibold px-3 py-2 rounded-[10px] flex-shrink-0"
+              style={{ background: 'var(--tint-bg)', color: 'var(--tint)' }}
+            >
+              👁 View in app
+            </a>
           <a
             href={`#/admin/products/${id}/copy`}
             target="_blank"
@@ -762,6 +773,7 @@ export default function AdminProductForm({ copyMode = false }) {
           >
             📋 Copy as new product
           </a>
+          </div>
         )}
       </div>
       {copyMode ? (

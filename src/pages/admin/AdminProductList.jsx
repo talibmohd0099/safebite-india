@@ -273,6 +273,7 @@ export default function AdminProductList() {
                   {row.updated_at ? new Date(row.updated_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
                 </span>
                 <div className="flex items-center gap-2.5 justify-end">
+                  <a href={`#/p/${row.id}`} target="_blank" rel="noreferrer" title="View in the app" className="tap-scale text-[13px] font-semibold" style={{ color: 'var(--label-2)' }}>View</a>
                   <Link to={`/admin/products/${row.id}/history`} title="History" className="tap-scale text-[15px]" style={{ color: 'var(--label-3)' }}>🕐</Link>
                   <Link to={`/admin/products/${row.id}/edit`} className="tap-scale text-[13px] font-semibold" style={{ color: 'var(--tint)' }}>Edit</Link>
                   <button onClick={() => handleDelete(row.id, row.product_name)} className="tap-scale text-[13px] font-semibold" style={{ color: 'var(--v-poor)' }}>Delete</button>

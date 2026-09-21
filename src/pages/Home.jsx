@@ -14,7 +14,6 @@ import { CATEGORIES } from '../data/categories';
 import { getTodaysTip } from '../data/didYouKnowTips';
 import { getTodaysFact } from '../services/dailyFactRepo';
 import BarcodeScanner, { isBarcodeScanSupported } from '../components/BarcodeScanner';
-import ScanBadge from '../components/ScanBadge';
 import { useFamily } from '../contexts/FamilyContext';
 
 // A plain pulsing placeholder block -- shared shape for every home
@@ -611,44 +610,28 @@ export default function Home() {
 
       {mode === 'search' && (
         <>
-          {/* Hero band -- kept short on purpose: about half the height of
-              the earlier version. The subtitle line was the trade-off cut
-              to get there; headline, live stats and the scan badge stay. */}
-          <div className="hero-animated relative -mx-4 px-4 pt-4 pb-4 rounded-b-[22px] overflow-hidden">
-            <span className="hero-float absolute top-1 right-16 w-1 h-4 rounded-full bg-lime-300/40 rotate-12" aria-hidden="true" />
-
-            <div className="relative flex items-center justify-between gap-3">
-              <h1 className="text-white text-[17px] leading-tight font-bold min-w-0">
-                Know what's <span className="text-lime-300">in</span> your food.
-              </h1>
-              <ScanBadge size={40} />
-            </div>
-
+          {/* Hero band -- one headline and one quiet stats line. The old
+              version stacked a headline, a decorative badge and two boxed
+              stat pills into a short band, and the search bar then
+              overlapped all of it; less in the band reads calmer. */}
+          <div className="hero-animated relative -mx-4 px-5 pt-5 pb-10 rounded-b-[28px] overflow-hidden">
+            <h1 className="relative text-white text-[26px] leading-[1.15] font-extrabold tracking-tight">
+              Know what's <span className="text-lime-300">in</span><br />your food.
+            </h1>
             {sectionsLoading ? (
-              <div className="relative flex items-center gap-2 mt-2.5">
-                <div className="flex-1 h-8 rounded-xl bg-white/15 shimmer-light" />
-                <div className="flex-1 h-8 rounded-xl bg-white/15 shimmer-light" />
-              </div>
+              <div className="relative shimmer-light h-4 w-48 rounded-full mt-3" />
             ) : stats && (
-              <div className="relative flex items-center gap-2 mt-2.5">
-                <div className="flex-1 flex items-center gap-1.5 bg-white/15 backdrop-blur-sm rounded-xl px-2.5 py-1.5 min-w-0">
-                  <span className="text-xs flex-shrink-0">📊</span>
-                  <p className="text-white text-[12.5px] leading-none truncate">
-                    <span className="font-extrabold">{stats.total.toLocaleString()}</span> foods checked
-                  </p>
-                </div>
-                <div className="flex-1 flex items-center gap-1.5 bg-white/15 backdrop-blur-sm rounded-xl px-2.5 py-1.5 min-w-0">
-                  <span className="text-xs flex-shrink-0">✨</span>
-                  <p className="text-white text-[12.5px] leading-none truncate">
-                    <span className="font-extrabold">+{stats.addedToday.toLocaleString()}</span> today
-                  </p>
-                </div>
-              </div>
+              <p className="relative mt-2.5 flex items-center gap-2 text-[13px] text-white/85">
+                <span className="w-1.5 h-1.5 rounded-full bg-lime-300 flex-shrink-0" aria-hidden="true" />
+                <span><span className="font-bold text-white">{stats.total.toLocaleString()}</span> foods checked</span>
+                <span className="text-white/40" aria-hidden="true">·</span>
+                <span><span className="font-bold text-white">+{stats.addedToday.toLocaleString()}</span> today</span>
+              </p>
             )}
           </div>
 
           {/* Search bar */}
-          <div className="-mt-5 mb-4 relative z-10">
+          <div className="-mt-6 mb-4 relative z-10">
             <div className="flex items-center gap-3 bg-white dark:bg-slate-800 rounded-2xl shadow-lg shadow-slate-200 border border-slate-100 dark:border-slate-800 px-4 py-3">
               <span className="text-slate-400 dark:text-slate-500 text-lg flex-shrink-0">🔍</span>
               <div className="flex-1 min-w-0">
