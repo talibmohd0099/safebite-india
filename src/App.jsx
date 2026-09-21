@@ -11,7 +11,7 @@
 // Capacitor serves local files the same server-less way.
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { HashRouter, Routes, Route, useNavigate, useLocation, useNavigationType } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation, useNavigationType } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { LanguageProvider } from './contexts/LanguageContext';
@@ -29,7 +29,6 @@ import Compare from './pages/Compare';
 import CompareManage from './pages/CompareManage';
 import Family from './pages/Family';
 import About from './pages/About';
-import Browse from './pages/Browse';
 import Category from './pages/Category';
 import PopularSearches from './pages/PopularSearches';
 import News from './pages/News';
@@ -188,7 +187,7 @@ function AppShell() {
           <Route path="/compare/result" element={<Compare />} />
           <Route path="/family" element={<Family />} />
           <Route path="/about" element={<About />} />
-          <Route path="/browse" element={<Browse />} />
+          <Route path="/browse" element={<Navigate to="/" replace />} />
           <Route path="/category/:id" element={<Category />} />
           <Route path="/popular" element={<PopularSearches />} />
           <Route path="/news" element={<News />} />

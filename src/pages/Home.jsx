@@ -22,7 +22,7 @@ import { useFamily } from '../contexts/FamilyContext';
 // space its real content will take up (no layout jump once the real
 // data replaces it).
 function SkeletonBlock({ className }) {
-  return <div className={`animate-pulse rounded-xl bg-slate-200/70 dark:bg-slate-700/50 ${className || ''}`} />;
+  return <div className={`shimmer rounded-xl ${className || ''}`} />;
 }
 
 function BarcodeIcon() {
@@ -78,25 +78,29 @@ export default function Home() {
   const [dailyFact, setDailyFact] = useState(null);
   const [showFactDetail, setShowFactDetail] = useState(false);
 
-  useEffect(() => {
-    getTodaysFact().then(setDailyFact);
-  }, []);
   const { profiles, activeProfileId, setActiveProfile } = useFamily();
 
   // Real usage/catalog data for the home screen's discovery sections --
   // each loaded once, not worth the type-ahead effect's debounce/
   // cancellation machinery.
   useEffect(() => {
+    // Every section -- INCLUDING the daily fact and the hero stats --
+    // is awaited together and revealed in one go. A failed query falls
+    // back to that section's empty state instead of leaving the whole
+    // screen stuck on skeletons.
+    const safe = (promise, fallback) => Promise.resolve(promise).catch(() => fallback);
     Promise.all([
-      getPopularSearchTerms(8),
-      getRecentlyAddedProducts(10),
-      getDailySpotlight(),
-      getCatalogStats(),
-    ]).then(([popular, recent, spot, catStats]) => {
+      safe(getPopularSearchTerms(8), []),
+      safe(getRecentlyAddedProducts(10), []),
+      safe(getDailySpotlight(), { best: null, worst: null }),
+      safe(getCatalogStats(), null),
+      safe(getTodaysFact(), null),
+    ]).then(([popular, recent, spot, catStats, fact]) => {
       setPopularTerms(popular);
       setRecentlyAdded(recent);
       setSpotlight(spot);
       setStats(catStats);
+      setDailyFact(fact);
       setSectionsLoading(false);
     });
   }, []);
@@ -622,8 +626,8 @@ export default function Home() {
 
             {sectionsLoading ? (
               <div className="relative flex items-center gap-2 mt-2.5">
-                <div className="flex-1 h-8 rounded-xl bg-white/15 animate-pulse" />
-                <div className="flex-1 h-8 rounded-xl bg-white/15 animate-pulse" />
+                <div className="flex-1 h-8 rounded-xl bg-white/15 shimmer-light" />
+                <div className="flex-1 h-8 rounded-xl bg-white/15 shimmer-light" />
               </div>
             ) : stats && (
               <div className="relative flex items-center gap-2 mt-2.5">
@@ -932,43 +936,47 @@ export default function Home() {
             </div>
           )}
 
-          {/* Browse by category -- shown while the search box is empty, so
-              there's something to explore before typing anything. */}
-          {searchQuery.trim().length === 0 && (
+          {/* Explore food -- every category in one horizontal row, so there is
+              no separate "all categories" page to go find. Waits for the
+              same load gate as the sections above so nothing appears
+              ahead of the rest. */}
+          {searchQuery.trim().length === 0 && sectionsLoading && (
             <div className="mb-6">
-              <div className="flex items-center justify-between mb-2 px-0.5">
-                <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Explore food</p>
+              <SkeletonBlock className="h-4 w-28 mb-2 ml-0.5" />
+              <div className="flex gap-3">
+                {[0, 1, 2, 3, 4].map((n) => <SkeletonBlock key={n} className="h-[88px] w-[72px] flex-shrink-0" />)}
               </div>
-              {/* One compact row of 4, not the full catalog of categories
-                  -- a homepage teaser, not a second Browse page. "See
-                  more" below (not a top-right link) is the one way
-                  into the rest, right where the row that was cut off
-                  ends. */}
-              <div className="grid grid-cols-4 gap-2">
-                {CATEGORIES.slice(0, 4).map((cat, i) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => navigate(`/category/${cat.id}`)}
-                    style={{ animationDelay: `${i * 40}ms` }}
-                    className="item-in tap-scale flex flex-col items-center gap-1"
-                  >
-                    <img
-                      src={cat.image}
-                      alt=""
-                      className="w-full aspect-square object-cover rounded-2xl shadow-sm transition-transform hover:-translate-y-0.5"
-                    />
-                    <span className="text-[10.5px] font-semibold text-slate-600 dark:text-slate-300 text-center leading-tight line-clamp-2">
-                      {cat.label}
-                    </span>
-                  </button>
-                ))}
+            </div>
+          )}
+          {searchQuery.trim().length === 0 && !sectionsLoading && (
+            <div className="mb-6">
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">Explore food</p>
+              <div className="relative">
+                <div className="flex gap-3 overflow-x-auto pb-1 pr-8" style={{ scrollbarWidth: 'none' }}>
+                  {CATEGORIES.map((cat, i) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => navigate(`/category/${cat.id}`)}
+                      style={{ animationDelay: `${Math.min(i * 30, 240)}ms` }}
+                      className="item-in tap-scale flex-shrink-0 w-[72px] flex flex-col items-center gap-1"
+                    >
+                      <img
+                        src={cat.image}
+                        alt=""
+                        loading="lazy"
+                        className="w-[72px] h-[72px] object-cover rounded-2xl shadow-sm"
+                      />
+                      <span className="text-[10.5px] font-semibold text-slate-600 dark:text-slate-300 text-center leading-tight line-clamp-2 w-full">
+                        {cat.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <div
+                  className="pointer-events-none absolute top-0 right-0 bottom-1 w-10"
+                  style={{ background: 'linear-gradient(to right, transparent, var(--bg-grouped))' }}
+                />
               </div>
-              <button
-                onClick={() => navigate('/browse')}
-                className="tap-scale w-full mt-2.5 text-xs font-semibold text-green-600 dark:text-green-400"
-              >
-                See more categories ›
-              </button>
             </div>
           )}
 
@@ -979,8 +987,9 @@ export default function Home() {
               "Learn more" button -- the static tips have no separate
               detail text to expand into, and a button that opens
               nothing would be worse than no button. */}
-          {searchQuery.trim().length === 0 && (
-            <div className="mb-6 flex gap-3 items-start p-3.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-800">
+          {searchQuery.trim().length === 0 && sectionsLoading && <SkeletonBlock className="h-16 mb-6" />}
+          {searchQuery.trim().length === 0 && !sectionsLoading && (
+            <div className="item-in mb-6 flex gap-3 items-start p-3.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-800">
               <span className="text-lg flex-shrink-0">💡</span>
               <div className="min-w-0">
                 <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">

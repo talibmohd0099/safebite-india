@@ -18,8 +18,11 @@ export default function ScoreCircle({ score, size = 'large', showLabel = false }
   const clamped = Math.max(0, Math.min(100, score));
   const finalColors = getScoreColor(clamped);
 
-  const prefersReducedMotion =
-    typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  // Only the big result ring counts up -- small rings in lists (History,
+  // cards) show their score straight away, or every row would be
+  // counting at once as the list appears.
+  const prefersReducedMotion = size === 'small' ||
+    (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
   const [liveValue, setLiveValue] = useState(prefersReducedMotion ? clamped : 0);
   const frameRef = useRef(null);
 

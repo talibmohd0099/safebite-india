@@ -64,8 +64,8 @@ export default function Category() {
     return (
       <div className="page-in max-w-2xl mx-auto px-4 py-16 text-center">
         <p className="text-slate-500 dark:text-slate-400">Unknown category.</p>
-        <button onClick={() => navigate('/browse')} className="tap-scale mt-4 text-green-600 dark:text-green-400 font-semibold">
-          ← Back to categories
+        <button onClick={() => navigate('/')} className="tap-scale mt-4 text-green-600 dark:text-green-400 font-semibold">
+          ← Back to home
         </button>
       </div>
     );
