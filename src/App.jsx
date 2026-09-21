@@ -9,6 +9,8 @@
 // as the server is concerned. The tradeoff is a visible # in the URL.
 // It also happens to suit the Android app build just as well, since
 // Capacitor serves local files the same server-less way.
+import { syncNotifications, listenForTaps } from './services/notifications';
+import { getRecentlyAddedProducts } from './services/productCache';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation, useNavigationType } from 'react-router-dom';
@@ -59,6 +61,32 @@ import SubmitProduct from './pages/SubmitProduct';
 // press inside that window exits for real, anything else (letting it
 // time out, navigating away) just cancels it.
 const EXIT_CONFIRM_WINDOW_MS = 2000;
+
+// Keeps the opt-in notifications scheduled (start + every return to the
+// app, so the tip/product content stays current) and opens the right
+// screen when one is tapped. Renders nothing; a no-op outside the app.
+function NotificationBridge() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    syncNotifications(getRecentlyAddedProducts);
+    let stopTaps = () => {};
+    listenForTaps(navigate).then((stop) => { stopTaps = stop; });
+
+    let resumeHandle = null;
+    if (Capacitor.isNativePlatform()) {
+      CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) syncNotifications(getRecentlyAddedProducts);
+      }).then((h) => { resumeHandle = h; });
+    }
+    return () => {
+      stopTaps();
+      resumeHandle?.remove();
+    };
+  }, [navigate]);
+
+  return null;
+}
 
 function AndroidBackButton() {
   const navigate = useNavigate();
@@ -237,6 +265,7 @@ export default function App() {
       <FamilyProvider>
         <HashRouter>
           <AndroidBackButton />
+          <NotificationBridge />
           <ScrollRestoration />
           <AppShell />
           {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}

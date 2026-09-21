@@ -37,6 +37,8 @@
          (the report-ready haptic tick). A normal permission: granted at
          install, no prompt, and unrelated to notifications. -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Android 13+: needed to show the opt-in "Did you know?" / new-product notifications. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 </manifest>

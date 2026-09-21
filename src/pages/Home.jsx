@@ -22,6 +22,14 @@ import { useFamily } from '../contexts/FamilyContext';
 // screen section's skeleton, so a section always reserves the same
 // space its real content will take up (no layout jump once the real
 // data replaces it).
+// The last set of home-screen sections that finished loading, kept for the
+// life of the app session. Home is unmounted whenever a report is open, so
+// without this every Back to Home started from empty skeletons and waited on
+// the network again. Now it shows this straight away and refreshes quietly in
+// the background (the fetch below still runs every time); only the very
+// first visit shows skeletons.
+let homeSnapshot = null;
+
 function SkeletonBlock({ className }) {
   return <div className={`shimmer rounded-xl ${className || ''}`} />;
 }
@@ -53,10 +61,12 @@ export default function Home() {
   const [suggestions, setSuggestions] = useState({ cached: [], off: [] });
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
-  const [popularTerms, setPopularTerms] = useState([]);
-  const [recentlyAdded, setRecentlyAdded] = useState([]);
-  const [spotlight, setSpotlight] = useState({ best: null, worst: null });
-  const [stats, setStats] = useState(null);
+  // Coming back to Home (e.g. Back from a report) starts from the last
+  // loaded data instead of a blank skeleton -- see homeSnapshot below.
+  const [popularTerms, setPopularTerms] = useState(() => homeSnapshot?.popular ?? []);
+  const [recentlyAdded, setRecentlyAdded] = useState(() => homeSnapshot?.recent ?? []);
+  const [spotlight, setSpotlight] = useState(() => homeSnapshot?.spot ?? { best: null, worst: null });
+  const [stats, setStats] = useState(() => homeSnapshot?.stats ?? null);
   // True until ALL of the home screen's discovery sections have their
   // real data, not just the first one to resolve -- these are 4
   // independent Supabase queries, and letting each section render the
@@ -64,7 +74,7 @@ export default function Home() {
   // in one at a time at different moments, a real reported "looks odd"
   // complaint. Waiting for all of them and revealing together, with a
   // skeleton in the meantime, reads as one clean load instead.
-  const [sectionsLoading, setSectionsLoading] = useState(true);
+  const [sectionsLoading, setSectionsLoading] = useState(() => !homeSnapshot);
   const [loading, setLoading] = useState(false);
   // A saved report opens almost instantly, which feels abrupt -- keep the
   // loading screen up for a natural, randomised minimum (1-2.5s) before
@@ -93,7 +103,7 @@ export default function Home() {
   // today, when one exists -- null keeps todaysTip (the static
   // curated rotation) as the fallback, so the card always has
   // something true to show even on a day the job hasn't run yet.
-  const [dailyFact, setDailyFact] = useState(null);
+  const [dailyFact, setDailyFact] = useState(() => homeSnapshot?.fact ?? null);
   const [showFactDetail, setShowFactDetail] = useState(false);
 
   const { profiles, activeProfileId, setActiveProfile } = useFamily();
@@ -114,6 +124,7 @@ export default function Home() {
       safe(getCatalogStats(), null),
       safe(getTodaysFact(), null),
     ]).then(([popular, recent, spot, catStats, fact]) => {
+      homeSnapshot = { popular, recent, spot, stats: catStats, fact };
       setPopularTerms(popular);
       setRecentlyAdded(recent);
       setSpotlight(spot);

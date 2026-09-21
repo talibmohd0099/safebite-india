@@ -1,5 +1,11 @@
 {
   "appId": "com.foodguard.india",
   "appName": "FoodGuard India",
-  "webDir": "dist"
+  "webDir": "dist",
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_foodguard",
+      "iconColor": "#16A34A"
+    }
+  }
 }
