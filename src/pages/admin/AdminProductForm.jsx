@@ -10,7 +10,8 @@
 // (a wrong AI verdict, a name that needs fixing).
 import { getNutrientsPer100, toServing } from '../../services/nutrientBasis';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { adminMarkSubmissionApproved } from '../../services/adminSubmissionsRepo';
 import AdminLayout from './AdminLayout';
 import PhotoCropModal from './PhotoCropModal';
 import { analyzeText } from '../../services/analyzeText';
@@ -314,6 +315,42 @@ export default function AdminProductForm({ copyMode = false }) {
   // e.g. "Maggi" x4) and the check correctly finds them, but that's only
   // useful information when the admin is actively changing the name.
   const [originalProductName, setOriginalProductName] = useState(null);
+
+  // Set when this form was opened from a user's product submission
+  // (AdminSubmissionsList -> "Create product"): prefills the barcode,
+  // name and photos, and marks the submission approved once the product
+  // is actually saved -- see handleSave.
+  const location = useLocation();
+  const fromSubmission = !id ? location.state?.fromSubmission : null;
+  const [submissionId] = useState(fromSubmission?.submissionId || null);
+
+  useEffect(() => {
+    if (!fromSubmission) return;
+    setBarcode(fromSubmission.barcode || '');
+    if (fromSubmission.productName) setProductName(fromSubmission.productName);
+    if (fromSubmission.productPhoto) setPhotoDataUrl(fromSubmission.productPhoto);
+    // The extraction action reads File objects, the submission stores
+    // data: URLs -- turn them back into files so "Extract from photos"
+    // works on them exactly as on photos the admin picked by hand.
+    let cancelled = false;
+    (async () => {
+      const toSlot = async (dataUrl, name) => {
+        if (!dataUrl) return null;
+        const blob = await (await fetch(dataUrl)).blob();
+        return { file: new File([blob], name, { type: blob.type || 'image/jpeg' }), dataUrl };
+      };
+      try {
+        const slots = [
+          await toSlot(fromSubmission.ingredientsPhoto, 'ingredients.jpg'),
+          await toSlot(fromSubmission.nutritionPhoto, 'nutrition.jpg'),
+        ];
+        if (!cancelled) setSourcePhotos(slots);
+      } catch {
+        // Photos are a convenience -- the admin can still add them by hand.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!id) return;
@@ -690,8 +727,13 @@ export default function AdminProductForm({ copyMode = false }) {
         await adminUpdateProduct(id, payload);
       } else {
         await adminCreateProduct(payload);
+        // Only after the product really exists -- an approved submission
+        // must never point at nothing.
+        if (submissionId) {
+          try { await adminMarkSubmissionApproved(submissionId, finalReport.productName); } catch { /* product is saved; the admin can tidy the status by hand */ }
+        }
       }
-      navigate('/admin/products');
+      navigate(submissionId ? '/admin/submissions' : '/admin/products');
     } catch (err) {
       setError(err.message);
     } finally {

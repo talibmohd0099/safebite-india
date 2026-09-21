@@ -43,6 +43,8 @@ import AdminImport from './pages/admin/AdminImport';
 import AdminActivityLog from './pages/admin/AdminActivityLog';
 import AdminProductHistory from './pages/admin/AdminProductHistory';
 import AdminBarcodeCheck from './pages/admin/AdminBarcodeCheck';
+import AdminSubmissionsList from './pages/admin/AdminSubmissionsList';
+import SubmitProduct from './pages/SubmitProduct';
 
 // The Android app's hardware/gesture back button doesn't do anything by
 // default in a Capacitor WebView -- without this, it would just sit
@@ -190,6 +192,7 @@ function AppShell() {
           <Route path="/category/:id" element={<Category />} />
           <Route path="/popular" element={<PopularSearches />} />
           <Route path="/news" element={<News />} />
+          <Route path="/submit-product" element={<SubmitProduct />} />
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/products" element={<AdminGuard><AdminProductList /></AdminGuard>} />
           <Route path="/admin/products/new" element={<AdminGuard><AdminProductForm /></AdminGuard>} />
@@ -197,6 +200,7 @@ function AppShell() {
           <Route path="/admin/products/:id/copy" element={<AdminGuard><AdminProductForm copyMode /></AdminGuard>} />
           <Route path="/admin/products/:id/history" element={<AdminGuard><AdminProductHistory /></AdminGuard>} />
           <Route path="/admin/flags" element={<AdminGuard><AdminFlagsList /></AdminGuard>} />
+          <Route path="/admin/submissions" element={<AdminGuard><AdminSubmissionsList /></AdminGuard>} />
           <Route path="/admin/duplicates" element={<AdminGuard><AdminDuplicates /></AdminGuard>} />
           <Route path="/admin/barcode-check" element={<AdminGuard><AdminBarcodeCheck /></AdminGuard>} />
           <Route path="/admin/import" element={<AdminGuard><AdminImport /></AdminGuard>} />
