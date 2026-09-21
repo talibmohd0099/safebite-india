@@ -27,6 +27,7 @@
 //   node scripts/generate-reports.js --dry-run
 
 import { analyzeText } from '../src/services/analyzeText.js';
+import { isBundleListing } from '../src/services/bundleListing.js';
 import { saveReport } from '../src/services/productCache.js';
 import { getPendingProducts, markReportGenerated } from '../src/services/productsRepo.js';
 import { getPendingBlinkitProducts, markBlinkitReportGenerated, blinkitLookupKey, extractNutrientsForHabitCheck } from '../src/services/blinkitProductsRepo.js';
@@ -169,6 +170,14 @@ async function main() {
   for (const product of pending) {
     if (dryRun) {
       console.log(`  would generate: "${product.product_name || product.lookup_key}"`);
+      continue;
+    }
+
+    // A gift pack/hamper/combo can't be scored honestly from one
+    // ingredients field -- close it out with no report instead of
+    // retrying it forever.
+    if (isBundleListing(product.product_name)) {
+      await product.markGenerated();
       continue;
     }
 

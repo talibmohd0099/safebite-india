@@ -14,6 +14,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { GEMINI_API_KEYS, callGemini } from './geminiService.js';
+import { isBundleListing } from './bundleListing.js';
 
 const SITEMAP_INDEX = 'https://blinkit.com/sitemap.xml';
 // A real browser UA, not a self-identifying bot string. Manual testing
@@ -280,8 +281,10 @@ export async function extractIngredientsWithAI(productName, attributes) {
 // "combo" as marketing, e.g. "Orange Fruit Juice Combo With Pulp" --
 // a completely ordinary single juice, no "+" in its name). See
 // blinkit.combo.test.js for the real names this was checked against.
+// Widened from just " + " to every bundle shape (gift packs, hampers,
+// potlis, assorted/variety packs, samplers, "combo") -- see bundleListing.js.
 export function isComboListing(productName) {
-  return / \+ /.test(productName || '');
+  return isBundleListing(productName);
 }
 
 export async function scrapeProduct(url, category, { useAI = false, useImageFallback = false } = {}) {
