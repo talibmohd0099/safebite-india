@@ -9,6 +9,7 @@ import { getCachedReport, saveReport, barcodeKey, textKey, searchCachedProducts,
 import { saveToHistory, getScoreColor } from '../utils/storage';
 import LoadingScreen from '../components/LoadingScreen';
 import ProductStripCard from '../components/ProductStripCard';
+import { randomLoadDelayMs, waitForMinimum } from '../utils/loadingPace';
 import ProductImage from '../components/ProductImage';
 import { CATEGORIES } from '../data/categories';
 import { getTodaysTip } from '../data/didYouKnowTips';
@@ -64,6 +65,20 @@ export default function Home() {
   // skeleton in the meantime, reads as one clean load instead.
   const [sectionsLoading, setSectionsLoading] = useState(true);
   const [loading, setLoading] = useState(false);
+  // A saved report opens almost instantly, which feels abrupt -- keep the
+  // loading screen up for a natural, randomised minimum (1-2.5s) before
+  // opening it. A report that really takes longer isn't delayed further.
+  const loadStartRef = useRef(0);
+  const loadMinMsRef = useRef(0);
+  const beginLoading = () => {
+    loadStartRef.current = Date.now();
+    loadMinMsRef.current = randomLoadDelayMs();
+    setLoading(true);
+  };
+  const goToResult = async (id) => {
+    await waitForMinimum(loadStartRef.current, loadMinMsRef.current);
+    navigate(`/result/${id}`);
+  };
   const [error, setError] = useState('');
   const fileInputRef = useRef(null);
   const searchInputRef = useRef(null);
@@ -205,7 +220,7 @@ export default function Home() {
 
   const openCachedSuggestion = async (item) => {
     setError('');
-    setLoading(true);
+    beginLoading();
     try {
       const cached = await getCachedReport(item.lookupKey);
       if (!cached) {
@@ -215,7 +230,7 @@ export default function Home() {
       }
       cached.lookupKey = item.lookupKey;
       const id = saveToHistory(cached, 'search');
-      navigate(`/result/${id}`);
+      await goToResult(id);
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
       setLoading(false);
@@ -225,13 +240,13 @@ export default function Home() {
   const openSearchResult = async (item) => {
     setError('');
     const key = barcodeKey(item.code);
-    setLoading(true);
+    beginLoading();
     try {
       const cached = await getCachedReport(key);
       if (cached) {
         cached.lookupKey = key;
         const id = saveToHistory(cached, 'search');
-        navigate(`/result/${id}`);
+        await goToResult(id);
         return;
       }
 
@@ -302,7 +317,7 @@ export default function Home() {
       return;
     }
 
-    setLoading(true);
+    beginLoading();
     try {
       if (mode === 'text') {
         const key = textKey(text.trim());
@@ -335,7 +350,7 @@ export default function Home() {
           setLoading(false);
           return;
         }
-        navigate(`/result/${id}`);
+        await goToResult(id);
         return;
       }
 
@@ -363,7 +378,7 @@ export default function Home() {
             setLoading(false);
             return;
           }
-          navigate(`/result/${id}`);
+          await goToResult(id);
           return;
         }
 
@@ -396,7 +411,7 @@ export default function Home() {
       return;
     }
     setError('');
-    setLoading(true);
+    beginLoading();
 
     // Barcode-sourced reviews already had their exact key checked (and
     // missed) before we ever got here — only text/photo-sourced reviews
@@ -437,7 +452,7 @@ export default function Home() {
         setLoading(false);
         return;
       }
-      navigate(`/result/${id}`);
+      await goToResult(id);
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
       setLoading(false);

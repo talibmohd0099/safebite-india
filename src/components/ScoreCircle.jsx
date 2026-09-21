@@ -14,7 +14,7 @@ import { getScoreColor } from '../utils/storage';
 
 const ANIMATION_MS = 1000;
 
-export default function ScoreCircle({ score, size = 'large', showLabel = false }) {
+export default function ScoreCircle({ score, size = 'large', showLabel = false, burstTarget = false, startDelayMs = 0 }) {
   const clamped = Math.max(0, Math.min(100, score));
   const finalColors = getScoreColor(clamped);
 
@@ -31,15 +31,23 @@ export default function ScoreCircle({ score, size = 'large', showLabel = false }
       setLiveValue(clamped);
       return;
     }
-    const start = performance.now();
+    // startDelayMs holds the ring empty while ResultBurst's sparks fly in
+    // and assemble it, then it fills.
+    let start = 0;
     const tick = (now) => {
       const t = Math.min(1, (now - start) / ANIMATION_MS);
       const eased = 1 - (1 - t) ** 3; // ease-out cubic
       setLiveValue(eased * clamped);
       if (t < 1) frameRef.current = requestAnimationFrame(tick);
     };
-    frameRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frameRef.current);
+    const kickoff = setTimeout(() => {
+      start = performance.now();
+      frameRef.current = requestAnimationFrame(tick);
+    }, startDelayMs);
+    return () => {
+      clearTimeout(kickoff);
+      cancelAnimationFrame(frameRef.current);
+    };
   }, [clamped]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const liveColors = getScoreColor(liveValue);
@@ -51,7 +59,11 @@ export default function ScoreCircle({ score, size = 'large', showLabel = false }
 
   return (
     <div className="flex flex-col items-center flex-shrink-0">
-      <div className="relative" style={{ width: svgSize, height: svgSize }}>
+      <div
+        className="relative"
+        style={{ width: svgSize, height: svgSize }}
+        {...(burstTarget ? { 'data-burst-target': true, 'data-burst-radius': radius } : {})}
+      >
         <svg width={svgSize} height={svgSize} viewBox={`0 0 ${svgSize} ${svgSize}`} className="rotate-[-90deg]">
           <circle
             cx={svgSize / 2}

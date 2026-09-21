@@ -25,7 +25,7 @@ import ProductImage from '../components/ProductImage';
 import ProductStripCard from '../components/ProductStripCard';
 import NewsCard from '../components/NewsCard';
 import { toServing } from '../services/nutrientBasis';
-import ResultBurst, { shouldBurst } from '../components/ResultBurst';
+import ResultBurst, { shouldBurst, BURST_ARRIVE_MS } from '../components/ResultBurst';
 
 // Maps a dailyHabitCheck.js nutrientKey to the matching i18n string keys
 // (see src/i18n/strings.js) for its display name and its three
@@ -750,7 +750,7 @@ export default function Result() {
           number. */
       <div className="mx-4 rounded-[20px] p-5" style={{ background: 'var(--bg-card)' }}>
         <div className="flex items-center gap-5">
-          <ScoreCircle score={score} size="xl" />
+          <ScoreCircle score={score} size="xl" burstTarget startDelayMs={burst ? BURST_ARRIVE_MS : 0} />
           <div className="min-w-0">
             <p className="text-[24px] font-bold tracking-tight leading-tight" style={{ color: scoreColors.color }}>
               {verdictLabel}

@@ -10,6 +10,8 @@ import { browseCategoryProducts, getCachedReport } from '../services/productCach
 import { saveToHistory, getScoreColor } from '../utils/storage';
 import { CATEGORIES } from '../data/categories';
 import ProductImage from '../components/ProductImage';
+import LoadingScreen from '../components/LoadingScreen';
+import { randomLoadDelayMs, waitForMinimum } from '../utils/loadingPace';
 
 const SORTS = [
   { id: 'default', label: 'All' },
@@ -25,6 +27,7 @@ export default function Category() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sort, setSort] = useState('default');
+  const [opening, setOpening] = useState(false);
   // Tapping a card's photo shows a quick preview (image + rating)
   // instead of jumping straight to the full report -- the full report
   // is still one more tap away (tapping the rest of the card).
@@ -50,15 +53,22 @@ export default function Category() {
 
   const openResult = async (item) => {
     setError('');
+    const startedAt = Date.now();
+    const minMs = randomLoadDelayMs();
+    setOpening(true);
     const cached = await getCachedReport(item.lookupKey);
     if (!cached) {
+      setOpening(false);
       setError("Couldn't load that saved report. Please try another one.");
       return;
     }
     cached.lookupKey = item.lookupKey;
     const historyId = saveToHistory(cached, 'search');
+    await waitForMinimum(startedAt, minMs);
     navigate(`/result/${historyId}`);
   };
+
+  if (opening) return <LoadingScreen />;
 
   if (!category) {
     return (

@@ -343,43 +343,36 @@ body {
   animation: loader-tick-pop 0.35s ease-out;
 }
 
-/* "Report ready" burst (ResultBurst.jsx): particles fly out from the
-   score and a ring expands. Anchored near the top of the report, where the
-   score ring sits. */
+/* "Report ready" burst (ResultBurst.jsx): sparks start at the middle of the
+   screen, fly to points on the score ring and assemble it, then the ring
+   pulses. Each dot is placed on its target point on the ring and animates
+   FROM the screen centre (--from-x/--from-y) to there. */
 .result-burst {
   position: fixed;
-  left: 50%;
-  top: 46vh;
-  width: 0;
-  height: 0;
+  inset: 0;
   z-index: 60;
   pointer-events: none;
 }
-@keyframes result-burst-fly {
-  0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; }
-  70% { opacity: 1; }
-  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1) rotate(200deg); opacity: 0; }
+@keyframes result-burst-gather {
+  0% { transform: translate(calc(-50% + var(--from-x)), calc(-50% + var(--from-y))) scale(0.3); opacity: 0; }
+  10% { opacity: 1; }
+  48% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.9); opacity: 0; }
 }
 .result-burst-dot {
   position: absolute;
-  left: 0;
-  top: 0;
-  animation: result-burst-fly 0.95s cubic-bezier(0.15, 0.85, 0.3, 1) forwards;
-  opacity: 0;
+  animation: result-burst-gather 1.45s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
-@keyframes result-burst-ring {
-  0% { transform: translate(-50%, -50%) scale(0.2); opacity: 0.8; }
-  100% { transform: translate(-50%, -50%) scale(2.6); opacity: 0; }
+@keyframes result-burst-pulse {
+  0% { transform: translate(-50%, -50%) scale(0.85); opacity: 0; }
+  20% { opacity: 0.85; }
+  100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
 }
-.result-burst-ring {
+.result-burst-pulse {
   position: absolute;
-  left: 0;
-  top: 0;
-  width: 120px;
-  height: 120px;
   border-radius: 9999px;
-  border: 3px solid rgb(74 222 128 / 0.8);
-  animation: result-burst-ring 0.8s ease-out forwards;
+  border: 3px solid rgb(74 222 128 / 0.85);
+  animation: result-burst-pulse 0.75s ease-out 0.75s both;
 }
 @media (prefers-reduced-motion: reduce) {
   .loader-glow, .loader-orbit, .loader-tick, .result-burst { animation: none; display: none; }
