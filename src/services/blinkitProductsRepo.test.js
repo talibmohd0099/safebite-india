@@ -59,3 +59,20 @@ test('extractNutrientsForHabitCheck still returns null when there is no usable n
   assert.equal(extractNutrientsForHabitCheck({}, '200 ml'), null);
   assert.equal(extractNutrientsForHabitCheck(null, '200 ml'), null);
 });
+
+test('extractNutrientsForHabitCheck scales per-100 to the serving, and keeps the per-100 table as the canonical basis', () => {
+  // Real bug: per-100 numbers were labelled "per 16 g serving", so a
+  // cookie's 100g panel read as if one serving carried all of it.
+  const result = extractNutrientsForHabitCheck({ Energy: '500 kcal', Sodium: '625 mg', Protein: '6 g' }, '16 g');
+  assert.equal(result.servingGrams, 16);
+  assert.equal(result.nutrients.caloriesKcal, 80);
+  assert.equal(result.nutrients.sodiumMg, 100);
+  assert.equal(result.nutrientsPer100.caloriesKcal, 500);
+  assert.equal(result.nutrientsPer100.sodiumMg, 625);
+});
+
+test('extractNutrientsForHabitCheck with no serving leaves nutrients and per-100 identical', () => {
+  const result = extractNutrientsForHabitCheck({ Energy: '454 kcal' }, null);
+  assert.equal(result.nutrients.caloriesKcal, 454);
+  assert.equal(result.nutrientsPer100.caloriesKcal, 454);
+});

@@ -1,0 +1,74 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { classifyFoodType, normalizeFoodType } from './foodType.js';
+
+const t = (productName, ingredientNames = []) => classifyFoodType({ productName, ingredientNames });
+
+test('the reported over-scored fried snacks are all classified fried', () => {
+  for (const name of [
+    'Bingo Kitchen Style Ribbon Pakoda Namkeen Snacks',
+    'Whole Foods Diet Chivda Namkeen',
+    'Prabhuji Bhujia - Muchy Masti',
+    'Salted Banana Chips',
+    'Too Yumm Spicy Korean Banana Chips (No Palm Oil)',
+  ]) {
+    const r = t(name);
+    assert.equal(r.foodType, 'fried-snack', name);
+    assert.equal(r.isDeepFried, true, name);
+  }
+});
+
+test('baked / roasted snacks are not treated as fried', () => {
+  assert.equal(t('Roasted Chana Chivda').foodType, 'baked-snack');
+  assert.equal(t('Baked Multigrain Chips').isDeepFried, false);
+  assert.equal(t('Act II Popcorn').foodType, 'baked-snack');
+});
+
+test('oils, nuts, staples and supplements are their own types', () => {
+  assert.equal(t('Fortune Sunflower Oil').foodType, 'oil-fat');
+  assert.equal(t('Amul Ghee').foodType, 'oil-fat');
+  assert.equal(t('California Almonds').foodType, 'nuts-seeds');
+  assert.equal(t('Aashirvaad Atta').foodType, 'staple');
+  assert.equal(t('Whey Protein Powder Chocolate').foodType, 'supplement');
+});
+
+test('butter cookies are a sweet snack, not a fat', () => {
+  assert.equal(t('Unibic Butter cookies').foodType, 'sweet-snack');
+  assert.equal(t('Peanut Butter Creamy').foodType, 'condiment');
+});
+
+test('beverages and infant foods', () => {
+  assert.equal(t('Devbhog Masala Buttermilk').foodType, 'beverage');
+  assert.equal(t('Furilac Advance Stage 1 Infant Formula').foodType, 'infant');
+});
+
+test('an oddly named snack with frying oil is still fried', () => {
+  const r = t('Crunchy Bites', ['Rice flour', 'Refined Palmolein Oil', 'Salt']);
+  assert.equal(r.isDeepFried, true);
+  assert.equal(r.foodType, 'fried-snack');
+});
+
+test('normalizeFoodType accepts only known values', () => {
+  assert.equal(normalizeFoodType(' Fried-Snack '), 'fried-snack');
+  assert.equal(normalizeFoodType('pizza'), null);
+});
+
+test('names that merely contain a snack word are not fried snacks', () => {
+  assert.equal(t('Bingo Chatpat Kairi Kaccha Mango Drink').foodType, 'beverage');
+  assert.equal(t('Bingo Tedhe Medhe Masala Tadka Buttermilk').foodType, 'beverage');
+  assert.equal(t("Kellogg's Multigrain Chocos Crunchy Bites Kids Cereal").foodType, 'staple');
+  assert.equal(t('KitKat Rich Chocolate Coated Wafer').foodType, 'sweet-snack');
+  assert.equal(t('Harveys Dark Compound Choco Chips').foodType, 'sweet-snack');
+  assert.equal(t('Mangat Ram Unpolished Moong Dal (Chilka)').foodType, 'staple');
+  assert.equal(t('Creamy Dark Chocolate Peanut Butter').foodType, 'condiment');
+});
+
+test('branded fried moong dal is a fried snack; raw dal is not', () => {
+  assert.equal(t("Haldiram's Moong Dal").foodType, 'fried-snack');
+  assert.equal(t('Tenali Double Horse Moong Dal (Chilka)').foodType, 'staple');
+});
+
+test('potato wafers and plain chips remain fried', () => {
+  assert.equal(t('Balaji Wafers Rumbles Potato Chips').foodType, 'fried-snack');
+  assert.equal(t('POTATO WAFERS').foodType, 'fried-snack');
+});

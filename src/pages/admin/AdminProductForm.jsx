@@ -8,6 +8,7 @@
 // score/verdict/summary/recommendation are then directly editable
 // below, for the real correction cases this session kept running into
 // (a wrong AI verdict, a name that needs fixing).
+import { getNutrientsPer100, toServing } from '../../services/nutrientBasis';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import AdminLayout from './AdminLayout';
@@ -336,7 +337,18 @@ export default function AdminProductForm({ copyMode = false }) {
         setIngredientsText(row.ingredients_text || '');
         if (r.imageUrl) setPhotoDataUrl(r.imageUrl);
         if (r.nutritionPanel) setNutrients(r.nutritionPanel);
-        else if (r.realNutrients) setNutrients(r.realNutrients);
+        else {
+          // The form's fields are per 100 -- go through the canonical
+          // per-100 view, not realNutrients (which may be per serving).
+          const per100 = getNutrientsPer100(r);
+          if (per100) {
+            const asFormFields = {};
+            for (const [reportKey, adminKey] of Object.entries(OFF_TO_ADMIN_NUTRIENT_KEY)) {
+              if (typeof per100[reportKey] === 'number') asFormFields[adminKey] = per100[reportKey];
+            }
+            setNutrients(asFormFields);
+          }
+        }
         if (r.realNutrientsServingGrams) setServingGrams(r.realNutrientsServingGrams);
         if (r.realNutrientsServingUnit) setServingUnit(r.realNutrientsServingUnit);
         setReport(r);
@@ -441,10 +453,14 @@ export default function AdminProductForm({ copyMode = false }) {
       }
 
       if (found.nutrientsInfo?.nutrients) {
+        // These fields are per 100 g/ml -- so fill them from OFF's per-100
+        // figures, never its pack-scaled ones (that mix-up is what made a
+        // small pack's numbers read as if they were per 100 g).
+        const per100 = found.nutrientsInfo.nutrientsPer100 || found.nutrientsInfo.nutrients;
         setNutrients((prev) => {
           const next = { ...prev };
           for (const [offKey, adminKey] of Object.entries(OFF_TO_ADMIN_NUTRIENT_KEY)) {
-            const value = found.nutrientsInfo.nutrients[offKey];
+            const value = per100[offKey];
             if (value != null && (next[adminKey] === undefined || next[adminKey] === '')) next[adminKey] = value;
           }
           return next;
@@ -546,15 +562,30 @@ export default function AdminProductForm({ copyMode = false }) {
     }
   };
 
+  // The form's numbers are per 100 g/ml (that's what a label's panel
+  // states) -- they ARE the canonical basis; `nutrients` is the same
+  // table scaled to the serving size when one is filled in.
   const buildNutrientsInfo = () => {
-    const scored = {};
-    for (const field of NUTRIENT_FIELDS) {
-      if (field.scored && nutrients[field.key] !== undefined && nutrients[field.key] !== '') {
-        scored[field.key] = Number(nutrients[field.key]);
-      }
+    const per100 = {};
+    for (const [reportKey, adminKey] of Object.entries(OFF_TO_ADMIN_NUTRIENT_KEY)) {
+      const v = nutrients[adminKey];
+      if (v !== undefined && v !== '' && Number.isFinite(Number(v))) per100[reportKey] = Number(v);
     }
-    if (Object.keys(scored).length === 0) return undefined;
-    return { nutrients: scored, servingGrams: servingGrams !== '' ? Number(servingGrams) : undefined, servingUnit };
+    if (Object.keys(per100).length === 0) return undefined;
+    // Same convention as the OFF/Blinkit producers: with no separate
+    // added-sugar figure the total stands in for it (WHO's limit is on
+    // free sugars), and isn't then printed a second time under its own name.
+    if (per100.addedSugarG === undefined && per100.totalSugarG !== undefined) {
+      per100.addedSugarG = per100.totalSugarG;
+      delete per100.totalSugarG;
+    }
+    const serving = servingGrams !== '' && Number(servingGrams) > 0 ? Number(servingGrams) : undefined;
+    return {
+      nutrients: serving ? toServing(per100, serving) : per100,
+      nutrientsPer100: per100,
+      servingGrams: serving,
+      servingUnit,
+    };
   };
 
   const buildNutritionPanel = () => {

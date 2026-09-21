@@ -17,7 +17,7 @@ const VERDICT_TIERS = [
   { min: 0, label: 'Very Poor' },
 ];
 
-function verdictFor(score) {
+export function verdictFor(score) {
   return VERDICT_TIERS.find((t) => score >= t.min).label;
 }
 

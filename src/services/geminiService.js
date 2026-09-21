@@ -382,6 +382,8 @@ Return ONLY valid JSON, no markdown, no preamble:
   "recommendation": "...",
   "isCondimentOrSeasoning": false,
   "isInfantFormula": false,
+  "foodType": "other",
+  "isDeepFried": false,
   "usefulContext": null,
   "story": null
 }
@@ -405,6 +407,9 @@ false for anything eaten as a food in its own right -- biscuits, noodles, chips,
 
 "isInfantFormula" -- true ONLY for infant formula / infant milk substitute products explicitly intended as a complete or partial substitute for breast milk for infants (e.g. named "Infant Formula", "Stage 1/2", "Follow-up Formula" for the under-1 stage, branded infant milk powders like Similac, Nan, Lactogen, Enfamil, Furilac). This is a specially regulated product category (FSSAI Infant Milk Substitutes Act, Codex Standard for Infant Formula) whose ingredient-based score should not be read the way an ordinary food's score is -- it is formulated to meet mandated nutritional requirements, not judged by "less processed is better".
 false for: regular milk and milk powder, toddler/growing-up milk marketed for children over 2 years, general baby food and cereals (e.g. Cerelac) unless the specific product is itself labelled as an infant formula/infant milk substitute, and anything for adults or general consumption.
+
+"foodType" -- exactly ONE of: "fried-snack" (namkeen, bhujia, sev, chivda, mixture, chips, wafers, murukku, papdi, banana/potato/tapioca chips, puffs and extruded snacks made by frying), "sweet-snack" (biscuits, cookies, cakes, pastries, wafer bars, chocolates, candies, mithai), "baked-snack" (baked/roasted crackers, khakhra, roasted namkeen, makhana, popcorn), "beverage" (juices, soft drinks, energy drinks, tea/coffee drinks, lassi, buttermilk, milk drinks), "dairy" (milk, curd, paneer, cheese, ghee-free dairy), "staple" (atta, rice, dal, pulses, flours, oats, cereals, bread, pasta, noodles), "oil-fat" (cooking oils, ghee, butter, vanaspati), "nuts-seeds" (plain or roasted nuts, seeds, dry fruit), "condiment" (masalas, sauces, pickles, chutneys, spreads used in small amounts), "supplement" (protein powders, vitamins, health/nutrition supplements, electrolyte/ORS), "infant" (infant formula and baby foods), "ready-meal" (instant meals, soups, frozen/ready-to-eat dishes), or "other". Pick by what the product actually IS, from its name and ingredients.
+"isDeepFried" -- true ONLY if the product itself is made by deep frying (its ingredients list frying oil like palmolein/refined vegetable oil and it is a fried snack); false for baked, roasted, air-popped or non-snack foods.
 
 "usefulContext" -- null for ordinary everyday foods. A product's ingredient score alone can't say WHY it exists, and some products genuinely have a real, specific purpose that a low or middling score would otherwise hide -- oral rehydration salts and electrolyte drinks, glucose/dextrose energy powders, protein or meal-replacement supplements. For exactly these, ONE short sentence (25 words max) naming the actual real-world situation this product is genuinely useful for (e.g. "During dehydration, heat exhaustion, or after intense exercise, for fast glucose and electrolyte replacement."). Never invent or guess at a use case that isn't well-established for this exact kind of product -- when in doubt, return null.
 
@@ -500,6 +505,8 @@ Concerning ingredients: ${concerningNames.length ? concerningNames.join(', ') : 
       recommendation: clean(parsed?.recommendation),
       isCondimentOrSeasoning: parsed?.isCondimentOrSeasoning === true,
       isInfantFormula: parsed?.isInfantFormula === true,
+      foodType: typeof parsed?.foodType === 'string' ? parsed.foodType.trim().toLowerCase() : null,
+      isDeepFried: parsed?.isDeepFried === true,
       usefulContext: clean(parsed?.usefulContext),
       story,
     };

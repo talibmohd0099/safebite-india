@@ -13,6 +13,7 @@
 // the lookup key here is derived from the same (source, brand,
 // product_name) rather than any id column.
 import { supabase, isSupabaseConfigured } from './supabaseClient.js';
+import { toPer100, toServing } from './nutrientBasis.js';
 
 function normalize(text) {
   return (text || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -129,9 +130,15 @@ export function extractNutrientsForHabitCheck(nutrition, servingSize = null) {
 
   if (Object.keys(nutrients).length === 0) return null;
   const parsedServing = parseQuantityText(servingSize);
+  // Blinkit's nutrition table is per 100 g/ml -- that IS the canonical
+  // basis. `nutrients` is the same table scaled to the real serving, so
+  // "per {serving}" labels are true (they weren't when the raw per-100
+  // numbers were labelled with the serving size).
+  const servingGrams = parsedServing?.value ?? null;
   return {
-    nutrients,
-    servingGrams: parsedServing?.value ?? null,
+    nutrients: servingGrams ? toServing(nutrients, servingGrams) : nutrients,
+    nutrientsPer100: toPer100(nutrients, null),
+    servingGrams,
     servingUnit: parsedServing?.unit || 'g',
   };
 }

@@ -6,6 +6,7 @@
 // FoodGuard can answer "which of these fits me better", not just "is
 // this one okay" one product at a time.
 
+import { getNutrientsPer100 } from './nutrientBasis.js';
 import { calculatePersonalAssessment, AVOID_PRIORITIES } from './personalAssessment.js';
 import { getIngredientSeverity } from '../utils/storage.js';
 
@@ -69,7 +70,10 @@ function numberOrNull(v) {
  */
 export function buildComparisonRows(products, activeProfile = null) {
   return (products || []).map((p) => {
-    const real = p.realNutrients || {};
+    // Per 100 g/ml for every product -- comparing one product's per-serving
+    // numbers with another's per-100 is exactly the apples-to-oranges the
+    // canonical basis (nutrientBasis.js) exists to prevent.
+    const real = getNutrientsPer100(p) || {};
     // Prefer "added sugar" (what the daily-habit check itself watches)
     // but fall back to total sugar -- most text/photo scans only ever
     // have the latter, and "no sugar data" would otherwise hide a real,
@@ -97,7 +101,7 @@ export function buildComparisonRows(products, activeProfile = null) {
       // nothing was ever stored under the key this file was reading.
       energyKcal: numberOrNull(real.caloriesKcal),
       proteinG: numberOrNull(real.proteinG),
-      totalCarbG: numberOrNull(real.totalCarbG),
+      totalCarbG: numberOrNull(real.carbohydrateG),
       sugarG,
       totalFatG: numberOrNull(real.totalFatG),
       saturatedFatG: numberOrNull(real.saturatedFatG),

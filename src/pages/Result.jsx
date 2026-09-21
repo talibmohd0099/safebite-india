@@ -24,6 +24,7 @@ import IngredientCard from '../components/IngredientCard';
 import ProductImage from '../components/ProductImage';
 import ProductStripCard from '../components/ProductStripCard';
 import NewsCard from '../components/NewsCard';
+import { toServing } from '../services/nutrientBasis';
 
 // Maps a dailyHabitCheck.js nutrientKey to the matching i18n string keys
 // (see src/i18n/strings.js) for its display name and its three
@@ -1100,7 +1101,7 @@ export default function Result() {
           right below it, which turns the SAME numbers into an "if you
           ate this every day" projection -- this section is just what the
           label actually says. */}
-      {view === 'overview' && result.realNutrients && (
+      {view === 'overview' && (displayNutrients) && (
         <>
           <SectionHeader>{t('sectionNutrition')}</SectionHeader>
           <Group>
@@ -1111,11 +1112,11 @@ export default function Result() {
                   : t('nutritionPer100g')}
               </p>
               <div className="grid grid-cols-3 gap-3">
-                {NUTRITION_TABLE_ROWS.filter((row) => typeof result.realNutrients[row.key] === 'number').map((row) => (
+                {NUTRITION_TABLE_ROWS.filter((row) => typeof displayNutrients[row.key] === 'number').map((row) => (
                   <div key={row.key}>
                     <p className="text-[11px] capitalize" style={{ color: 'var(--label-3)' }}>{t(row.labelKey)}</p>
                     <p className="text-[16px] font-bold" style={{ color: 'var(--label-1)' }}>
-                      {Math.round(result.realNutrients[row.key] * 10) / 10}{row.unit}
+                      {Math.round(displayNutrients[row.key] * 10) / 10}{row.unit}
                     </p>
                   </div>
                 ))}

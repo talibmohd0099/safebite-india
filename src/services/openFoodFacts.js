@@ -114,32 +114,39 @@ export function extractNutrientsForHabitCheck(product) {
   // 720.000000000001 -- harmless once rounded for display, but stored
   // as-is it makes every equality check downstream unreliable (the
   // added-vs-total sugar comparison below being the first casualty).
-  const at = (value, multiplier = 1) =>
-    typeof value === 'number' ? Math.round(value * multiplier * scale * 100) / 100 : null;
+  const build = (sc) => {
+    const at = (value, multiplier = 1) =>
+      typeof value === 'number' ? Math.round(value * multiplier * sc * 100) / 100 : null;
+    const out = {};
+    const put = (key, value) => { if (value !== null) out[key] = value; };
 
-  const nutrients = {};
-  const put = (key, value) => { if (value !== null) nutrients[key] = value; };
+    put('sodiumMg', at(sodiumG, 1000));
+    put('addedSugarG', at(addedSugarG));
+    put('saturatedFatG', at(saturatedFatG));
+    put('transFatG', at(transFatG));
+    put('caloriesKcal', at(caloriesKcal));
+    put('proteinG', at(proteinG));
+    put('carbohydrateG', at(carbohydrateG));
+    put('totalFatG', at(totalFatG));
+    put('fibreG', at(fibreG));
+    put('cholesterolMg', at(cholesterolG, 1000));
+    // Only kept when it actually differs from the added-sugar figure --
+    // addedSugarG falls back to this same total when OFF has no
+    // added-sugars field, and printing one number twice under two
+    // different names reads as two separate measurements.
+    if (at(totalSugarG) !== null && at(totalSugarG) !== out.addedSugarG) {
+      put('totalSugarG', at(totalSugarG));
+    }
+    return out;
+  };
 
-  put('sodiumMg', at(sodiumG, 1000));
-  put('addedSugarG', at(addedSugarG));
-  put('saturatedFatG', at(saturatedFatG));
-  put('transFatG', at(transFatG));
-  put('caloriesKcal', at(caloriesKcal));
-  put('proteinG', at(proteinG));
-  put('carbohydrateG', at(carbohydrateG));
-  put('totalFatG', at(totalFatG));
-  put('fibreG', at(fibreG));
-  put('cholesterolMg', at(cholesterolG, 1000));
-  // Only kept when it actually differs from the added-sugar figure --
-  // addedSugarG falls back to this same total when OFF has no
-  // added-sugars field, and printing one number twice under two
-  // different names reads as two separate measurements.
-  if (at(totalSugarG) !== null && at(totalSugarG) !== nutrients.addedSugarG) {
-    put('totalSugarG', at(totalSugarG));
-  }
+  const nutrients = build(scale);
+  // Canonical basis (see nutrientBasis.js), built straight from OFF's own
+  // per-100g figures rather than by dividing the scaled ones back down.
+  const nutrientsPer100 = build(1);
 
   if (Object.keys(nutrients).length === 0) return null;
-  return { nutrients, servingGrams: packGrams ? Math.round(packGrams) : null };
+  return { nutrients, nutrientsPer100, servingGrams: packGrams ? Math.round(packGrams) : null };
 }
 
 /**

@@ -5,6 +5,9 @@
 // score it with plain rules. No whole-product AI call needed once
 // ingredients are known.
 
+import { toPer100 } from './nutrientBasis.js';
+import { classifyFoodType, normalizeFoodType } from './foodType.js';
+import { applyNutritionDensityCeiling } from './nutritionDensity.js';
 import { parseLabel, isBracketBalanced, looksLikeNutritionPanel } from './ingredientParser.js';
 import { resolveIngredients } from './ingredientLibrary.js';
 import { buildReport, applyRealNutrientCap } from './scoringEngine.js';
@@ -145,6 +148,12 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
     // recorded) -- see the "Per Xg serving" -> "Per X{unit} serving"
     // fix in Result.jsx/strings.js.
     report.realNutrientsServingUnit = nutrientsInfo.servingUnit || 'g';
+    // The canonical basis (per 100 g/ml) -- everything that compares
+    // products or scores density reads THIS, never realNutrients, whose
+    // basis depends on the serving size. Producers that know it pass it
+    // straight through; the rest are derived by dividing the serving out.
+    report.nutrientsPer100 = nutrientsInfo.nutrientsPer100
+      ?? toPer100(nutrientsInfo.nutrients, nutrientsInfo.servingGrams);
   }
 
   // Single-ingredient lookups don't need "product" text at all -- only
@@ -174,6 +183,14 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
     // 78/Good). See Result.jsx's own isInfantFormula branch.
     if (insights?.isInfantFormula) report.isInfantFormula = true;
     if (insights?.usefulContext) report.usefulContext = insights.usefulContext;
+    // What kind of food this is -- Gemini's read first (it sees the whole
+    // name + ingredient list), the deterministic keyword pass when that's
+    // absent or not one of the known types.
+    const keywordType = classifyFoodType({ productName: report.productName, ingredientNames: ingredients.map((i) => i.name) });
+    report.foodType = normalizeFoodType(insights?.foodType) ?? keywordType.foodType;
+    // "Other" from Gemini defers to a confident keyword hit (e.g. "Bhujia").
+    if (report.foodType === 'other' && keywordType.foodType !== 'other') report.foodType = keywordType.foodType;
+    report.isDeepFried = insights?.isDeepFried === true || (keywordType.isDeepFried && report.foodType === 'fried-snack');
     if (insights?.story) report.story = insights.story;
 
     // A masala scoring 95 isn't eaten by the spoonful -- the same reason
@@ -194,6 +211,11 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
         applyRealNutrientCap(report, habitCheck);
       }
     }
+
+    // Fried / energy-dense snacks can't out-score their nutrition just
+    // because the ingredient list is short and recognisable -- see
+    // nutritionDensity.js. Runs last so it only ever lowers the score.
+    applyNutritionDensityCeiling(report);
 
     // Hindi translation of everything above -- a completely separate
     // service/quota from Gemini, so it's safe to always attempt (falls

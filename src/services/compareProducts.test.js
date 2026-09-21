@@ -20,7 +20,7 @@ const MAGGI = {
   productName: 'Maggi 2 Minute Noodles Masala',
   brand: 'Nestle',
   overallScore: 48,
-  realNutrients: { caloriesKcal: 457, proteinG: 9.5, totalCarbG: 60.3, addedSugarG: 6.1, totalFatG: 17.2, saturatedFatG: 7.9, sodiumMg: 890 },
+  realNutrients: { caloriesKcal: 457, proteinG: 9.5, carbohydrateG: 60.3, addedSugarG: 6.1, totalFatG: 17.2, saturatedFatG: 7.9, sodiumMg: 890 },
   ingredients: [
     { name: 'Palm Oil', insCode: null, category: 'oil', status: 'concerning' },
     { name: 'Wheat Flour', insCode: null, category: 'natural', status: 'safe' },
@@ -35,7 +35,7 @@ const YIPPEE = {
   productName: 'Sunfeast Yippee Noodles Magic Masala',
   brand: 'Sunfeast',
   overallScore: 61,
-  realNutrients: { caloriesKcal: 430, proteinG: 8.2, totalCarbG: 62.1, addedSugarG: 4.2, totalFatG: 15.1, saturatedFatG: 6.8, sodiumMg: 620 },
+  realNutrients: { caloriesKcal: 430, proteinG: 8.2, carbohydrateG: 62.1, addedSugarG: 4.2, totalFatG: 15.1, saturatedFatG: 6.8, sodiumMg: 620 },
   ingredients: [
     { name: 'Wheat Flour', insCode: null, category: 'natural', status: 'safe' },
     { name: 'Salt', insCode: null, category: 'other', status: 'safe' },
@@ -47,7 +47,7 @@ const TOP_RAMEN = {
   productName: 'Top Ramen Masala Noodles',
   brand: 'Nissin',
   overallScore: 58,
-  realNutrients: { caloriesKcal: 444, proteinG: 9.1, totalCarbG: 61.0, addedSugarG: 4.8, totalFatG: 16.8, saturatedFatG: 7.1, sodiumMg: 720 },
+  realNutrients: { caloriesKcal: 444, proteinG: 9.1, carbohydrateG: 61.0, addedSugarG: 4.8, totalFatG: 16.8, saturatedFatG: 7.1, sodiumMg: 720 },
   ingredients: [
     { name: 'Wheat Flour', insCode: null, category: 'natural', status: 'safe' },
     { name: 'Flavour Enhancer', insCode: '621', category: 'flavour', status: 'concerning' },
@@ -209,4 +209,12 @@ test('describeDifferences returns empty bullets and null take for fewer than 2 p
   const { bullets, take } = describeDifferences(rows);
   assert.deepEqual(bullets, []);
   assert.equal(take, null);
+});
+
+test('buildComparisonRows compares on a per-100 basis even when realNutrients is per serving', () => {
+  // A 16 g serving with 80 kcal is 500 kcal per 100 g -- that's the number
+  // that must appear next to another product's per-100 figure.
+  const perServing = { productName: 'Cookie', ingredients: [], realNutrients: { caloriesKcal: 80 }, realNutrientsServingGrams: 16 };
+  const [row] = buildComparisonRows([perServing]);
+  assert.equal(row.energyKcal, 500);
 });
