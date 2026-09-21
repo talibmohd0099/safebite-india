@@ -6,7 +6,7 @@ import { extractIngredientsFromImage } from '../services/geminiService';
 import { analyzeText } from '../services/analyzeText';
 import { lookupBarcode, searchProductsByName } from '../services/openFoodFacts';
 import { getCachedReport, saveReport, barcodeKey, textKey, searchCachedProducts, getPopularSearchTerms, getRecentlyAddedProducts, getDailySpotlight, getCatalogStats, dayOfYearSeed } from '../services/productCache';
-import { saveToHistory, getScoreColor, getHistory, productLayoutId } from '../utils/storage';
+import { saveToHistory, getScoreColor, getHistory } from '../utils/storage';
 import LoadingScreen from '../components/LoadingScreen';
 import ProductStripCard from '../components/ProductStripCard';
 import ProductImage from '../components/ProductImage';
@@ -806,7 +806,6 @@ export default function Home() {
                     item={{ productName: entry.productName, imageUrl: entry.imageUrl, score: entry.overallScore, isInfantFormula: entry.isInfantFormula }}
                     onClick={() => navigate(`/result/${entry.id}`)}
                     style={{ animationDelay: `${i * 30}ms` }}
-                    layoutId={productLayoutId(entry)}
                   />
                 ))}
               </div>
@@ -844,7 +843,7 @@ export default function Home() {
                   >
                     <span className="text-[10px] font-bold text-green-700 dark:text-green-400 uppercase tracking-wide">FoodGuard pick</span>
                     <div className="flex items-center gap-2.5">
-                      <ProductImage src={spotlight.best.imageUrl} size={44} expandable={false} layoutId={productLayoutId(spotlight.best)} />
+                      <ProductImage src={spotlight.best.imageUrl} size={44} expandable={false} />
                       <span className="block min-w-0 flex-1 text-xs font-semibold text-slate-700 dark:text-slate-200 leading-tight line-clamp-2">{spotlight.best.productName}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -867,7 +866,7 @@ export default function Home() {
                   >
                     <span className="text-[10px] font-bold text-red-700 dark:text-red-400 uppercase tracking-wide">Worth a closer look</span>
                     <div className="flex items-center gap-2.5">
-                      <ProductImage src={spotlight.worst.imageUrl} size={44} expandable={false} layoutId={productLayoutId(spotlight.worst)} />
+                      <ProductImage src={spotlight.worst.imageUrl} size={44} expandable={false} />
                       <span className="block min-w-0 flex-1 text-xs font-semibold text-slate-700 dark:text-slate-200 leading-tight line-clamp-2">{spotlight.worst.productName}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -950,7 +949,6 @@ export default function Home() {
                       item={item}
                       onClick={() => openCachedSuggestion(item)}
                       style={{ animationDelay: `${i * 30}ms` }}
-                      layoutId={productLayoutId(item)}
                     />
                   ))}
                 </div>

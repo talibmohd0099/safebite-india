@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { getHistoryById, updateHistoryProductName, refreshHistoryEntry, saveToHistory, getScoreColor, getIngredientSeverity, productLayoutId } from '../utils/storage';
+import { getHistoryById, updateHistoryProductName, refreshHistoryEntry, saveToHistory, getScoreColor, getIngredientSeverity } from '../utils/storage';
 import { updateProductName, getCachedReport, getSaferAlternatives, getSimilarProducts, deleteReport, saveReport, getReportIdByLookupKey } from '../services/productCache';
 import { buildProductShareText, productShareUrl, whatsappShareUrl } from '../utils/share';
 import { renderShareCardImage } from '../utils/shareCard';
@@ -605,7 +605,7 @@ export default function Result() {
         {result.imageUrl && (
           <div className="flex justify-center mb-4">
             <div className="rounded-[20px] p-3" style={{ background: 'var(--bg-card)', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
-              <ProductImage src={result.imageUrl} size={132} layoutId={productLayoutId(result)} />
+              <ProductImage src={result.imageUrl} size={132} />
             </div>
           </div>
         )}

@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { browseCategoryProducts, getCachedReport } from '../services/productCache';
-import { saveToHistory, getScoreColor, productLayoutId } from '../utils/storage';
+import { saveToHistory, getScoreColor } from '../utils/storage';
 import { CATEGORIES } from '../data/categories';
 import ProductImage from '../components/ProductImage';
 
@@ -138,7 +138,7 @@ export default function Category() {
                   role="button"
                   aria-label="View larger image and rating"
                 >
-                  <ProductImage src={item.imageUrl} size={90} expandable={false} layoutId={productLayoutId(item)} />
+                  <ProductImage src={item.imageUrl} size={90} expandable={false} />
                 </div>
                 <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200 leading-tight line-clamp-2 w-full">
                   {item.productName}
