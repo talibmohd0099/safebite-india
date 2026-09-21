@@ -307,6 +307,8 @@ export default function AdminProductForm({ copyMode = false }) {
   const [fetchingBarcode, setFetchingBarcode] = useState(false);
   const [autoAnalyzeTrigger, setAutoAnalyzeTrigger] = useState(0);
   const [existingSource, setExistingSource] = useState(null);
+  // The row's identity as loaded -- an edit must keep it (see handleSave).
+  const [existingLookupKey, setExistingLookupKey] = useState(null);
   // The name as loaded, for edit mode only -- checkNameDuplicate skips
   // its query entirely while the field still matches this, so simply
   // blurring an untouched name field never flags a product against
@@ -370,6 +372,7 @@ export default function AdminProductForm({ copyMode = false }) {
           setBarcode(row.lookup_key?.startsWith('barcode:') ? row.lookup_key.slice('barcode:'.length) : '');
           setPackSize(r.packSize || '');
           setExistingSource(row.source || null);
+          setExistingLookupKey(row.lookup_key || null);
         }
         setIngredientsText(row.ingredients_text || '');
         if (r.imageUrl) setPhotoDataUrl(r.imageUrl);
@@ -710,7 +713,15 @@ export default function AdminProductForm({ copyMode = false }) {
         packSize: packSize.trim() || null,
         nutritionPanel: buildNutritionPanel(),
       };
-      const lookupKey = barcode.trim() ? barcodeKey(barcode.trim()) : textKey(ingredientsText.trim());
+      // Identity of the product. A new product gets barcode:/text: as
+      // before, but an EDIT keeps the key it already has unless a barcode
+      // was typed. Recomputing it from the edited ingredients (or turning
+      // a blinkit:/text: key into a different one) left the original key
+      // unowned, so the next scan/refresh/scrape of the very same pack
+      // saved a second row for it -- "editing creates a new product".
+      const typedBarcode = barcode.trim();
+      const keepKey = isEdit && existingLookupKey && !existingLookupKey.startsWith('barcode:') ? existingLookupKey : null;
+      const lookupKey = typedBarcode ? barcodeKey(typedBarcode) : keepKey || textKey(ingredientsText.trim());
       // 'blinkit' is a real provenance marker (this row came from the
       // scraper) -- adding or editing a barcode on that product isn't a
       // change of WHERE it came from, so it must survive the save.

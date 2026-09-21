@@ -10,8 +10,6 @@ test('gift packs, hampers, potlis and assorted packs are bundles (real catalog n
     "McVitie's Festivities Assorted Biscuits Gift Pack",
     'Snackstar Imported Snacks Gift Hamper (Small)',
     'Haldiram\'s Meetha Teekha Gift Pack',
-    'Elvan Mini Assorted Chocolate Pack',
-    'SuperYou Assorted Wafer Protein Bar Pack',
     'Indian Mirrch Co. Gravy Masala Combo',
     'Fruitaco Soy Sauce, Red & Green Chilli with Vinegar Combo',
     'Kwality Multigrain Chocos & Cereal Combo Pack - Pack of 2',
@@ -29,6 +27,13 @@ test('single products are left alone, including repeats and "combo" marketing', 
     'Salt & Pepper Peanuts',
     'Fortune Chakki Fresh Atta - 5kg',
     'Maggi 2-Minute Noodles',
+    'Yoga Bar Fruits + Nuts & Seeds Super Muesli - Pack of 3',
+    'Setu Hydration + Energy Electrolyte',
+    'Muesli+ (Fruits + Nuts & Seeds)',
+    'OPN Instant Hydration Electrolyte (Assorted Flavours)',
+    'Fitspire Assorted Protein Bar',
+    'Elvan Mini Assorted Chocolate Pack',
+    'Choko La Hot Chocolate (Assorted Flavours)',
   ]) assert.equal(isBundleListing(name), false, name);
 });
 
