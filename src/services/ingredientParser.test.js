@@ -453,3 +453,23 @@ test('findIngredientTextIssues merges both checks, sorted by position', () => {
   assert.ok(issues.some((i) => i.severity === 'warning'));
   for (let i = 1; i < issues.length; i++) assert.ok(issues[i].from >= issues[i - 1].from);
 });
+
+// "Milk Solids, Vitamin A & Vitamin D" silently lost its Vitamin A (the "A"
+// counted as an English filler word), and "Vitamin A & D" / "Vitamins (A, D
+// & B12)" lost every vitamin (bare letters are rejected as OCR noise).
+test('"Vitamin A & Vitamin D" keeps both vitamins', () => {
+  const names = parseIngredients('Toned Milk, Milk Solids, Vitamin A & Vitamin D').map((i) => i.displayName);
+  assert.deepEqual(names, ['Toned Milk', 'Milk Solids', 'Vitamin A', 'Vitamin D']);
+});
+
+test('vitamin shorthand is spelled out: "Vitamin A & D", "Vitamins A, D and E", "Vitamins (A, D & B12)"', () => {
+  const names = (t) => parseIngredients(t).map((i) => i.displayName);
+  assert.deepEqual(names('Water, Vitamin A & D, Salt'), ['Water', 'Vitamin A', 'Vitamin D', 'Salt']);
+  assert.deepEqual(names('Sugar, Vitamins A, D and E'), ['Sugar', 'Vitamin A', 'Vitamin D', 'Vitamin E']);
+  assert.deepEqual(names('Flour, Vitamins (A, D & B12), Iron'), ['Flour', 'Vitamin A', 'Vitamin D', 'Vitamin B12', 'Iron']);
+});
+
+test('vitamin expansion does not swallow ordinary words that follow a vitamin', () => {
+  const names = parseIngredients('Sugar, Vitamin C and Dextrose, Salt').map((i) => i.displayName);
+  assert.deepEqual(names, ['Sugar', 'Vitamin C', 'Dextrose', 'Salt']);
+});

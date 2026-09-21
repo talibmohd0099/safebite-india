@@ -185,7 +185,13 @@ export function looksLikeIngredientName(name) {
   // fatty acid esters of glycerol") rarely run past ~8 words.
   if (words.length > 8) return false;
 
-  const fillerCount = words.filter((w) => ENGLISH_FILLER_WORDS.has(w)).length;
+  // The "A" in "Vitamin A" is a vitamin letter, not the English article --
+  // counting it as filler made a two-word name like "Vitamin A" read as
+  // half filler and get thrown out as "not an ingredient".
+  const fillerCount = words.filter((w, i) => {
+    if (w === 'a' && /^vitamins?$/.test(words[i - 1] || '')) return false;
+    return ENGLISH_FILLER_WORDS.has(w);
+  }).length;
   // More than a third filler/question words reads like a sentence, not
   // a food substance name.
   return fillerCount / words.length <= 0.34;
@@ -759,8 +765,29 @@ export function parseLabel(labelText) {
  * categoryHint }] with duplicates removed, in label order (which matters
  * — labels list ingredients by descending quantity).
  */
+// Labels shorten a run of vitamins to one phrase: "Vitamin A & D",
+// "Vitamins A, D and E", "Vitamins (A, D & B12)". Split on the "&"/"and"/
+// comma, that leaves bare single letters ("D") that are rejected as noise,
+// so the vitamin behind them was silently lost. Spell each one out first:
+// "Vitamin A, Vitamin D, Vitamin B12". Vitamin letters are matched
+// uppercase only so "Vitamin C, a blend of..." isn't misread.
+const VITAMIN_LETTER = '[ABCDEK]\\d{0,2}';
+const VITAMIN_LIST_RE = new RegExp(
+  `\\b(vitamins?)\\s*[(\\[]?\\s*(${VITAMIN_LETTER}(?:\\s*(?:,|&|\\band\\b)\\s*${VITAMIN_LETTER}\\b)+)\\s*[)\\]]?`,
+  'gi',
+);
+export function expandVitaminShorthand(text) {
+  return String(text || '').replace(VITAMIN_LIST_RE, (whole, word, list) => {
+    const letters = list.split(/\s*(?:,|&|\band\b)\s*/i).map((l) => l.trim()).filter(Boolean);
+    // Only expand real vitamin letters -- a lowercase run is prose.
+    if (!letters.every((l) => new RegExp(`^${VITAMIN_LETTER}$`).test(l))) return whole;
+    return letters.map((l) => `Vitamin ${l}`).join(', ');
+  });
+}
+
 export function parseIngredients(labelText) {
   if (!labelText || !labelText.trim()) return [];
+  labelText = expandVitaminShorthand(labelText);
 
   const out = [];
   const seen = new Set();
