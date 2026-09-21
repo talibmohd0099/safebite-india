@@ -25,7 +25,8 @@ import ProductImage from '../components/ProductImage';
 import ProductStripCard from '../components/ProductStripCard';
 import NewsCard from '../components/NewsCard';
 import { toServing } from '../services/nutrientBasis';
-import ResultBurst, { shouldBurst, BURST_ARRIVE_MS } from '../components/ResultBurst';
+import ResultBurst, { shouldBurst, arriveMs } from '../components/ResultBurst';
+import { peekHandoff } from '../utils/reportHandoff';
 
 // Maps a dailyHabitCheck.js nutrientKey to the matching i18n string keys
 // (see src/i18n/strings.js) for its display name and its three
@@ -206,7 +207,8 @@ export default function Result() {
   const { profiles, activeProfileId, setActiveProfile } = useFamily();
   const [selectedProfileId, setSelectedProfileId] = useState(activeProfileId);
   const [result, setResult] = useState(null);
-  const [burst, setBurst] = useState(false);
+  // null, or { handoff } -- handoff is where the loading ring was, if we came from one.
+  const [burst, setBurst] = useState(null);
   const [filter, setFilter] = useState('all');
   const [view, setView] = useState('overview');
   const [editingName, setEditingName] = useState(false);
@@ -236,7 +238,7 @@ export default function Result() {
     }
     setResult(data);
     // Celebrate a freshly opened report once; not when re-opening from History.
-    setBurst(!location.state?.quiet && shouldBurst(id));
+    setBurst(!location.state?.quiet && shouldBurst(id) ? { handoff: peekHandoff() } : null);
   }, [id, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Resolved up front, not when the share button is tapped -- a link
@@ -601,7 +603,7 @@ export default function Result() {
 
   return (
     <div className="page-in max-w-[560px] mx-auto pb-24" style={{ background: 'var(--bg-grouped)' }}>
-      {burst && <ResultBurst id={id} onDone={() => setBurst(false)} />}
+      {burst && <ResultBurst id={id} handoff={burst.handoff} onDone={() => setBurst(null)} />}
 
       {/* Nav */}
       <button
@@ -750,7 +752,7 @@ export default function Result() {
           number. */
       <div className="mx-4 rounded-[20px] p-5" style={{ background: 'var(--bg-card)' }}>
         <div className="flex items-center gap-5">
-          <ScoreCircle score={score} size="xl" burstTarget startDelayMs={burst ? BURST_ARRIVE_MS : 0} />
+          <ScoreCircle score={score} size="xl" burstTarget startDelayMs={burst ? arriveMs(Boolean(burst.handoff)) : 0} />
           <div className="min-w-0">
             <p className="text-[24px] font-bold tracking-tight leading-tight" style={{ color: scoreColors.color }}>
               {verdictLabel}

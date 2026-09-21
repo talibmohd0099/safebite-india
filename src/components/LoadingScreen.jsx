@@ -5,7 +5,7 @@
 // never has to know how the report is being produced. A glowing ring
 // fills as the steps tick off; the celebration when the report opens
 // lives on the Result page (ResultBurst).
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const STEPS = [
   { icon: '📷', label: 'Reading the label' },
@@ -26,17 +26,25 @@ const RING_STROKE = 8;
 const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
-export default function LoadingScreen() {
+// `finishing` (see useLoaderFinish) makes the ring sprint to 100% and tick
+// every step; `onFinished` fires once it has landed there, so the page can
+// hand the ring over to the score ring.
+export default function LoadingScreen({ finishing = false, onFinished }) {
   const [progress, setProgress] = useState(0);
   const [stepIndex, setStepIndex] = useState(0);
+  const finishingRef = useRef(false);
+  finishingRef.current = finishing;
 
   useEffect(() => {
     const progressTimer = setInterval(() => {
-      setProgress((p) => (p < MAX_SIMULATED_PROGRESS ? p + 1 : p));
+      setProgress((p) => {
+        if (finishingRef.current) return Math.min(100, p + 6);
+        return p < MAX_SIMULATED_PROGRESS ? p + 1 : p;
+      });
     }, (STEP_DURATION_MS * STEPS.length) / MAX_SIMULATED_PROGRESS);
 
     const stepTimer = setInterval(() => {
-      setStepIndex((i) => (i < STEPS.length - 1 ? i + 1 : i));
+      setStepIndex((i) => (finishingRef.current ? STEPS.length : i < STEPS.length - 1 ? i + 1 : i));
     }, STEP_DURATION_MS);
 
     return () => {
@@ -45,13 +53,24 @@ export default function LoadingScreen() {
     };
   }, []);
 
+  // Landed on 100%: hold a beat so it reads as "complete", then hand over.
+  useEffect(() => {
+    if (!finishing || progress < 100) return undefined;
+    const t = setTimeout(() => onFinished?.(), 380);
+    return () => clearTimeout(t);
+  }, [finishing, progress, onFinished]);
+
   const offset = RING_CIRCUMFERENCE * (1 - progress / 100);
 
   return (
     <div className="flex flex-col items-center justify-center py-14 px-4">
       {/* Progress ring: soft pulsing glow behind, a dot orbiting the
           edge, the arc filling with the real progress. */}
-      <div className="relative mb-6" style={{ width: RING_SIZE, height: RING_SIZE }}>
+      <div
+        className={`relative mb-6 ${finishing && progress >= 100 ? 'loader-complete' : ''}`}
+        style={{ width: RING_SIZE, height: RING_SIZE }}
+        data-loader-ring
+      >
         <div className="loader-glow absolute inset-2 rounded-full" aria-hidden="true" />
         <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`} className="relative -rotate-90">
           <defs>

@@ -12,6 +12,7 @@ import { CATEGORIES } from '../data/categories';
 import ProductImage from '../components/ProductImage';
 import LoadingScreen from '../components/LoadingScreen';
 import { randomLoadDelayMs, waitForMinimum } from '../utils/loadingPace';
+import { useLoaderFinish } from '../hooks/useLoaderFinish';
 
 const SORTS = [
   { id: 'default', label: 'All' },
@@ -28,6 +29,7 @@ export default function Category() {
   const [error, setError] = useState('');
   const [sort, setSort] = useState('default');
   const [opening, setOpening] = useState(false);
+  const { finishing, finishLoader, onFinished, resetFinish } = useLoaderFinish();
   // Tapping a card's photo shows a quick preview (image + rating)
   // instead of jumping straight to the full report -- the full report
   // is still one more tap away (tapping the rest of the card).
@@ -55,6 +57,7 @@ export default function Category() {
     setError('');
     const startedAt = Date.now();
     const minMs = randomLoadDelayMs();
+    resetFinish();
     setOpening(true);
     const cached = await getCachedReport(item.lookupKey);
     if (!cached) {
@@ -65,10 +68,11 @@ export default function Category() {
     cached.lookupKey = item.lookupKey;
     const historyId = saveToHistory(cached, 'search');
     await waitForMinimum(startedAt, minMs);
+    await finishLoader();
     navigate(`/result/${historyId}`);
   };
 
-  if (opening) return <LoadingScreen />;
+  if (opening) return <LoadingScreen finishing={finishing} onFinished={onFinished} />;
 
   if (!category) {
     return (

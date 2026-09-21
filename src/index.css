@@ -374,6 +374,44 @@ body {
   border: 3px solid rgb(74 222 128 / 0.85);
   animation: result-burst-pulse 0.75s ease-out 0.75s both;
 }
+/* Loader -> score ring hand-off (ResultBurst.jsx). */
+.handoff-ring {
+  position: absolute;
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+.handoff-ring svg circle:last-child {
+  filter: drop-shadow(0 0 6px rgb(74 222 128 / 0.65));
+}
+@keyframes handoff-label-fade {
+  0%, 25% { opacity: 1; }
+  60%, 100% { opacity: 0; }
+}
+.handoff-ring-label {
+  animation: handoff-label-fade 0.95s ease-out forwards;
+}
+/* Sparks explode outward from the score ring as the loader ring lands. */
+@keyframes result-burst-explode {
+  0% { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
+  12% { opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1) rotate(180deg); opacity: 0; }
+}
+.result-burst-spark {
+  position: absolute;
+  opacity: 0;
+  animation: result-burst-explode 0.85s cubic-bezier(0.15, 0.85, 0.3, 1) both;
+}
+/* Loader completes: a small pop at 100%. */
+@keyframes loader-complete-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+.loader-complete {
+  animation: loader-complete-pop 0.38s ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .loader-glow, .loader-orbit, .loader-tick, .result-burst { animation: none; display: none; }
+  .loader-glow, .loader-orbit, .loader-tick, .loader-complete { animation: none; }
+  .result-burst { display: none; }
 }
