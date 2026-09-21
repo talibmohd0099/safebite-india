@@ -14,7 +14,7 @@ import { getScoreColor } from '../utils/storage';
 
 const ANIMATION_MS = 1000;
 
-export default function ScoreCircle({ score, size = 'large', showLabel = false, burstTarget = false, startDelayMs = 0 }) {
+export default function ScoreCircle({ score, size = 'large', showLabel = false, burstTarget = false, startDelayMs = 0, fillMs = ANIMATION_MS }) {
   const clamped = Math.max(0, Math.min(100, score));
   const finalColors = getScoreColor(clamped);
 
@@ -35,7 +35,7 @@ export default function ScoreCircle({ score, size = 'large', showLabel = false, 
     // and assemble it, then it fills.
     let start = 0;
     const tick = (now) => {
-      const t = Math.min(1, (now - start) / ANIMATION_MS);
+      const t = Math.min(1, (now - start) / fillMs);
       const eased = 1 - (1 - t) ** 3; // ease-out cubic
       setLiveValue(eased * clamped);
       if (t < 1) frameRef.current = requestAnimationFrame(tick);

@@ -25,7 +25,7 @@ import ProductImage from '../components/ProductImage';
 import ProductStripCard from '../components/ProductStripCard';
 import NewsCard from '../components/NewsCard';
 import { toServing } from '../services/nutrientBasis';
-import ResultBurst, { shouldBurst, arriveMs } from '../components/ResultBurst';
+import ResultBurst, { shouldBurst, arriveMs, celebrationProfile } from '../components/ResultBurst';
 import { peekHandoff } from '../utils/reportHandoff';
 
 // Maps a dailyHabitCheck.js nutrientKey to the matching i18n string keys
@@ -209,6 +209,8 @@ export default function Result() {
   const [result, setResult] = useState(null);
   // null, or { handoff } -- handoff is where the loading ring was, if we came from one.
   const [burst, setBurst] = useState(null);
+  // Delay (ms) before the verdict word slides in -- set once per report so it survives the burst ending.
+  const [verdictReveal, setVerdictReveal] = useState(0);
   const [filter, setFilter] = useState('all');
   const [view, setView] = useState('overview');
   const [editingName, setEditingName] = useState(false);
@@ -238,7 +240,10 @@ export default function Result() {
     }
     setResult(data);
     // Celebrate a freshly opened report once; not when re-opening from History.
-    setBurst(!location.state?.quiet && shouldBurst(id) ? { handoff: peekHandoff() } : null);
+    const celebrate = !location.state?.quiet && shouldBurst(id);
+    const handoff = celebrate ? peekHandoff() : null;
+    setBurst(celebrate ? { handoff } : null);
+    setVerdictReveal(celebrate ? arriveMs(Boolean(handoff)) + celebrationProfile(data.overallScore || 0).fillMs - 200 : 0);
   }, [id, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Resolved up front, not when the share button is tapped -- a link
@@ -603,7 +608,7 @@ export default function Result() {
 
   return (
     <div className="page-in max-w-[560px] mx-auto pb-24" style={{ background: 'var(--bg-grouped)' }}>
-      {burst && <ResultBurst id={id} handoff={burst.handoff} onDone={() => setBurst(null)} />}
+      {burst && <ResultBurst id={id} score={score} handoff={burst.handoff} onDone={() => setBurst(null)} />}
 
       {/* Nav */}
       <button
@@ -752,9 +757,12 @@ export default function Result() {
           number. */
       <div className="mx-4 rounded-[20px] p-5" style={{ background: 'var(--bg-card)' }}>
         <div className="flex items-center gap-5">
-          <ScoreCircle score={score} size="xl" burstTarget startDelayMs={burst ? arriveMs(Boolean(burst.handoff)) : 0} />
+          <ScoreCircle score={score} size="xl" burstTarget startDelayMs={burst ? arriveMs(Boolean(burst.handoff)) : 0} fillMs={burst ? celebrationProfile(score).fillMs : undefined} />
           <div className="min-w-0">
-            <p className="text-[24px] font-bold tracking-tight leading-tight" style={{ color: scoreColors.color }}>
+            <p
+              className={`text-[24px] font-bold tracking-tight leading-tight ${verdictReveal ? 'verdict-reveal' : ''}`}
+              style={{ color: scoreColors.color, ...(verdictReveal ? { animationDelay: `${verdictReveal}ms` } : null) }}
+            >
               {verdictLabel}
             </p>
             <p className="text-[15px] mt-0.5" style={{ color: 'var(--label-2)' }}>

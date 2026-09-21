@@ -374,6 +374,17 @@ body {
   border: 3px solid rgb(74 222 128 / 0.85);
   animation: result-burst-pulse 0.75s ease-out 0.75s both;
 }
+/* The verdict word ("Excellent", "Poor"...) slides up once the ring has
+   filled. backwards-fill: hidden during its delay, then back to its normal
+   state (no lingering transform -- see .page-in). */
+@keyframes verdict-reveal {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.verdict-reveal {
+  animation: verdict-reveal 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
 /* Loader -> score ring hand-off (ResultBurst.jsx). */
 .handoff-ring {
   position: absolute;
@@ -412,6 +423,6 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .loader-glow, .loader-orbit, .loader-tick, .loader-complete { animation: none; }
+  .loader-glow, .loader-orbit, .loader-tick, .loader-complete, .verdict-reveal { animation: none; }
   .result-burst { display: none; }
 }

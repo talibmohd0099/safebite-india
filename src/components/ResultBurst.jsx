@@ -19,6 +19,7 @@
 // arriveMs(handoff) before it starts filling.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { clearHandoff } from '../utils/reportHandoff';
+import { getScoreColor } from '../utils/storage';
 
 const shown = new Set();
 
@@ -40,13 +41,21 @@ export function arriveMs(hasHandoff) {
   return hasHandoff ? FLIGHT_MS : GATHER_MS;
 }
 
-const COLORS = ['#22c55e', '#4ade80', '#a3e635', '#facc15', '#fb923c', '#38bdf8'];
-const PARTICLES = 40;
+// The celebration matches the result: a great score gets a big, bright
+// burst; a poor one a small, quiet one and a slower, more serious fill --
+// it would feel wrong to throw confetti at a 6/100. `fillMs` is how long
+// the score ring takes to fill; `haptic` is the vibration pattern (ms).
+export function celebrationProfile(score) {
+  if (score >= 80) return { particles: 56, reach: [90, 190], fillMs: 1100, haptic: [18, 40, 30], colors: ['#22c55e', '#4ade80', '#a3e635', '#facc15', '#38bdf8'] };
+  if (score >= 50) return { particles: 40, reach: [70, 160], fillMs: 1000, haptic: [22], colors: ['#84cc16', '#a3e635', '#facc15', '#fbbf24', '#4ade80'] };
+  if (score >= 25) return { particles: 22, reach: [50, 110], fillMs: 1300, haptic: [16], colors: ['#f59e0b', '#fb923c', '#fbbf24'] };
+  return { particles: 10, reach: [35, 80], fillMs: 1500, haptic: [34], colors: ['#f87171', '#fb923c', '#fca5a5'] };
+}
 
 // A static copy of the finished loading ring (same look as LoadingScreen's).
 const CLONE_R = 54; // (116 - 8) / 2
 const CLONE_C = 2 * Math.PI * CLONE_R;
-function RingClone() {
+function RingClone({ scoreColor, landing }) {
   return (
     <>
       <svg width="116" height="116" viewBox="0 0 116 116" className="-rotate-90" style={{ display: 'block' }}>
@@ -58,6 +67,13 @@ function RingClone() {
         </defs>
         <circle cx="58" cy="58" r={CLONE_R} fill="none" stroke="var(--fill)" strokeWidth="8" />
         <circle cx="58" cy="58" r={CLONE_R} fill="none" stroke="url(#handoff-ring-gradient)" strokeWidth="8" strokeLinecap="round" strokeDasharray={CLONE_C} strokeDashoffset="0" />
+        {/* The ring takes on the score's colour as it lands -- red for a
+            poor score, amber for moderate -- so it becomes THE score ring. */}
+        <circle
+          cx="58" cy="58" r={CLONE_R} fill="none" stroke={scoreColor} strokeWidth="8" strokeLinecap="round"
+          strokeDasharray={CLONE_C} strokeDashoffset="0"
+          style={{ opacity: landing ? 1 : 0, transition: 'opacity 0.45s ease-out' }}
+        />
       </svg>
       <div className="handoff-ring-label absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-[26px] font-bold leading-none tabular-nums text-slate-800 dark:text-slate-100">100</span>
@@ -67,10 +83,13 @@ function RingClone() {
   );
 }
 
-export default function ResultBurst({ id, handoff = null, onDone }) {
+export default function ResultBurst({ id, score = 60, handoff = null, onDone }) {
   const [alive, setAlive] = useState(true);
   const [geometry, setGeometry] = useState(null);
+  const [landing, setLanding] = useState(false); // the copied ring has started taking the score's colour
   const cloneRef = useRef(null);
+  const profile = useMemo(() => celebrationProfile(score), [score]);
+  const scoreColor = getScoreColor(score).color;
 
   useEffect(() => {
     if (id) shown.add(id);
@@ -118,19 +137,34 @@ export default function ResultBurst({ id, handoff = null, onDone }) {
 
   const particles = useMemo(
     () =>
-      Array.from({ length: PARTICLES }, (_, i) => {
-        const angle = (i / PARTICLES) * Math.PI * 2;
+      Array.from({ length: profile.particles }, (_, i) => {
+        const angle = (i / profile.particles) * Math.PI * 2;
+        const [minReach, maxReach] = profile.reach;
         return {
           angle,
           size: 5 + Math.random() * 5,
-          color: COLORS[i % COLORS.length],
+          color: profile.colors[i % profile.colors.length],
           delay: Math.random() * 180,
           round: i % 3 !== 0,
-          reach: 70 + Math.random() * 90,
+          reach: minReach + Math.random() * (maxReach - minReach),
         };
       }),
-    []
+    [profile]
   );
+
+  // Colour hand-off partway through the flight, and a haptic tick at the
+  // exact moment the ring lands (silently skipped where unsupported).
+  useEffect(() => {
+    const landAt = arriveMs(Boolean(handoff));
+    const colorTimer = handoff ? setTimeout(() => setLanding(true), landAt * 0.55) : null;
+    const hapticTimer = setTimeout(() => {
+      try { navigator.vibrate?.(profile.haptic); } catch { /* not supported */ }
+    }, landAt);
+    return () => {
+      clearTimeout(colorTimer);
+      clearTimeout(hapticTimer);
+    };
+  }, [handoff, profile]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -152,7 +186,7 @@ export default function ResultBurst({ id, handoff = null, onDone }) {
             className="handoff-ring"
             style={{ left: handoff.left, top: handoff.top, width: handoff.width, height: handoff.height }}
           >
-            <RingClone />
+            <RingClone scoreColor={scoreColor} landing={landing} />
           </div>
           {/* Landing: sparks explode outward from the score ring. */}
           {particles.map((p, i) => (
@@ -203,6 +237,7 @@ export default function ResultBurst({ id, handoff = null, onDone }) {
           top: cy,
           width: radius * 2 + 20,
           height: radius * 2 + 20,
+          borderColor: scoreColor,
           animationDelay: `${arriveMs(Boolean(handoff)) - 50}ms`,
         }}
       />
