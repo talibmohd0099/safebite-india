@@ -19,7 +19,7 @@ export const DENSE_SNACK_CEILING = 63;
 export const DENSE_SNACK_FLOOR = 45;
 // A fried snack with no nutrition panel at all can't be positioned inside
 // the band from data, so it gets a flat, cautious value instead.
-export const NO_DATA_SNACK_CEILING = 58;
+export const NO_DATA_SNACK_CEILING = 59;
 
 // Food types the ceiling never applies to: they're eaten in a different
 // way (or judged by a different standard) than a packaged snack, so
