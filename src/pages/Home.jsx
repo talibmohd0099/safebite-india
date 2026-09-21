@@ -6,7 +6,7 @@ import { extractIngredientsFromImage } from '../services/geminiService';
 import { analyzeText } from '../services/analyzeText';
 import { lookupBarcode, searchProductsByName } from '../services/openFoodFacts';
 import { getCachedReport, saveReport, barcodeKey, textKey, searchCachedProducts, getPopularSearchTerms, getRecentlyAddedProducts, getDailySpotlight, getCatalogStats, dayOfYearSeed } from '../services/productCache';
-import { saveToHistory, getScoreColor, getHistory } from '../utils/storage';
+import { saveToHistory, getScoreColor } from '../utils/storage';
 import LoadingScreen from '../components/LoadingScreen';
 import ProductStripCard from '../components/ProductStripCard';
 import ProductImage from '../components/ProductImage';
@@ -64,7 +64,6 @@ export default function Home() {
   // complaint. Waiting for all of them and revealing together, with a
   // skeleton in the meantime, reads as one clean load instead.
   const [sectionsLoading, setSectionsLoading] = useState(true);
-  const [recentScans] = useState(() => getHistory().slice(0, 5));
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Analyzing ingredients...');
   const [error, setError] = useState('');
@@ -781,33 +780,6 @@ export default function Home() {
                 >
                   + Add person
                 </button>
-              </div>
-            </div>
-          )}
-
-          {/* Continue where you left off -- your own past scans, so
-              re-checking something you already looked at doesn't need a
-              trip to the History tab. Only for returning users. */}
-          {searchQuery.trim().length === 0 && recentScans.length > 0 && (
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-2 px-0.5">
-                <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Continue where you left off</p>
-                <button
-                  onClick={() => navigate('/compare')}
-                  className="tap-scale text-xs font-semibold text-green-600 dark:text-green-400 flex-shrink-0"
-                >
-                  ⚖️ Compare
-                </button>
-              </div>
-              <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-                {recentScans.map((entry, i) => (
-                  <ProductStripCard
-                    key={entry.id}
-                    item={{ productName: entry.productName, imageUrl: entry.imageUrl, score: entry.overallScore, isInfantFormula: entry.isInfantFormula }}
-                    onClick={() => navigate(`/result/${entry.id}`)}
-                    style={{ animationDelay: `${i * 30}ms` }}
-                  />
-                ))}
               </div>
             </div>
           )}
