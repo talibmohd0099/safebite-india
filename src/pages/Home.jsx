@@ -610,19 +610,15 @@ export default function Home() {
 
       {mode === 'search' && (
         <>
-          {/* Hero band -- one headline and one quiet stats line. The old
-              version stacked a headline, a decorative badge and two boxed
-              stat pills into a short band, and the search bar then
-              overlapped all of it; less in the band reads calmer. */}
-          <div className="hero-animated relative -mx-4 px-5 pt-5 pb-10 rounded-b-[28px] overflow-hidden">
-            <h1 className="relative text-white text-[26px] leading-[1.15] font-extrabold tracking-tight">
-              Know what's <span className="text-lime-300">in</span><br />your food.
+          {/* Hero band -- compact: one headline line and one quiet stats line. */}
+          <div className="hero-animated relative -mx-4 px-5 pt-3 pb-8 rounded-b-[24px] overflow-hidden">
+            <h1 className="relative text-white text-[21px] leading-tight font-extrabold tracking-tight">
+              Know what's <span className="text-lime-300">in</span> your food.
             </h1>
             {sectionsLoading ? (
-              <div className="relative shimmer-light h-4 w-48 rounded-full mt-3" />
+              <div className="relative shimmer-light h-3.5 w-44 rounded-full mt-2" />
             ) : stats && (
-              <p className="relative mt-2.5 flex items-center gap-2 text-[13px] text-white/85">
-                <span className="w-1.5 h-1.5 rounded-full bg-lime-300 flex-shrink-0" aria-hidden="true" />
+              <p className="relative mt-1 flex items-center gap-1.5 text-[12px] text-white/85">
                 <span><span className="font-bold text-white">{stats.total.toLocaleString()}</span> foods checked</span>
                 <span className="text-white/40" aria-hidden="true">·</span>
                 <span><span className="font-bold text-white">+{stats.addedToday.toLocaleString()}</span> today</span>
@@ -630,58 +626,45 @@ export default function Home() {
             )}
           </div>
 
-          {/* Search bar */}
-          <div className="-mt-6 mb-4 relative z-10">
-            <div className="flex items-center gap-3 bg-white dark:bg-slate-800 rounded-2xl shadow-lg shadow-slate-200 border border-slate-100 dark:border-slate-800 px-4 py-3">
-              <span className="text-slate-400 dark:text-slate-500 text-lg flex-shrink-0">🔍</span>
-              <div className="flex-1 min-w-0">
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search a product"
-                  autoComplete="off"
-                  className="w-full text-[15px] font-semibold text-slate-800 dark:text-slate-100 placeholder:text-slate-800 dark:placeholder:text-slate-300 bg-transparent focus:outline-none"
-                />
-                {searchQuery.length === 0 && (
-                  <p className="text-xs text-slate-400 dark:text-slate-500 -mt-0.5">Maggi, Parle-G, Oreo...</p>
-                )}
-              </div>
-              <button
-                onClick={() => searchInputRef.current?.focus()}
-                aria-label="Search"
-                className="tap-scale w-10 h-10 rounded-full bg-green-600 hover:bg-green-700 flex items-center justify-center text-white text-base flex-shrink-0"
-              >
-                🔍
-              </button>
-            </div>
+          {/* Search bar -- an obvious text field: solid outline, one icon,
+              a plain "Search food" placeholder. */}
+          <div className="-mt-5 mb-3 relative z-10">
+            <label className="flex items-center gap-2.5 bg-white dark:bg-slate-800 rounded-xl shadow-md shadow-slate-200 dark:shadow-none border-2 border-green-600 dark:border-green-500 px-3.5 py-2.5 focus-within:ring-4 focus-within:ring-green-600/20">
+              <span className="text-base flex-shrink-0" aria-hidden="true">🔍</span>
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search food"
+                aria-label="Search food"
+                autoComplete="off"
+                className="flex-1 min-w-0 text-[15px] font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 bg-transparent focus:outline-none"
+              />
+            </label>
           </div>
 
-          {/* Quick actions -- Photo is the primary/most common flow, so it
-              gets the bigger green pill; Barcode/Paste are secondary,
-              smaller, and share the row instead of each getting a full
-              card -- keeps Popular searches/Explore food within reach
-              without scrolling. */}
+          {/* Quick actions -- Barcode is the primary (big green) action; Photo
+              and Paste are secondary and share the row. */}
           {searchQuery.trim().length === 0 && (
-            <div className="flex gap-2 mb-5">
-              <button
-                onClick={() => { setMode('image'); setError(''); }}
-                className="tap-scale flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white shadow-sm shadow-green-200 transition-colors"
-              >
-                <span className="text-base">📷</span>
-                <span className="text-sm font-bold">Scan Photo</span>
-              </button>
+            <div className="flex gap-2 mb-4">
               <button
                 onClick={() => { setMode('barcode'); setError(''); }}
-                className="tap-scale flex items-center justify-center gap-1.5 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+                className="tap-scale flex-1 flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-green-600 hover:bg-green-700 text-white shadow-sm shadow-green-200 transition-colors"
               >
                 <BarcodeIcon />
-                <span className="text-xs font-semibold">Barcode</span>
+                <span className="text-sm font-bold">Scan Barcode</span>
+              </button>
+              <button
+                onClick={() => { setMode('image'); setError(''); }}
+                className="tap-scale flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+              >
+                <span className="text-sm">📷</span>
+                <span className="text-xs font-semibold">Photo</span>
               </button>
               <button
                 onClick={() => { setMode('text'); setError(''); }}
-                className="tap-scale flex items-center justify-center gap-1.5 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+                className="tap-scale flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
               >
                 <span className="text-sm">📄</span>
                 <span className="text-xs font-semibold">Paste</span>
