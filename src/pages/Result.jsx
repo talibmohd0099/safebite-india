@@ -238,6 +238,7 @@ export default function Result() {
   const [refreshError, setRefreshError] = useState('');
   const [showFlagModal, setShowFlagModal] = useState(false);
   const [showLogModal, setShowLogModal] = useState(false);
+  const [showLabelOrderInfo, setShowLabelOrderInfo] = useState(false);
   const [flagReason, setFlagReason] = useState('');
   const [flagRemarks, setFlagRemarks] = useState('');
   const [flagState, setFlagState] = useState('idle'); // 'idle' | 'sending' | 'sent' | 'error'
@@ -1327,6 +1328,22 @@ export default function Result() {
                 </button>
               );
             })}
+          </div>
+
+          {/* One-time context for why the list is ordered the way it is
+              -- FSSAI (like most label laws) requires descending order
+              by quantity, so the first few rows are usually also the
+              biggest share of the product, not a ranking of concern. */}
+          <div className="mx-4 mt-3 rounded-2xl px-3.5 py-2.5 flex items-start gap-2.5" style={{ background: 'var(--fill)' }}>
+            <span className="text-[15px] flex-shrink-0" aria-hidden="true">🌿</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[12.5px] leading-relaxed" style={{ color: 'var(--label-2)' }}>
+                {showLabelOrderInfo ? t('labelOrderInfoLong') : t('labelOrderInfoShort')}
+              </p>
+              <button onClick={() => setShowLabelOrderInfo((v) => !v)} className="tap-scale text-[11.5px] font-semibold mt-1" style={{ color: 'var(--tint)' }}>
+                {showLabelOrderInfo ? t('showLess') : `${t('learnMore')} ›`}
+              </button>
+            </div>
           </div>
 
           {filteredIngredients.length === 0 ? (

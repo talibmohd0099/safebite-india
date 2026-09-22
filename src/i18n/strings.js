@@ -246,6 +246,11 @@ export const STRINGS = {
     filterAll: 'All',
     noneInCategory: 'None in this category.',
 
+    labelOrderInfoShort: 'Ingredients are listed in the order provided on the label.',
+    labelOrderInfoLong: 'Ingredients are listed in the order provided on the label. FSSAI (like most food-label laws) requires listing them by descending quantity, so the first few names are usually also the biggest share of the product by weight -- this is not a ranking of how concerning each one is.',
+    learnMore: 'Learn more',
+    showLess: 'Show less',
+
     asReadFromLabel: 'As read from the label',
     compareLabelNote: "Compare this against the list above — if something on your pack isn't here, it was missed while reading the label.",
 
@@ -489,6 +494,11 @@ export const STRINGS = {
 
     filterAll: 'सभी',
     noneInCategory: 'इस कैटेगरी में कुछ नहीं है।',
+
+    labelOrderInfoShort: 'सामग्री लेबल पर दिए गए क्रम में सूचीबद्ध है।',
+    labelOrderInfoLong: 'सामग्री लेबल पर दिए गए क्रम में सूचीबद्ध है। FSSAI (ज़्यादातर फ़ूड-लेबल कानूनों की तरह) मात्रा के घटते क्रम में सूचीबद्ध करना ज़रूरी बनाता है, इसलिए पहले कुछ नाम अक्सर वज़न के हिसाब से उत्पाद का सबसे बड़ा हिस्सा होते हैं -- यह इस बात की रैंकिंग नहीं है कि हर एक कितना चिंताजनक है।',
+    learnMore: 'ज़्यादा जानें',
+    showLess: 'कम दिखाएं',
 
     asReadFromLabel: 'लेबल पर जैसा लिखा है',
     compareLabelNote: 'इसे ऊपर की लिस्ट से मिलाकर देखें — अगर आपके पैक पर कुछ ऐसा है जो यहां नहीं है, तो वह लेबल पढ़ते समय छूट गया होगा।',
