@@ -36,12 +36,29 @@ const CHECKS = [
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+const OFF_FIELD = {
+  sodium: 'sodium_100g', calories: 'energy-kcal_100g', protein: 'proteins_100g', fat: 'fat_100g',
+  carbs: 'carbohydrates_100g', 'total sugar': 'sugars_100g', 'added sugar': 'added-sugars_100g',
+  'saturated fat': 'saturated-fat_100g', 'trans fat': 'trans-fat_100g', fibre: 'fiber_100g',
+};
+
+async function fetchWithRetry(url, attempts = 3) {
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      const res = await fetch(url);
+      return await res.json();
+    } catch (err) {
+      if (i === attempts) throw err;
+      await sleep(1500 * i);
+    }
+  }
+}
+
 async function offReason(barcode, nutrientLabel, key, value, unit) {
   try {
-    const field = { sodium: 'sodium_100g', calories: 'energy-kcal_100g' }[nutrientLabel];
+    const field = OFF_FIELD[nutrientLabel];
     if (!field) return `Physically implausible (${value}${unit} per 100g). Not individually re-checked against a live source field for this nutrient -- worth a manual look at the product's real label.`;
-    const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${barcode}.json?fields=${field},product_name`);
-    const json = await res.json();
+    const json = await fetchWithRetry(`https://world.openfoodfacts.org/api/v2/product/${barcode}.json?fields=${field},product_name`);
     const live = json.product?.[field];
     if (typeof live !== 'number') return `Physically implausible (${value}${unit} per 100g). Open Food Facts no longer has this field for this barcode -- may need a fresh lookup or a different barcode entirely.`;
     const liveDerived = field === 'sodium_100g' ? live * 1000 : live;
@@ -54,15 +71,35 @@ async function offReason(barcode, nutrientLabel, key, value, unit) {
   }
 }
 
+let blinkitCache = null;
+async function loadBlinkitProducts() {
+  if (blinkitCache) return blinkitCache;
+  const all = [];
+  for (let from = 0; ; from += 1000) {
+    const { data } = await supabase.from('blinkit_products').select('product_name, brand, source, nutrition').not('nutrition', 'is', null).order('id', { ascending: true }).range(from, from + 999);
+    if (!data?.length) break;
+    all.push(...data);
+    if (data.length < 1000) break;
+  }
+  blinkitCache = all;
+  return all;
+}
+
+const BLINKIT_FIELD = {
+  sodium: 'Sodium', calories: 'Energy', protein: 'Protein', fat: 'Total Fat',
+  carbs: 'Carbohydrate', 'total sugar': 'Total Sugar', 'added sugar': 'Added Sugar',
+  'saturated fat': 'Saturated Fat', 'trans fat': 'Trans Fat', fibre: 'Dietary Fibre',
+};
+
 async function blinkitReason(lookupKey, nutrientLabel, value, unit) {
   try {
-    const { data: rows } = await supabase.from('blinkit_products').select('product_name, brand, source, nutrition').not('nutrition', 'is', null).limit(2000);
-    const match = (rows || []).find((r) => blinkitLookupKey(r.source, r.brand, r.product_name) === lookupKey);
+    const rows = await loadBlinkitProducts();
+    const match = rows.find((r) => blinkitLookupKey(r.source, r.brand, r.product_name) === lookupKey);
     if (!match) return `Physically implausible (${value}${unit} per 100g). Could not find the matching blinkit_products row anymore to re-check its raw scraped text -- may have been removed or re-keyed.`;
-    const field = { sodium: 'Sodium', calories: 'Energy' }[nutrientLabel];
+    const field = BLINKIT_FIELD[nutrientLabel];
     const raw = field ? match.nutrition?.[field] : null;
     if (raw) return `Blinkit's own scraped page text for "${match.product_name}" reads "${raw}" for ${nutrientLabel} -- matches what's stored. Either genuinely correct for this concentrated product, or a data-entry error on Blinkit's own listing that can't be fixed by a formula.`;
-    return `Physically implausible (${value}${unit} per 100g). Blinkit's raw nutrition text no longer has a "${field}" field for this product to re-check against.`;
+    return `Physically implausible (${value}${unit} per 100g). Blinkit's raw nutrition text has no "${field || nutrientLabel}" field for this product to re-check against -- worth a manual look.`;
   } catch {
     return `Physically implausible (${value}${unit} per 100g). Could not re-check Blinkit's raw data (lookup failed) -- needs a manual look.`;
   }
