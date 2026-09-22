@@ -6,6 +6,7 @@ import { extractIngredientsFromImage } from '../services/geminiService';
 import { analyzeText } from '../services/analyzeText';
 import { lookupBarcode, searchProductsByName } from '../services/openFoodFacts';
 import { getCachedReport, saveReport, barcodeKey, textKey, searchCachedProducts, getPopularSearchTerms, getRecentlyAddedProducts, getDailySpotlight, getCatalogStats, dayOfYearSeed } from '../services/productCache';
+import { getTodaysTotals } from '../services/intakeLog';
 import { saveToHistory, getScoreColor } from '../utils/storage';
 import LoadingScreen from '../components/LoadingScreen';
 import ProductStripCard from '../components/ProductStripCard';
@@ -67,6 +68,11 @@ export default function Home() {
   const [recentlyAdded, setRecentlyAdded] = useState(() => homeSnapshot?.recent ?? []);
   const [spotlight, setSpotlight] = useState(() => homeSnapshot?.spot ?? { best: null, worst: null });
   const [stats, setStats] = useState(() => homeSnapshot?.stats ?? null);
+  // Local-only, read fresh every time Home mounts (e.g. Back from a
+  // report just logged against) -- no network involved, so no skeleton
+  // needed. Only ever rendered when there's actually something logged
+  // today, so it costs nothing for someone not using the feature.
+  const [intakeToday, setIntakeToday] = useState(() => getTodaysTotals());
   // True until ALL of the home screen's discovery sections have their
   // real data, not just the first one to resolve -- these are 4
   // independent Supabase queries, and letting each section render the
@@ -691,6 +697,28 @@ export default function Home() {
                 <span className="text-xs font-semibold">Paste</span>
               </button>
             </div>
+          )}
+
+          {/* Today's intake -- only shown once something is actually logged
+              (see intakeLog.js/My Intake), so this costs nothing for anyone
+              not using the feature. Deliberately no %/target language here,
+              same reason as My Intake itself: this is a log, not a goal. */}
+          {searchQuery.trim().length === 0 && intakeToday.entryCount > 0 && (
+            <button
+              onClick={() => navigate('/my-intake')}
+              className="tap-scale w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 mb-5"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-lg flex-shrink-0">🍽️</span>
+                <div className="text-left min-w-0">
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Today's intake</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">
+                    {typeof intakeToday.totals.caloriesKcal === 'number' ? `${Math.round(intakeToday.totals.caloriesKcal)} kcal logged` : `${intakeToday.entryCount} item${intakeToday.entryCount === 1 ? '' : 's'} logged`}
+                  </p>
+                </div>
+              </div>
+              <span className="text-slate-300 dark:text-slate-600 text-lg flex-shrink-0">›</span>
+            </button>
           )}
 
           {/* Shopping Mode -- "scan, quick result, ready for the next

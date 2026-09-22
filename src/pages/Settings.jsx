@@ -44,6 +44,7 @@ export default function Settings() {
       <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">Your profiles, alerts, and how FoodGuard works.</p>
 
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 divide-y divide-slate-100 dark:divide-slate-700 mb-4">
+        <NavRow to="/my-intake" icon="🍽️" title="My Intake" description="What you've logged eating today, and its nutrition" />
         <NavRow to="/family" icon="👪" title="Family" description="Profiles and personal scores for the people you scan for" />
         <NavRow to="/about" icon="🛡️" title="About FoodGuard" description="Our mission, how scoring works, and data sources" />
       </div>

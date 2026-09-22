@@ -27,6 +27,8 @@ import NewsCard from '../components/NewsCard';
 import { toServing } from '../services/nutrientBasis';
 import ResultBurst, { shouldBurst, arriveMs, celebrationProfile } from '../components/ResultBurst';
 import { peekHandoff } from '../utils/reportHandoff';
+import LogPortionModal from '../components/LogPortionModal';
+import { canLogIntake } from '../services/intakeLog';
 
 // Maps a dailyHabitCheck.js nutrientKey to the matching i18n string keys
 // (see src/i18n/strings.js) for its display name and its three
@@ -225,6 +227,7 @@ export default function Result() {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState('');
   const [showFlagModal, setShowFlagModal] = useState(false);
+  const [showLogModal, setShowLogModal] = useState(false);
   const [flagReason, setFlagReason] = useState('');
   const [flagRemarks, setFlagRemarks] = useState('');
   const [flagState, setFlagState] = useState('idle'); // 'idle' | 'sending' | 'sent' | 'error'
@@ -1130,11 +1133,24 @@ export default function Result() {
           <SectionHeader>{t('sectionNutrition')}</SectionHeader>
           <Group>
             <div className="px-4 py-3.5">
-              <p className="text-[12px] mb-3" style={{ color: 'var(--label-3)' }}>
-                {result.realNutrientsServingGrams
-                  ? t('nutritionPerServing', { grams: result.realNutrientsServingGrams, unit: result.realNutrientsServingUnit || 'g' })
-                  : t('nutritionPer100g')}
-              </p>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <p className="text-[12px]" style={{ color: 'var(--label-3)' }}>
+                  {result.realNutrientsServingGrams
+                    ? t('nutritionPerServing', { grams: result.realNutrientsServingGrams, unit: result.realNutrientsServingUnit || 'g' })
+                    : t('nutritionPer100g')}
+                </p>
+                {/* Only offered when there's real calorie data to log against
+                    -- see canLogIntake in intakeLog.js. No estimation path. */}
+                {canLogIntake(result) && (
+                  <button
+                    onClick={() => setShowLogModal(true)}
+                    className="tap-scale flex-shrink-0 px-3 py-1.5 rounded-full text-[12px] font-semibold"
+                    style={{ background: 'var(--tint-bg)', color: 'var(--tint)' }}
+                  >
+                    ＋ Log what I had
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-3 gap-3">
                 {NUTRITION_TABLE_ROWS.filter((row) => typeof displayNutrients[row.key] === 'number').map((row) => (
                   <div key={row.key}>
@@ -1682,6 +1698,14 @@ export default function Result() {
       {/* Report an issue -- what someone saw is captured alongside what
           they typed (see productFlags.js), since the product gets
           re-analyzed the moment anything here is acted on. */}
+      {showLogModal && (
+        <LogPortionModal
+          report={result}
+          onClose={() => setShowLogModal(false)}
+          onLogged={() => navigate('/my-intake')}
+        />
+      )}
+
       {showFlagModal && createPortal(
         <div
           className="fixed inset-0 z-[999] bg-black/50 flex items-end sm:items-center justify-center"

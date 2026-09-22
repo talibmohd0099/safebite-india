@@ -25,12 +25,13 @@ export default function BottomTabBar() {
     >
       <div className="max-w-2xl mx-auto grid grid-cols-4">
         {TABS.map((tab) => {
-          // Settings also lights up for its sub-pages (Family, About) --
-          // they no longer have their own tab, so this is the only way
-          // back into it, and it should still read as "you're here".
+          // Settings also lights up for its sub-pages (Family, About,
+          // My Intake) -- they no longer have their own tab, so this is
+          // the only way back into it, and it should still read as
+          // "you're here".
           const active =
             tab.path === '/settings'
-              ? ['/settings', '/family', '/about'].includes(location.pathname)
+              ? ['/settings', '/family', '/about', '/my-intake'].includes(location.pathname)
               : location.pathname === tab.path;
           return (
             <Link
