@@ -179,6 +179,9 @@ function MacroRing({ segments, size = 128, stroke = 16 }) {
 }
 
 const MACRO_COLORS = { proteinG: '#ffffff', carbohydrateG: '#bef264', totalFatG: '#fde047' };
+// Deliberately muted/desaturated relative to the three vivid macro colours
+// above -- reads as "unknown", not as a fourth nutrient of its own.
+const UNAVAILABLE_COLOR = 'rgba(15, 23, 42, 0.32)';
 const MACRO_KCAL_PER_G = { proteinG: 4, carbohydrateG: 4, totalFatG: 9 };
 const MACRO_LABEL = { proteinG: 'Protein', carbohydrateG: 'Carbs', totalFatG: 'Fat' };
 
@@ -188,6 +191,7 @@ export default function MyIntake() {
   const [entries, setEntries] = useState(() => getEntriesForDay(selectedDay));
   const [totals, setTotals] = useState(() => getTotalsForDay(selectedDay).totals);
   const [showLearnMore, setShowLearnMore] = useState(false);
+  const [showMacroGapInfo, setShowMacroGapInfo] = useState(false);
 
   useEffect(() => {
     setEntries(getEntriesForDay(selectedDay));
@@ -223,12 +227,15 @@ export default function MyIntake() {
   // kcal-per-gram), not by the real logged total shown in the ring's own
   // centre -- so the ring silently explained a smaller, different number
   // (e.g. 560kcal) than the 714kcal sitting right inside it. That mismatch
-  // is real and expected (a label's own stated "Energy" rarely equals its
-  // macros recomputed via Atwater factors exactly -- rounding, fibre,
-  // alcohol etc. all cause real gaps), so the fix isn't to force them to
-  // match: every segment's fraction is now of the TRUE logged total, and
-  // any calories that aren't accounted for by a known macro are simply
-  // left as unfilled ring track -- honest, not hidden, never invented.
+  // is real and expected: getTotalsForDay (intakeLog.js) sums calories and
+  // each macro independently, only from entries that HAVE that field, so a
+  // day where some logged foods carried a calorie figure but no full
+  // protein/carb/fat breakdown (common -- most of this catalog has
+  // calories, a minority has the full split) genuinely can't have all its
+  // calories assigned to a macro. The fix isn't to force them to match --
+  // every segment's fraction is of the TRUE logged total, and calories
+  // that aren't accounted for by a known macro get their own explicit
+  // "Macro data unavailable" segment below, rather than an unlabelled gap.
   const macroKcal = {};
   let macroKcalTotal = 0;
   for (const key of ['proteinG', 'carbohydrateG', 'totalFatG']) {
@@ -244,8 +251,16 @@ export default function MyIntake() {
   // themselves overflow past a full ring if they add up to slightly more
   // than the stated total.
   const ringDenominator = Math.max(totals.caloriesKcal || 0, macroKcalTotal);
+  // Rounding noise (a fraction of a kcal) shouldn't earn its own segment --
+  // only a gap big enough to actually mean "a logged food had no macro
+  // breakdown" gets called out.
+  const unavailableKcal = ringDenominator - macroKcalTotal;
+  const hasUnavailableGap = unavailableKcal > 0.5;
   const ringSegments = ringDenominator > 0
-    ? Object.entries(macroKcal).map(([key, kcal]) => ({ key, fraction: kcal / ringDenominator, color: MACRO_COLORS[key] }))
+    ? [
+        ...Object.entries(macroKcal).map(([key, kcal]) => ({ key, fraction: kcal / ringDenominator, color: MACRO_COLORS[key] })),
+        ...(hasUnavailableGap ? [{ key: 'unavailable', fraction: unavailableKcal / ringDenominator, color: UNAVAILABLE_COLOR }] : []),
+      ]
     : [];
   const fatEnergyPct = ringDenominator > 0 && typeof macroKcal.totalFatG === 'number'
     ? Math.round((macroKcal.totalFatG / ringDenominator) * 100)
@@ -325,14 +340,22 @@ export default function MyIntake() {
               )}
               {ringSegments.length > 0 && (
                 <div className="flex-1 min-w-0 space-y-2">
-                  {ringSegments.map((seg) => (
-                    <div key={seg.key} className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: seg.color }} />
-                      <span className="text-[13px] font-semibold text-white flex-1 min-w-0 truncate">{MACRO_LABEL[seg.key]}</span>
-                      <span className="text-[13px] font-bold text-white tabular-nums">{Math.round(totals[seg.key] * 10) / 10}g</span>
-                      <span className="text-[11px] text-white/70 tabular-nums w-9 text-right">{Math.round(seg.fraction * 100)}%</span>
-                    </div>
-                  ))}
+                  {ringSegments.map((seg) => {
+                    const isUnavailable = seg.key === 'unavailable';
+                    return (
+                      <div key={seg.key} className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: isUnavailable ? 'rgba(255,255,255,0.4)' : seg.color }} />
+                        <span className={`text-[13px] flex-1 min-w-0 truncate ${isUnavailable ? 'font-medium text-white/70' : 'font-semibold text-white'}`}>
+                          {isUnavailable ? 'Data unavailable' : MACRO_LABEL[seg.key]}
+                        </span>
+                        {!isUnavailable && (
+                          <span className="text-[13px] font-bold text-white tabular-nums">{Math.round(totals[seg.key] * 10) / 10}g</span>
+                        )}
+                        <span className={`text-[11px] tabular-nums w-9 text-right ${isUnavailable ? 'text-white/60' : 'text-white/70'}`}>{Math.round(seg.fraction * 100)}%</span>
+                      </div>
+                    );
+                  })}
+                  <p className="text-[10px] text-white/45 pt-0.5">Shares are of total logged calories</p>
                 </div>
               )}
             </div>
@@ -341,17 +364,21 @@ export default function MyIntake() {
                 Plus <span className="font-bold text-white">{Math.round(totalSugar * 10) / 10}g</span> total sugar (sugar's calories are already counted within carbs above).
               </p>
             )}
-            {/* The ring rarely fills all the way -- some logged foods only
-                have a calorie figure with no protein/carb/fat breakdown on
-                their label (common on this catalog), so their calories
-                count towards the centre number but can't be split into a
-                slice. Spelling that out here stops the gap from reading as
-                a bug -- a real screenshot of this exact gap was flagged as
-                "percentages don't add up to 100%" before this line existed. */}
-            {ringSegments.length > 0 && ringDenominator > macroKcalTotal + 0.5 && (
-              <p className="relative text-[11px] text-white/65 mt-2">
-                Ring doesn't fill up to 100%? Some logged foods only had a calorie figure, no full protein/carb/fat breakdown on their label -- those calories still count in the centre number, just not in a slice.
-              </p>
+            {/* The short version is the "Macro data unavailable" segment +
+                legend row above -- that alone tells the story without
+                needing a user to understand how the log is built. This is
+                just the longer why, one tap away, for anyone curious. */}
+            {hasUnavailableGap && (
+              <div className={`relative ${typeof totalSugar === 'number' ? 'mt-2' : 'mt-4 pt-3 border-t border-white/15'}`}>
+                <button onClick={() => setShowMacroGapInfo((v) => !v)} className="tap-scale text-[11px] font-semibold text-white/55 flex items-center gap-1">
+                  <span>ⓘ</span> {showMacroGapInfo ? 'Show less' : 'Why is some macro data unavailable?'}
+                </button>
+                {showMacroGapInfo && (
+                  <p className="text-[11px] text-white/65 leading-relaxed mt-1.5">
+                    {Math.round(unavailableKcal)} kcal from today's logged foods couldn't be assigned to protein, carbs or fat because their label didn't give a full breakdown -- those calories still count in the {Math.round(totals.caloriesKcal)} kcal total above, just not in a slice.
+                  </p>
+                )}
+              </div>
             )}
           </div>
 
