@@ -68,15 +68,16 @@ export default function IngredientCard({ ingredient, severityLabel, style }) {
       className="item-in rounded-2xl overflow-hidden"
       style={{
         ...style,
-        // Every severity gets its own light background when expanded --
-        // red for Harmful, orange for Concerning, yellow for Highly
-        // processed, green for Fine -- the same tier colours used
-        // everywhere else in the app (getIngredientSeverity), not a
-        // one-off palette just for this card. Fine used to stay
-        // transparent, which read as "less finished" than the flagged
-        // rows right next to it.
-        border: expanded ? `1px solid ${severity.color}40` : '1px solid transparent',
-        background: expanded ? severity.bg : 'transparent',
+        // A filled severity-coloured background across the whole card
+        // (an earlier version of this) made the text sitting on top of
+        // it harder to read -- a colour LOUD enough to read as a signal
+        // is also loud enough to fight with body text for attention.
+        // A slim coloured left edge carries the same "which tier is
+        // this" cue without ever sitting behind text, on a plain card
+        // background instead -- every severity still gets one (Fine
+        // included), just a border, not a wash.
+        borderLeft: expanded ? `3px solid ${severity.color}` : '3px solid transparent',
+        background: expanded ? 'var(--bg-card)' : 'transparent',
       }}
     >
       <button
@@ -133,7 +134,7 @@ export default function IngredientCard({ ingredient, severityLabel, style }) {
           {ingredient.reason && (
             <div
               className="flex items-start gap-2 rounded-xl px-2.5 py-2"
-              style={{ background: `${severity.color}1A` }}
+              style={{ background: 'var(--fill)' }}
             >
               <span className="text-[13px] flex-shrink-0 leading-snug" aria-hidden="true">{isConcerning ? '⚠️' : '💚'}</span>
               <p className="text-[14px] font-semibold leading-snug" style={{ color: 'var(--label-1)' }}>
