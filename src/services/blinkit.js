@@ -27,21 +27,29 @@ const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 // carries fashion, electronics and pet care, which have nothing to score.
 //
 // Order matters here (see scrape-blinkit.js's `--all` target sort, which
-// walks this array's own order, not the sitemap's) -- everyday-purchase
-// groups first, so a catalog too large to finish in one sweep still fills
-// in the products most people would actually scan before it reaches the
-// long tail of niche/occasional-buy items.
+// walks this array's own order, not the sitemap's). Ranked on two
+// combined factors, not just "how often is this bought":
+//   1. How often an Indian household actually buys from the group.
+//   2. How often someone would actually open FoodGuard and scan
+//      something from it -- this is a health-label scanner, not a
+//      grocery-list app, so a category people doubt (packaged snacks,
+//      sugary drinks, instant noodles) earns priority even over a
+//      more-bought but rarely-scanned staple like atta or rice.
+// Top: strong on both. Middle: strong on only one (atta-rice-dal is
+// bought constantly but rarely scanned; sauces-spreads is middling on
+// both). Bottom: weak on both, or a genuinely occasional buy
+// (sweet-tooth, dry-fruits-masala-oil).
 export const FOOD_GROUPS = [
   'dairy-breakfast',
-  'atta-rice-dal',
-  'tea-coffee-milk-drinks',
-  'bakery-biscuits',
   'munchies',
+  'bakery-biscuits',
+  'tea-coffee-milk-drinks',
   'cold-drinks-juices',
   'instant-frozen-food',
   'sauces-spreads',
-  'dry-fruits-masala-oil',
+  'atta-rice-dal',
   'sweet-tooth',
+  'dry-fruits-masala-oil',
 ];
 
 const NUTRITION_FIELDS = [
