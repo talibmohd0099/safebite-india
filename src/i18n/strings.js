@@ -30,6 +30,7 @@ export const STRINGS = {
     navFamily: 'Family',
     navNews: 'Updates',
     navAbout: 'About',
+    navSettings: 'Settings',
 
     familyTitle: 'Family',
     familyEmptyTitle: 'Make food decisions personal.',
@@ -306,6 +307,7 @@ export const STRINGS = {
     navFamily: 'परिवार',
     navNews: 'अपडेट्स',
     navAbout: 'बारे में',
+    navSettings: 'सेटिंग्स',
 
     familyTitle: 'परिवार',
     familyEmptyTitle: 'खाने का फैसला अपने हिसाब से बनाएं।',

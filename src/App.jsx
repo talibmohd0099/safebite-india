@@ -31,6 +31,7 @@ import Compare from './pages/Compare';
 import CompareManage from './pages/CompareManage';
 import Family from './pages/Family';
 import About from './pages/About';
+import Settings from './pages/Settings';
 import Category from './pages/Category';
 import PopularSearches from './pages/PopularSearches';
 import News from './pages/News';
@@ -215,6 +216,7 @@ function AppShell() {
           <Route path="/compare/result" element={<Compare />} />
           <Route path="/family" element={<Family />} />
           <Route path="/about" element={<About />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="/browse" element={<Navigate to="/" replace />} />
           <Route path="/category/:id" element={<Category />} />
           <Route path="/popular" element={<PopularSearches />} />

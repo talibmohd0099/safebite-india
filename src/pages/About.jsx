@@ -1,7 +1,6 @@
 // src/pages/About.jsx
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import NotificationSettings from '../components/NotificationSettings';
 
 export default function About() {
   const navigate = useNavigate();
@@ -27,8 +26,6 @@ export default function About() {
           Food label transparency for every Indian consumer
         </p>
       </div>
-
-      <NotificationSettings />
 
       {/* Mission */}
       <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-2xl p-5 mb-4">
