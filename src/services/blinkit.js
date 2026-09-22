@@ -25,17 +25,23 @@ const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 
 // The groups worth scanning for a food-label app. The sitemap also
 // carries fashion, electronics and pet care, which have nothing to score.
+//
+// Order matters here (see scrape-blinkit.js's `--all` target sort, which
+// walks this array's own order, not the sitemap's) -- everyday-purchase
+// groups first, so a catalog too large to finish in one sweep still fills
+// in the products most people would actually scan before it reaches the
+// long tail of niche/occasional-buy items.
 export const FOOD_GROUPS = [
-  'atta-rice-dal',
-  'bakery-biscuits',
-  'cold-drinks-juices',
   'dairy-breakfast',
-  'dry-fruits-masala-oil',
-  'instant-frozen-food',
-  'munchies',
-  'sauces-spreads',
-  'sweet-tooth',
+  'atta-rice-dal',
   'tea-coffee-milk-drinks',
+  'bakery-biscuits',
+  'munchies',
+  'cold-drinks-juices',
+  'instant-frozen-food',
+  'sauces-spreads',
+  'dry-fruits-masala-oil',
+  'sweet-tooth',
 ];
 
 const NUTRITION_FIELDS = [

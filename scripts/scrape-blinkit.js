@@ -139,7 +139,12 @@ async function main() {
 
   let targets;
   if (SCRAPE_ALL) {
-    targets = sitemaps.filter((s) => FOOD_GROUPS.includes(s.group));
+    // .filter() alone keeps the sitemap's own (arbitrary) order -- sorting
+    // by FOOD_GROUPS' index is what actually makes that array's order
+    // mean anything, so everyday-purchase groups get walked first.
+    targets = sitemaps
+      .filter((s) => FOOD_GROUPS.includes(s.group))
+      .sort((a, b) => FOOD_GROUPS.indexOf(a.group) - FOOD_GROUPS.indexOf(b.group));
     console.log(`Walking ${targets.length} food categories, up to ${PER_CATEGORY} products each.`);
   } else {
     targets = sitemaps.filter((s) => s.category.includes(CATEGORY) || s.group.includes(CATEGORY));
