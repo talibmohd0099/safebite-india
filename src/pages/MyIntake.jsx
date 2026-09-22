@@ -217,6 +217,18 @@ export default function MyIntake() {
 
   // The ring's own math -- calorie share per macro, never a personal
   // target. Only built when at least one macro is actually known.
+  //
+  // A real bug found from a live screenshot: this used to divide each
+  // macro's kcal by the SUM OF THE MACROS (protein+carbs+fat via 4/4/9
+  // kcal-per-gram), not by the real logged total shown in the ring's own
+  // centre -- so the ring silently explained a smaller, different number
+  // (e.g. 560kcal) than the 714kcal sitting right inside it. That mismatch
+  // is real and expected (a label's own stated "Energy" rarely equals its
+  // macros recomputed via Atwater factors exactly -- rounding, fibre,
+  // alcohol etc. all cause real gaps), so the fix isn't to force them to
+  // match: every segment's fraction is now of the TRUE logged total, and
+  // any calories that aren't accounted for by a known macro are simply
+  // left as unfilled ring track -- honest, not hidden, never invented.
   const macroKcal = {};
   let macroKcalTotal = 0;
   for (const key of ['proteinG', 'carbohydrateG', 'totalFatG']) {
@@ -226,11 +238,17 @@ export default function MyIntake() {
       macroKcalTotal += kcal;
     }
   }
-  const ringSegments = macroKcalTotal > 0
-    ? Object.entries(macroKcal).map(([key, kcal]) => ({ key, fraction: kcal / macroKcalTotal, color: MACRO_COLORS[key] }))
+  // Normally the label's own stated energy (what's shown in the ring's
+  // centre); falls back to the macro sum on the rare chance macros are
+  // known but calories genuinely aren't, and is never let the macros
+  // themselves overflow past a full ring if they add up to slightly more
+  // than the stated total.
+  const ringDenominator = Math.max(totals.caloriesKcal || 0, macroKcalTotal);
+  const ringSegments = ringDenominator > 0
+    ? Object.entries(macroKcal).map(([key, kcal]) => ({ key, fraction: kcal / ringDenominator, color: MACRO_COLORS[key] }))
     : [];
-  const fatEnergyPct = macroKcalTotal > 0 && typeof macroKcal.totalFatG === 'number'
-    ? Math.round((macroKcal.totalFatG / macroKcalTotal) * 100)
+  const fatEnergyPct = ringDenominator > 0 && typeof macroKcal.totalFatG === 'number'
+    ? Math.round((macroKcal.totalFatG / ringDenominator) * 100)
     : null;
 
   const sodiumLimit = NUTRIENT_LIMITS.find((l) => l.key === 'sodiumMg');
@@ -389,13 +407,13 @@ export default function MyIntake() {
                           <div className="h-full bg-pink-400" style={{ width: `${Math.min(100, (addedSugar / totalSugar) * 100)}%` }} />
                         </div>
                         <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed">
-                          <strong className="text-slate-600 dark:text-slate-300">{Math.round(addedSugar * 10) / 10}g</strong> of the {Math.round(totalSugar * 10) / 10}g total is reported as added/free sugar — the rest is naturally occurring.
-                          WHO recommends keeping free sugars under 10% of total energy intake.
+                          <strong className="text-slate-600 dark:text-slate-300">{Math.round(addedSugar * 10) / 10}g</strong> of the {Math.round(totalSugar * 10) / 10}g total is reported as <strong className="text-slate-600 dark:text-slate-300">added sugar</strong> — the rest is naturally occurring.
+                          {' '}WHO's &lt;10%-of-energy guidance is specifically about "free sugars" (added sugars, plus sugars in honey, syrups and fruit juice) — a related but not always identical figure to added sugar as reported here.
                         </p>
                       </>
                     ) : (
                       <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed">
-                        WHO recommends keeping free sugars under 10% of total energy intake — the products logged today don't separately break out how much of this is added vs. naturally occurring.
+                        WHO recommends keeping free sugars (added sugars, plus sugars in honey, syrups and fruit juice) under 10% of total energy intake — the products logged today don't separately break out how much of this sugar is added vs. naturally occurring.
                       </p>
                     )}
                   </div>
