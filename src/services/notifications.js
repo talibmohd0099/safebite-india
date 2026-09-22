@@ -1,15 +1,23 @@
 // src/services/notifications.js
 //
 // Opt-in local notifications for the Android app (no server, no Firebase):
-//   * "Did you know?"  -- one curated tip a day, at a time the person picks
+//   * "Did you know?"  -- one curated tip a day
 //   * "New on FoodGuard" -- a recently added product (name + score)
 //
-// A local notification can't fetch anything while the app is closed, so
-// the next few days are scheduled ahead of time -- whenever the app opens
-// or comes back to the foreground -- with the real content known at that
+// Deliberately no time-of-day picker -- just an on/off switch per kind, at a
+// fixed internal time (see TIPS_TIME/PRODUCTS_TIME). Turning a switch on
+// also fires that kind's real notification within a few seconds (see
+// notifyNow), so the person gets immediate, visible proof it's actually
+// working instead of waiting up to a day for the first one -- and for "new
+// products" specifically, that immediate one already IS the "a new product
+// was added" alert, not a placeholder.
+//
+// A local notification can't fetch anything while the app is closed, so the
+// next few days are scheduled ahead of time -- whenever the app opens or
+// comes back to the foreground -- with the real content known at that
 // moment (today's tip rotation, the newest products in the catalog). Each
-// refresh cancels and re-schedules, so content stays current for anyone
-// who opens the app at least once a week.
+// refresh cancels and re-schedules, so content stays current for anyone who
+// opens the app at least once a week.
 //
 // Off by default. Nothing is scheduled, and no permission is asked, until
 // the person turns a toggle on in About > Notifications.
@@ -22,10 +30,16 @@ const CHANNEL_ID = 'foodguard-updates';
 const DAYS_AHEAD = 7;
 const TIP_ID_BASE = 1000;
 const PRODUCT_ID_BASE = 2000;
+const IMMEDIATE_ID_BASE = 9000; // the "it's working" / "new product" fired right on toggle-on
+
+// Not user-configurable -- picked once, good enough for most people, and
+// removes a whole screen of setup for a two-switch feature.
+export const TIPS_TIME = '09:00';
+export const PRODUCTS_TIME = '18:00';
 
 export const DEFAULT_PREFS = {
-  tips: { on: false, time: '09:00' },
-  products: { on: false, time: '18:00' },
+  tips: { on: false },
+  products: { on: false },
 };
 
 export const isNativeApp = () => {
@@ -36,8 +50,8 @@ export function loadPrefs() {
   try {
     const saved = JSON.parse(localStorage.getItem(PREFS_KEY) || 'null');
     return {
-      tips: { ...DEFAULT_PREFS.tips, ...(saved?.tips || {}) },
-      products: { ...DEFAULT_PREFS.products, ...(saved?.products || {}) },
+      tips: { on: Boolean(saved?.tips?.on) },
+      products: { on: Boolean(saved?.products?.on) },
     };
   } catch {
     return structuredClone(DEFAULT_PREFS);
@@ -59,6 +73,12 @@ export function parseTime(value, fallback = '09:00') {
 
 const clip = (text, n) => (text.length <= n ? text : `${text.slice(0, n - 1).trimEnd()}…`);
 
+const productLine = (p) => {
+  const scoreText = p && typeof p.score === 'number' ? ` — scored ${p.score}/100${p.verdict ? ` (${p.verdict})` : ''}` : '';
+  return p ? `${p.productName}${scoreText}` : 'Fresh products were just added — see what they score.';
+};
+const productRoute = (p) => (p ? `/?q=${encodeURIComponent(p.productName)}` : '/');
+
 /**
  * Pure: turn preferences + the newest products into the notifications to
  * schedule. `now` and `products` are injected so it can be tested.
@@ -75,7 +95,7 @@ export function buildSchedule(prefs, now = new Date(), products = []) {
 
   if (prefs.tips?.on) {
     for (let i = 0; i < DAYS_AHEAD; i++) {
-      const at = slot(i, prefs.tips.time);
+      const at = slot(i, TIPS_TIME);
       if (!at) continue;
       const tip = getTodaysTip(dayOfYear(at));
       out.push({ id: TIP_ID_BASE + i, title: '💡 Did you know?', body: clip(tip, 110), largeBody: tip, at, route: '/' });
@@ -85,18 +105,10 @@ export function buildSchedule(prefs, now = new Date(), products = []) {
   if (prefs.products?.on) {
     const usable = products.filter((p) => p?.productName);
     for (let i = 0; i < DAYS_AHEAD; i++) {
-      const at = slot(i, prefs.products.time);
+      const at = slot(i, PRODUCTS_TIME);
       if (!at) continue;
       const p = usable.length ? usable[i % usable.length] : null;
-      const scoreText = p && typeof p.score === 'number' ? ` — scored ${p.score}/100${p.verdict ? ` (${p.verdict})` : ''}` : '';
-      out.push({
-        id: PRODUCT_ID_BASE + i,
-        title: '🆕 New on FoodGuard',
-        body: p ? `${p.productName}${scoreText}` : 'Fresh products were just added — see what they score.',
-        at,
-        // Opens Home with the product name in the search box.
-        route: p ? `/?q=${encodeURIComponent(p.productName)}` : '/',
-      });
+      out.push({ id: PRODUCT_ID_BASE + i, title: '🆕 New on FoodGuard', body: productLine(p), at, route: productRoute(p) });
     }
   }
 
@@ -138,6 +150,15 @@ async function cancelOurs(LocalNotifications) {
   try { await LocalNotifications.cancel({ notifications }); } catch { /* nothing pending */ }
 }
 
+async function ensureChannel(LocalNotifications) {
+  await LocalNotifications.createChannel({
+    id: CHANNEL_ID,
+    name: 'Daily tips & new products',
+    description: 'A daily food tip and newly added products',
+    importance: 3,
+  }).catch(() => {});
+}
+
 /**
  * Re-schedule everything from the saved preferences. Safe to call often
  * (app start, resume, after a toggle). Does nothing on the web.
@@ -152,12 +173,7 @@ export async function syncNotifications(fetchRecentProducts) {
     if (!prefs.tips.on && !prefs.products.on) return;
     if ((await permissionState()) !== 'granted') return;
 
-    await LocalNotifications.createChannel({
-      id: CHANNEL_ID,
-      name: 'Daily tips & new products',
-      description: 'A daily food tip and newly added products',
-      importance: 3,
-    }).catch(() => {});
+    await ensureChannel(LocalNotifications);
 
     let products = [];
     if (prefs.products.on && fetchRecentProducts) {
@@ -180,6 +196,58 @@ export async function syncNotifications(fetchRecentProducts) {
     });
   } catch {
     // Notifications are a nicety -- never let them break the app.
+  }
+}
+
+const IMMEDIATE_DELAY_MS = 4000;
+
+/**
+ * Fires ONE real notification of the given kind a few seconds from now --
+ * called the moment a toggle is switched on, so the person gets immediate,
+ * visible proof it's working rather than waiting for the next scheduled
+ * slot. For 'products' this is a genuine "a product was recently added"
+ * alert, not a placeholder -- see productLine/productRoute above.
+ */
+export async function notifyNow(kind, fetchRecentProducts) {
+  if (!isNativeApp()) return;
+  try {
+    if ((await permissionState()) !== 'granted') return;
+    const LocalNotifications = plugin();
+    await ensureChannel(LocalNotifications);
+    const at = new Date(Date.now() + IMMEDIATE_DELAY_MS);
+
+    if (kind === 'tips') {
+      const tip = getTodaysTip(dayOfYear(new Date()));
+      await LocalNotifications.schedule({
+        notifications: [{
+          id: IMMEDIATE_ID_BASE,
+          title: '💡 Did you know?',
+          body: clip(tip, 110),
+          largeBody: tip,
+          channelId: CHANNEL_ID,
+          schedule: { at, allowWhileIdle: true },
+          extra: { route: '/' },
+        }],
+      });
+    } else if (kind === 'products') {
+      let products = [];
+      if (fetchRecentProducts) {
+        try { products = await fetchRecentProducts(5); } catch { products = []; }
+      }
+      const p = products.find((x) => x?.productName) || null;
+      await LocalNotifications.schedule({
+        notifications: [{
+          id: IMMEDIATE_ID_BASE + 1,
+          title: '🆕 New on FoodGuard',
+          body: productLine(p),
+          channelId: CHANNEL_ID,
+          schedule: { at, allowWhileIdle: true },
+          extra: { route: productRoute(p) },
+        }],
+      });
+    }
+  } catch {
+    // Best-effort confirmation ping -- never let it break the toggle.
   }
 }
 
