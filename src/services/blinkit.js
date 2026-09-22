@@ -52,6 +52,24 @@ export const FOOD_GROUPS = [
   'dry-fruits-masala-oil',
 ];
 
+// How many NEW products `--all` mode takes from a category per round --
+// tiered the same way FOOD_GROUPS' own order is, so top-priority groups
+// don't just get walked first, they finish scraping much sooner too.
+// Middle groups get enough to make steady progress without crowding out
+// the top tier; bottom groups get just enough to eventually finish.
+export const FOOD_GROUP_QUOTA = {
+  'dairy-breakfast': 8,
+  munchies: 8,
+  'bakery-biscuits': 8,
+  'tea-coffee-milk-drinks': 8,
+  'cold-drinks-juices': 8,
+  'instant-frozen-food': 8,
+  'sauces-spreads': 4,
+  'atta-rice-dal': 4,
+  'sweet-tooth': 1,
+  'dry-fruits-masala-oil': 1,
+};
+
 const NUTRITION_FIELDS = [
   'Energy', 'Protein', 'Total Carbohydrates', 'Added Sugar', 'Total Sugar',
   'Total Fat', 'Saturated Fat', 'Trans Fat', 'Unsaturated Fat', 'Sodium', 'Calcium',

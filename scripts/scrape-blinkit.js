@@ -27,15 +27,22 @@
 //
 // Usage:
 //   node scripts/scrape-blinkit.js --list
-//   node scripts/scrape-blinkit.js --all --per-category 8
+//   node scripts/scrape-blinkit.js --all                          (per-category quota comes from FOOD_GROUP_QUOTA, not a flag)
 //   node scripts/scrape-blinkit.js --category soft-drinks --limit 15
-//   node scripts/scrape-blinkit.js --all --per-category 5 --dry-run --no-ai
-//   node scripts/scrape-blinkit.js --all --per-category 5 --no-ai --image-fallback
+//   node scripts/scrape-blinkit.js --all --dry-run --no-ai
+//   node scripts/scrape-blinkit.js --all --no-ai --image-fallback
+//
+// --all mode gets its per-category count from src/services/blinkit.js's
+// FOOD_GROUP_QUOTA instead of --per-category now, so higher-priority
+// categories get more products per round, not just an earlier turn.
+// --per-category only still matters as a fallback for a food group not
+// yet listed there; a manual --category run uses --limit instead.
 
 import { createClient } from '@supabase/supabase-js';
 
 import {
   FOOD_GROUPS,
+  FOOD_GROUP_QUOTA,
   getProductSitemaps,
   productUrlsFrom,
   scrapeProduct,
@@ -145,7 +152,12 @@ async function main() {
     targets = sitemaps
       .filter((s) => FOOD_GROUPS.includes(s.group))
       .sort((a, b) => FOOD_GROUPS.indexOf(a.group) - FOOD_GROUPS.indexOf(b.group));
-    console.log(`Walking ${targets.length} food categories, up to ${PER_CATEGORY} products each.`);
+    // --per-category is ignored in --all mode -- FOOD_GROUP_QUOTA decides
+    // per-group instead, so top-priority groups don't just get walked
+    // first, they finish scraping sooner too. (--limit / --per-category
+    // still apply to a manual single-category run, below.)
+    const quotaTiers = [...new Set(FOOD_GROUPS.map((g) => FOOD_GROUP_QUOTA[g] ?? PER_CATEGORY))].sort((a, b) => b - a);
+    console.log(`Walking ${targets.length} food categories -- ${quotaTiers.join('/')} products each per round (higher for higher-priority groups).`);
   } else {
     targets = sitemaps.filter((s) => s.category.includes(CATEGORY) || s.group.includes(CATEGORY));
     if (targets.length === 0) {
@@ -177,7 +189,7 @@ async function main() {
     if (SCRAPE_ALL && cursor?.exhausted) continue;
 
     const startIndex = SCRAPE_ALL ? cursor?.next_index || 0 : 0;
-    const max = SCRAPE_ALL ? PER_CATEGORY : LIMIT;
+    const max = SCRAPE_ALL ? (FOOD_GROUP_QUOTA[sitemap.group] ?? PER_CATEGORY) : LIMIT;
 
     const all = await productUrlsFrom(sitemap.url);
     // null means the fetch failed — don't let a transient network error
