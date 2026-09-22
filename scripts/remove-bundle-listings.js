@@ -1,10 +1,10 @@
 // scripts/remove-bundle-listings.js
 //
-// Removes gift packs / hampers / potlis / assorted packs / combos that are
-// already in product_reports (see bundleListing.js for why they can't be
-// scored honestly). Dry run by default: prints every product it would
-// remove. Blinkit's raw rows stay in blinkit_products, so nothing is
-// unrecoverable.
+// Removes gift packs / hampers / potlis / assorted packs / combos / multi-
+// packs ("Pack of N") that are already in product_reports (see
+// bundleListing.js for why each kind is excluded). Dry run by default:
+// prints every product it would remove. Blinkit's raw rows stay in
+// blinkit_products, so nothing is unrecoverable.
 //
 // Usage:
 //   node scripts/remove-bundle-listings.js            (dry run)

@@ -1,15 +1,21 @@
 // src/services/bundleListing.js
 //
 // Listings that are a BUNDLE, not one product: gift packs and hampers,
-// potlis, variety packs, samplers, combos. A bundle has one ingredients
-// field (often just "Mix Dry Fruits" or one item's list) that can't
-// describe everything in the box, so any score for it is meaningless --
-// Farmley "Mix Dry Fruit Potli Gift Pack" scored 100 on the single
-// ingredient "Mix Dry Fruits". These are skipped at scrape/report time and
-// swept out of the catalog with scripts/remove-bundle-listings.js.
+// potlis, variety packs, samplers, combos, and multi-packs ("Pack of 2").
+// A gift/hamper/variety listing has one ingredients field (often just
+// "Mix Dry Fruits" or one item's list) that can't describe everything in
+// the box, so any score for it is meaningless -- Farmley "Mix Dry Fruit
+// Potli Gift Pack" scored 100 on the single ingredient "Mix Dry Fruits".
+// "Pack of N" is a different reason: its own score would actually still be
+// correct (the same product repeated), but it's just a duplicate catalog
+// entry of whatever single-pack listing already exists for it, and its own
+// product photo (showing the multiple units together, a staging choice
+// Blinkit made for that specific listing rather than a plain reproduction
+// of the manufacturer's own pack shot) is a needlessly identifiable thing
+// to be carrying around. Skipped at scrape/report time and swept out of
+// the catalog with scripts/remove-bundle-listings.js.
 //
 // Deliberately NOT caught:
-//  - "Pack of 2/3": the same product repeated -- its score is still right.
 //  - "combo" as marketing on one product ("Orange Juice Combo With Pulp").
 //  - "Assorted" on its own: usually flavours of ONE product (an "Assorted
 //    Flavours" electrolyte or protein bar) -- an assorted GIFT PACK is still
@@ -24,6 +30,7 @@ const BUNDLE_PATTERNS = [
   /\bvariety\s+(pack|box|set)\b/i,
   /\bsampler\b/i,
   /\bcombo\b(?!\s+with\s+pulp)/i,
+  /\bpack\s+of\s+\d+\b/i,
 ];
 
 const NUTRITION_PLUS =
