@@ -41,6 +41,7 @@ import AdminGuard from './pages/admin/AdminGuard';
 import AdminProductList from './pages/admin/AdminProductList';
 import AdminProductForm from './pages/admin/AdminProductForm';
 import AdminFlagsList from './pages/admin/AdminFlagsList';
+import AdminDataIssuesList from './pages/admin/AdminDataIssuesList';
 import AdminDuplicates from './pages/admin/AdminDuplicates';
 import AdminImport from './pages/admin/AdminImport';
 import AdminActivityLog from './pages/admin/AdminActivityLog';
@@ -231,6 +232,7 @@ function AppShell() {
           <Route path="/admin/products/:id/copy" element={<AdminGuard><AdminProductForm copyMode /></AdminGuard>} />
           <Route path="/admin/products/:id/history" element={<AdminGuard><AdminProductHistory /></AdminGuard>} />
           <Route path="/admin/flags" element={<AdminGuard><AdminFlagsList /></AdminGuard>} />
+          <Route path="/admin/data-issues" element={<AdminGuard><AdminDataIssuesList /></AdminGuard>} />
           <Route path="/admin/submissions" element={<AdminGuard><AdminSubmissionsList /></AdminGuard>} />
           <Route path="/admin/duplicates" element={<AdminGuard><AdminDuplicates /></AdminGuard>} />
           <Route path="/admin/barcode-check" element={<AdminGuard><AdminBarcodeCheck /></AdminGuard>} />
