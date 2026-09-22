@@ -78,10 +78,11 @@ export function parseServingGrams(servingSize, productQuantity) {
 // Personal FoodGuard's nutrition-priority matching (personalAssessment.js)
 // whenever it's available, since a real number is always better than
 // inferring from an ingredient's category/status tag. OFF stores
-// sodium/sugar/fat/energy/protein in GRAMS (or kcal) per 100g regardless
-// of what unit the contributor originally entered (confirmed against a
-// real product's live API response), so no unit-detection is needed
-// here, just a straight per-100g -> per-pack scale-up.
+// sugar/fat/energy/protein reliably in GRAMS (or kcal) per 100g -- but
+// sodium specifically is NOT always reliable (see the sodium_100g guard
+// below, confirmed against a real product's live API response still
+// carrying the wrong unit), so that one field does get a plausibility
+// check before being trusted as grams.
 export function extractNutrientsForHabitCheck(product) {
   const n = product?.nutriments;
   if (!n) return null;
@@ -89,7 +90,21 @@ export function extractNutrientsForHabitCheck(product) {
   const packGrams = parseServingGrams(product.serving_size, product.product_quantity);
   const scale = packGrams ? packGrams / 100 : 1;
 
-  const sodiumG = n.sodium_100g;
+  // A real, confirmed OFF data-quality issue: a contributor sometimes types
+  // the MILLIGRAM figure straight into this field, which OFF's schema
+  // defines as grams-per-100g -- e.g. "1247.1" meant as 1,247mg lands in
+  // sodium_100g as if it were 1,247.1 GRAMS of sodium. No real food can
+  // contain more sodium than pure salt does (sodium is ~39.3% of NaCl's
+  // mass, so ~39.3g sodium is the ceiling for 100g of anything) -- a
+  // sodium_100g value already past that, before any unit conversion, can
+  // only be a milligram figure sitting in the wrong field, never a
+  // genuine gram measurement. Confirmed live: Sunfeast YiPPee! Noodles'
+  // actual OFF entry has sodium_100g: 1247.1 -- real instant-noodle
+  // sodium is ~1,200mg/100g, not 1,247,100mg, which is what naively
+  // trusting the field as grams and multiplying by 1000 would produce.
+  const MAX_PLAUSIBLE_SODIUM_G_PER_100G = 40; // pure salt's real ceiling is ~39.3g
+  const sodiumAlreadyInMg = typeof n.sodium_100g === 'number' && n.sodium_100g > MAX_PLAUSIBLE_SODIUM_G_PER_100G;
+  const sodiumG = sodiumAlreadyInMg ? n.sodium_100g / 1000 : n.sodium_100g;
   // WHO's sugar guidance is specifically about FREE/ADDED sugars, not
   // sugars naturally present in whole foods -- prefer that field where
   // OFF has it, and only fall back to total sugar when it doesn't.

@@ -114,3 +114,33 @@ test('scaled figures are stored rounded, not as floating-point noise', () => {
   assert.equal(result.nutrients.sodiumMg, 720);
   assert.equal(result.nutrients.proteinG, 6);
 });
+
+// A real, confirmed OFF data-quality bug (not invented): a contributor
+// types the MILLIGRAM figure into sodium_100g, a field OFF's schema
+// defines as grams -- naively multiplying by 1000 then produces a
+// million-scale sodium reading. Sunfeast YiPPee! Noodles' actual live OFF
+// entry has sodium_100g: 1247.1 (confirmed against the real API); real
+// instant-noodle sodium is ~1,200mg/100g.
+test('a sodium_100g value already past what pure salt can reach is treated as already-mg, not multiplied by 1000 again', () => {
+  const result = extractNutrientsForHabitCheck({
+    nutriments: { sodium_100g: 1247.1, 'energy-kcal_100g': 459, proteins_100g: 9 },
+  });
+  assert.equal(result.nutrients.sodiumMg, 1247.1);
+  assert.equal(result.nutrientsPer100.sodiumMg, 1247.1);
+});
+
+test('a genuinely high but physically real gram-scale sodium reading (near pure salt) is still trusted as grams', () => {
+  // A real product this must NOT misfire on: a near-pure salt/seasoning
+  // blend can legitimately state close to salt's own sodium ceiling.
+  const result = extractNutrientsForHabitCheck({
+    nutriments: { sodium_100g: 38, 'energy-kcal_100g': 0 },
+  });
+  assert.equal(result.nutrients.sodiumMg, 38000);
+});
+
+test('an ordinary, unremarkable sodium_100g value is untouched by the guard', () => {
+  const result = extractNutrientsForHabitCheck({
+    nutriments: { sodium_100g: 0.283, 'energy-kcal_100g': 91 },
+  });
+  assert.equal(result.nutrients.sodiumMg, 283);
+});
