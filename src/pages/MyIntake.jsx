@@ -341,6 +341,18 @@ export default function MyIntake() {
                 Plus <span className="font-bold text-white">{Math.round(totalSugar * 10) / 10}g</span> total sugar (sugar's calories are already counted within carbs above).
               </p>
             )}
+            {/* The ring rarely fills all the way -- some logged foods only
+                have a calorie figure with no protein/carb/fat breakdown on
+                their label (common on this catalog), so their calories
+                count towards the centre number but can't be split into a
+                slice. Spelling that out here stops the gap from reading as
+                a bug -- a real screenshot of this exact gap was flagged as
+                "percentages don't add up to 100%" before this line existed. */}
+            {ringSegments.length > 0 && ringDenominator > macroKcalTotal + 0.5 && (
+              <p className="relative text-[11px] text-white/65 mt-2">
+                Ring doesn't fill up to 100%? Some logged foods only had a calorie figure, no full protein/carb/fat breakdown on their label -- those calories still count in the centre number, just not in a slice.
+              </p>
+            )}
           </div>
 
           {hasStandoutSection && (
