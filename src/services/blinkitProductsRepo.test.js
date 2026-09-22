@@ -76,3 +76,23 @@ test('extractNutrientsForHabitCheck with no serving leaves nutrients and per-100
   assert.equal(result.nutrients.caloriesKcal, 454);
   assert.equal(result.nutrientsPer100.caloriesKcal, 454);
 });
+
+// A real, confirmed Blinkit page bug: some listings print sodium suffixed
+// "g" when the real figure is milligrams -- e.g. Topnut Sriracha Cashew's
+// actual live listing reads "710 g" (should be 710 mg). No real food can
+// carry more sodium than pure salt (~39.3g/100g), so a "g" reading already
+// past that can only be a mg figure with the wrong unit attached.
+test('sodium suffixed "g" but past what pure salt can reach is treated as already-mg', () => {
+  const result = extractNutrientsForHabitCheck({ Sodium: '710 g', Energy: '550 kcal' });
+  assert.equal(result.nutrients.sodiumMg, 710);
+});
+
+test('a genuinely high but physically real sodium reading in grams is still converted normally', () => {
+  const result = extractNutrientsForHabitCheck({ Sodium: '35 g', Energy: '0 kcal' });
+  assert.equal(result.nutrients.sodiumMg, 35000);
+});
+
+test('an ordinary sodium reading in mg is unaffected by the guard', () => {
+  const result = extractNutrientsForHabitCheck({ Sodium: '450 mg', Energy: '400 kcal' });
+  assert.equal(result.nutrients.sodiumMg, 450);
+});

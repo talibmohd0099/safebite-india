@@ -72,3 +72,19 @@ test('potato wafers and plain chips remain fried', () => {
   assert.equal(t('Balaji Wafers Rumbles Potato Chips').foodType, 'fried-snack');
   assert.equal(t('POTATO WAFERS').foodType, 'fried-snack');
 });
+
+test('a full meal seasoned with masala/spices is NOT a condiment -- real bug: this wrongly suppressed legitimate high-sodium warnings', () => {
+  assert.equal(t('Maggi Masala Noodles').foodType, 'ready-meal');
+  assert.equal(t('Saffola Masala Oats').foodType, 'staple');
+  assert.equal(t('Knorr soupy noodles mast masala').foodType, 'ready-meal');
+  assert.equal(t('Masala Oats and Millets').foodType, 'staple');
+  assert.equal(t('Yippee Magic Masala Instant Noodles with Added Veggies').foodType, 'ready-meal');
+  assert.equal(t('Cookd Ambur Masala Biryani Paste - Ready to Cook').foodType, 'condiment'); // paste, not the biryani itself
+});
+
+test('real masala/spice/condiment products are unaffected by the meal exclusion', () => {
+  assert.equal(t('Everest Chaat Masala').foodType, 'condiment');
+  assert.equal(t('MTR Sambar Masala').foodType, 'condiment');
+  assert.equal(t('Ginger Garlic Paste').foodType, 'condiment');
+  assert.equal(t('Kissan Tomato Ketchup').foodType, 'condiment');
+});

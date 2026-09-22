@@ -94,7 +94,19 @@ export function extractNutrientsForHabitCheck(nutrition, servingSize = null) {
   const toMg = (parsed) => (!parsed ? null : parsed.unit === 'g' ? parsed.value * 1000 : parsed.value);
   const toG = (parsed) => (!parsed ? null : parsed.unit === 'mg' ? parsed.value / 1000 : parsed.value);
 
-  const sodiumMg = toMg(parseAmount(nutrition['Sodium']));
+  // A real, confirmed Blinkit page bug (same family as the OFF one in
+  // openFoodFacts.js): some listings print sodium with the wrong unit
+  // suffix -- e.g. "710 g" where the real figure is 710mg. Confirmed live
+  // on two Absolute Nuts makhana listings from the same seller (both
+  // print sodium suffixed "g" at values in the hundreds) and Topnut
+  // Sriracha Cashew ("710 g"). No real food can contain more sodium than
+  // pure salt does (~39.3g/100g) -- a "g" reading already past that,
+  // before any conversion, can only be a milligram figure with the wrong
+  // unit attached, not a genuine gram measurement.
+  const MAX_PLAUSIBLE_SODIUM_G_PER_SERVING = 40;
+  const rawSodium = parseAmount(nutrition['Sodium']);
+  const sodiumUnitLooksWrong = rawSodium?.unit === 'g' && rawSodium.value > MAX_PLAUSIBLE_SODIUM_G_PER_SERVING;
+  const sodiumMg = sodiumUnitLooksWrong ? rawSodium.value : toMg(rawSodium);
   const addedSugarG = toG(parseAmount(nutrition['Added Sugar']) || parseAmount(nutrition['Total Sugar']));
   const saturatedFatG = toG(parseAmount(nutrition['Saturated Fat']));
   const transFatG = toG(parseAmount(nutrition['Trans Fat']));

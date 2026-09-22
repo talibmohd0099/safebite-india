@@ -201,7 +201,17 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
     // are an ADULT 2000-kcal reference diet -- applying an adult daily
     // habit projection to a baby's feed would be wrong on two counts at
     // once (wrong population, wrong framing), not just one.
-    if (nutrientsInfo && !report.isCondimentOrSeasoning && !report.isInfantFormula && !isSmallPortionFood(report.productName, nutrientsInfo.servingGrams)) {
+    //
+    // foodType 'condiment'/'supplement' is the same isCondimentOrSeasoning
+    // reasoning as a safety net -- caught a real live bug: an electrolyte
+    // hydration mix (a powder reconstituted in water, not eaten by the
+    // 100g) showed "891% of your daily sodium limit" because Gemini's
+    // insights call never ran/returned for it and isCondimentOrSeasoning
+    // was simply never set. The keyword classifier (classifyFoodType,
+    // which DOES recognise "electrolyte"/"supplement") gives a second,
+    // deterministic chance to catch exactly this case.
+    const isSmallDoseType = report.foodType === 'condiment' || report.foodType === 'supplement';
+    if (nutrientsInfo && !report.isCondimentOrSeasoning && !report.isInfantFormula && !isSmallDoseType && !isSmallPortionFood(report.productName, nutrientsInfo.servingGrams)) {
       const habitCheck = buildDailyHabitCheck(nutrientsInfo.nutrients, nutrientsInfo.servingGrams, nutrientsInfo.servingUnit || 'g');
       if (habitCheck) {
         report.dailyHabitCheck = habitCheck;

@@ -37,7 +37,14 @@ const RULES = [
   { type: 'sweet-snack', re: /\b(biscuits?|cookies?|cake|cakes|pastry|brownie|muffin|cupcake|wafer (bar|cream|cube)|chocolates?|candy|candies|toffee|mithai|barfi|laddu|halwa|rasgulla|gulab jamun|jalebi|pheni|chikki|cream roll|rusk|donut|croissant|wafer cube)\b/i },
   { type: 'beverage', re: /\b(juice|drink|soda|cola|lassi|buttermilk|sharbat|squash|syrup|thandai|energy drink|coffee|tea|milkshake|shake|kombucha|coconut water)\b/i },
   { type: 'dairy', re: /\b(milk|curd|dahi|paneer|cheese|yogurt|yoghurt|cream|khoa|mawa)\b/i },
-  { type: 'condiment', re: /\b(masala|sauce|ketchup|pickle|achar|chutney|mayonnaise|spread|seasoning|jam|vinegar|paste|spice)\b/i },
+  // "Masala" (and "spice") is the trap here: "Maggi Masala Noodles" and
+  // "Saffola Masala Oats" are FULL MEALS seasoned with masala, not masala
+  // itself -- a real bug this caught live: classifying them as 'condiment'
+  // wrongly suppressed their (legitimate, useful) high-sodium daily-habit
+  // warning, the opposite of what foodType is for. Same protection
+  // dailyHabitCheck.js's own ORDINARY_PORTION_RE already has for exactly
+  // this reason -- an ordinary meal/staple word alongside "masala" wins.
+  { type: 'condiment', re: /\b(masala|sauce|ketchup|pickle|achar|chutney|mayonnaise|spread|seasoning|jam|vinegar|paste|spice)\b/i, notRe: /\b(noodles?|pasta|vermicelli|oats?|rice|dal|cereals?|muesli|granola|bread|chips|crisps|biscuits?|cookies?|soup|paratha|roti|idli|dosa|upma|poha)\b/i },
   { type: 'ready-meal', re: /\b(noodles|pasta|soup|ready to eat|instant|frozen|pizza|burger|meal)\b/i },
   { type: 'staple', re: /\b(atta|maida|flour|rice|dal|lentil|pulses?|oats|cornflakes|muesli|bread|besan|sooji|rava|poha|semolina|wheat|millet|ragi|quinoa|sugar|salt|jaggery)\b/i },
 ];
