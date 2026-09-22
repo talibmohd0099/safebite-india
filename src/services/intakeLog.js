@@ -90,27 +90,69 @@ export function getAllEntries() {
 
 const isSameLocalDay = (isoA, isoB) => new Date(isoA).toDateString() === new Date(isoB).toDateString();
 
-/** Today's entries (by the device's own local calendar day), most recent first. */
+/** Every entry logged on the same local calendar day as `date`, most recent first. */
+export function getEntriesForDay(date = new Date()) {
+  return readLog().filter((e) => isSameLocalDay(e.loggedAt, date.toISOString())).reverse();
+}
+
+/** Today's entries -- kept as its own name since it's the common case. */
 export function getTodaysEntries(now = new Date()) {
-  return readLog().filter((e) => isSameLocalDay(e.loggedAt, now.toISOString())).reverse();
+  return getEntriesForDay(now);
+}
+
+// A label doesn't need its own field if a product simply never split total
+// vs. added sugar on the label -- see nutrientBasis.js's own dedup rule
+// (totalSugarG is only stored at all when it actually differs from
+// addedSugarG; otherwise addedSugarG alone stands in for "the sugar
+// figure"). Naively summing entry.totalSugarG across a day would silently
+// DROP every entry that never had a distinct total figure, so a day's
+// "Total sugar" could end up counting fewer products than its own "Added
+// sugar" total -- two numbers that look comparable but aren't built from
+// the same set of entries. Falling back per entry keeps both totals built
+// from the same set: every entry that has ANY sugar figure contributes to
+// both, using the more specific one when it exists.
+function effectiveTotalSugar(nutrients) {
+  return typeof nutrients?.totalSugarG === 'number' ? nutrients.totalSugarG : nutrients?.addedSugarG;
 }
 
 /**
- * Sums today's entries. Returns { totals, entryCount } -- totals only
+ * Sums a day's entries. Returns { totals, entryCount } -- totals only
  * includes keys at least one entry actually had (no zero-filled fields
  * pretending to be real data).
  */
-export function getTodaysTotals(now = new Date()) {
-  const entries = getTodaysEntries(now);
+export function getTotalsForDay(date = new Date()) {
+  const entries = getEntriesForDay(date);
   const totals = {};
+  const add = (key, v) => { if (typeof v === 'number') totals[key] = (totals[key] || 0) + v; };
   for (const entry of entries) {
     for (const key of TOTAL_KEYS) {
-      const v = entry.nutrients?.[key];
-      if (typeof v === 'number') totals[key] = (totals[key] || 0) + v;
+      if (key === 'totalSugarG') continue; // handled below, consistently with addedSugarG
+      add(key, entry.nutrients?.[key]);
     }
+    add('totalSugarG', effectiveTotalSugar(entry.nutrients));
   }
   for (const key of Object.keys(totals)) totals[key] = Math.round(totals[key] * 10) / 10;
   return { totals, entryCount: entries.length };
+}
+
+/** Today's totals -- kept as its own name since it's the common case. */
+export function getTodaysTotals(now = new Date()) {
+  return getTotalsForDay(now);
+}
+
+/**
+ * Every distinct calendar day (as a Date set to local midnight) that has at
+ * least one logged entry, most recent first -- enough to drive a plain
+ * "Today / Yesterday / <date>" switcher without a real calendar UI.
+ */
+export function getLoggedDays() {
+  const seen = new Map(); // dateString -> Date
+  for (const entry of readLog()) {
+    const d = new Date(entry.loggedAt);
+    d.setHours(0, 0, 0, 0);
+    seen.set(d.toDateString(), d);
+  }
+  return [...seen.values()].sort((a, b) => b - a);
 }
 
 // Remembers the last amount/unit logged for a given product, so logging

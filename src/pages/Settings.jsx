@@ -7,6 +7,7 @@
 // permanent thumb-reach slot.
 import { Link } from 'react-router-dom';
 import NotificationSettings from '../components/NotificationSettings';
+import BackupSettings from '../components/BackupSettings';
 import { isNativeApp } from '../services/notifications';
 import { PUBLIC_APP_URL } from '../utils/share';
 
@@ -48,6 +49,8 @@ export default function Settings() {
         <NavRow to="/family" icon="👪" title="Family" description="Profiles and personal scores for the people you scan for" />
         <NavRow to="/about" icon="🛡️" title="About FoodGuard" description="Our mission, how scoring works, and data sources" />
       </div>
+
+      <BackupSettings />
 
       {/* Self-contained card; renders nothing on the web (Android-only feature). */}
       <NotificationSettings />

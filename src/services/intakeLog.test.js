@@ -18,7 +18,7 @@ function makeMemoryStorage() {
 }
 globalThis.localStorage = makeMemoryStorage();
 
-const { addLogEntry, removeLogEntry, getAllEntries, getTodaysEntries, getTodaysTotals, canLogIntake, lastPortionFor } =
+const { addLogEntry, removeLogEntry, getAllEntries, getTodaysEntries, getTodaysTotals, getEntriesForDay, getTotalsForDay, getLoggedDays, canLogIntake, lastPortionFor } =
   await import('./intakeLog.js');
 
 const reset = () => globalThis.localStorage.clear();
@@ -104,4 +104,50 @@ test('logging never crashes when a product has no lookupKey (e.g. an unsaved sca
   const entry = addLogEntry({ productName: 'Unsaved Scan', nutrientsPer100: { caloriesKcal: 200 } }, 50, 'g');
   assert.equal(entry.nutrients.caloriesKcal, 100);
   assert.equal(entry.lookupKey, null);
+});
+
+// A real bug found by reviewing an actual logged day: a product with no
+// distinct total-sugar figure on its label (only addedSugarG, e.g. a plain
+// dal/rajma) was silently EXCLUDED from the day's "Total sugar" sum while
+// still counting toward "Added sugar" -- two numbers that looked
+// comparable but were built from different sets of products, and "Total
+// sugar" could even read lower than "Added sugar" as a result.
+test("a day's total-sugar figure falls back to added sugar per entry, so it's never built from fewer products than added-sugar's own total", () => {
+  reset();
+  // Has both figures (differ, so totalSugarG is genuinely stored).
+  addLogEntry({ lookupKey: 'a', productName: 'Chocolate', nutrientsPer100: { caloriesKcal: 500, totalSugarG: 50, addedSugarG: 45 } }, 100, 'g');
+  // Only ever had ONE sugar figure (e.g. Open Food Facts/Blinkit never
+  // published a separate "total" -- addedSugarG stands in for it, per
+  // nutrientBasis.js's own dedup rule). No totalSugarG key at all.
+  addLogEntry({ lookupKey: 'b', productName: 'Rajma', nutrientsPer100: { caloriesKcal: 100, addedSugarG: 0 } }, 50, 'g');
+
+  const { totals } = getTodaysTotals();
+  // Both entries contribute to both totals -- entry b has no distinct
+  // total-sugar figure, so it falls back to its own addedSugarG (0) for
+  // the "total" sum too, instead of being dropped from it entirely.
+  assert.equal(totals.addedSugarG, 45); // 45 + 0
+  assert.equal(totals.totalSugarG, 50); // 50 + 0(fallback)
+});
+
+test('the total-sugar fallback is proven with a non-zero fallback value', () => {
+  reset();
+  addLogEntry({ lookupKey: 'a', productName: 'A', nutrientsPer100: { caloriesKcal: 100, totalSugarG: 10, addedSugarG: 8 } }, 100, 'g');
+  addLogEntry({ lookupKey: 'b', productName: 'B (no distinct total)', nutrientsPer100: { caloriesKcal: 100, addedSugarG: 6 } }, 100, 'g');
+  const { totals } = getTodaysTotals();
+  assert.equal(totals.addedSugarG, 14); // 8 + 6
+  assert.equal(totals.totalSugarG, 16); // 10 + 6(fallback) -- the old buggy code gave 10 here, silently dropping B
+});
+
+test('getEntriesForDay/getTotalsForDay generalize "today" to any date, and getLoggedDays lists every day that has entries', () => {
+  reset();
+  addLogEntry(WITH_DATA, 100, 'g');
+  const yesterday = new Date(Date.now() - 26 * 60 * 60 * 1000);
+  assert.equal(getEntriesForDay(new Date()).length, 1);
+  assert.equal(getEntriesForDay(yesterday).length, 0);
+  assert.equal(getTotalsForDay(new Date()).totals.caloriesKcal, 60);
+  assert.equal(getTotalsForDay(yesterday).entryCount, 0);
+
+  const days = getLoggedDays();
+  assert.equal(days.length, 1);
+  assert.equal(days[0].toDateString(), new Date().toDateString());
 });
