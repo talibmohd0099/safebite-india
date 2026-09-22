@@ -29,6 +29,7 @@ import ResultBurst, { shouldBurst, arriveMs, celebrationProfile } from '../compo
 import { peekHandoff } from '../utils/reportHandoff';
 import LogPortionModal from '../components/LogPortionModal';
 import { canLogIntake } from '../services/intakeLog';
+import { ENERGY_RELATIVE_LIMIT_KEYS } from '../services/dailyHabitCheck';
 
 // Maps a dailyHabitCheck.js nutrientKey to the matching i18n string keys
 // (see src/i18n/strings.js) for its display name and its three
@@ -44,6 +45,15 @@ const HABIT_NUTRIENT_LABEL_KEY = {
   addedSugarG: 'nutrientAddedSugarG',
   saturatedFatG: 'nutrientSaturatedFatG',
   transFatG: 'nutrientTransFatG',
+};
+// See ENERGY_RELATIVE_LIMIT_KEYS in dailyHabitCheck.js -- the WHO
+// guidance string shown instead of a personalised "% of your limit" for
+// the three nutrients whose real WHO limit is a % of energy intake, not
+// a flat number.
+const HABIT_WHO_GUIDANCE_KEY = {
+  addedSugarG: 'whoGuidanceAddedSugarG',
+  saturatedFatG: 'whoGuidanceSaturatedFatG',
+  transFatG: 'whoGuidanceTransFatG',
 };
 
 // The plain reference table (real numbers, never estimated -- see
@@ -589,12 +599,15 @@ export default function Result() {
     const servingText = habit.servingGrams
       ? t('habitServingPack', { grams: habit.servingGrams, unit: habit.servingUnit || 'g' })
       : t('habitServingPer100g');
+    const isEnergyRelative = ENERGY_RELATIVE_LIMIT_KEYS.has(habit.nutrientKey);
     return {
       ...habit,
       nutrientLabel: t(HABIT_NUTRIENT_LABEL_KEY[habit.nutrientKey]),
       prefix: HABIT_KEY_PREFIX[habit.nutrientKey],
       servingText,
       displayAmount: habit.unit === 'mg' ? Math.round(habit.amount) : habit.amount,
+      isEnergyRelative,
+      whoGuidance: isEnergyRelative ? t(HABIT_WHO_GUIDANCE_KEY[habit.nutrientKey]) : null,
     };
   })();
 
@@ -1177,26 +1190,51 @@ export default function Result() {
           <SectionHeader>⚡ {t('quickHealthCheck')}</SectionHeader>
           <Group>
             <div className="px-4 py-3.5">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[14px] font-semibold capitalize" style={{ color: 'var(--label-1)' }}>
-                  {habitDisplay.nutrientLabel}
-                </span>
-                <span className="text-[14px] font-bold" style={{ color: habitDisplay.percent >= 50 ? 'var(--v-poor)' : 'var(--v-moderate)' }}>
-                  {habitDisplay.percent}%
-                </span>
-              </div>
-              <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--fill)' }}>
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${Math.min(100, habitDisplay.percent)}%`,
-                    background: habitDisplay.percent >= 50 ? 'var(--v-poor)' : 'var(--v-moderate)',
-                  }}
-                />
-              </div>
-              <p className="text-[13px] leading-relaxed mt-2" style={{ color: 'var(--label-2)' }}>
-                {t('habitBarCaption', { percent: habitDisplay.percent, nutrient: habitDisplay.nutrientLabel, servingText: habitDisplay.servingText })}
-              </p>
+              {habitDisplay.isEnergyRelative ? (
+                // No personalised %: WHO's real limit for this one is a
+                // share of energy intake, not a flat number -- see
+                // ENERGY_RELATIVE_LIMIT_KEYS. Shown as the plain amount
+                // plus WHO's actual guidance instead.
+                <>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[14px] font-semibold capitalize" style={{ color: 'var(--label-1)' }}>
+                      {habitDisplay.nutrientLabel}
+                    </span>
+                    <span className="text-[14px] font-bold" style={{ color: 'var(--label-1)' }}>
+                      {habitDisplay.displayAmount}{habitDisplay.unit}
+                    </span>
+                  </div>
+                  <p className="text-[13px] leading-relaxed" style={{ color: 'var(--label-2)' }}>
+                    {t('habitAmountCaption', { amount: habitDisplay.displayAmount, unit: habitDisplay.unit, nutrient: habitDisplay.nutrientLabel, servingText: habitDisplay.servingText })}
+                  </p>
+                  <p className="text-[12px] leading-relaxed mt-1.5" style={{ color: 'var(--label-3)' }}>
+                    {habitDisplay.whoGuidance}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[14px] font-semibold capitalize" style={{ color: 'var(--label-1)' }}>
+                      {habitDisplay.nutrientLabel}
+                    </span>
+                    <span className="text-[14px] font-bold" style={{ color: habitDisplay.percent >= 50 ? 'var(--v-poor)' : 'var(--v-moderate)' }}>
+                      {habitDisplay.percent}%
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--fill)' }}>
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${Math.min(100, habitDisplay.percent)}%`,
+                        background: habitDisplay.percent >= 50 ? 'var(--v-poor)' : 'var(--v-moderate)',
+                      }}
+                    />
+                  </div>
+                  <p className="text-[13px] leading-relaxed mt-2" style={{ color: 'var(--label-2)' }}>
+                    {t('habitBarCaption', { percent: habitDisplay.percent, nutrient: habitDisplay.nutrientLabel, servingText: habitDisplay.servingText })}
+                  </p>
+                </>
+              )}
               <button
                 onClick={() => setShowHabitModal(true)}
                 className="tap-scale text-[13px] font-semibold mt-2"
@@ -1847,12 +1885,24 @@ export default function Result() {
                   nutrient: habitDisplay.nutrientLabel,
                 })}
               </p>
-              <p className="text-[14px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
-                {t('habitMathLine2', { limit: habitDisplay.limit, unit: habitDisplay.unit })}
-              </p>
-              <p className="text-[14px] font-semibold leading-relaxed pt-1" style={{ color: 'var(--v-poor)' }}>
-                → {t('habitMathLine3', { percent: habitDisplay.percent })}
-              </p>
+              {habitDisplay.isEnergyRelative ? (
+                // No line 3 here on purpose: unlike sodium's flat limit,
+                // there's no honest "% of your entire day" figure to give
+                // without knowing the person's actual energy intake --
+                // see ENERGY_RELATIVE_LIMIT_KEYS.
+                <p className="text-[14px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
+                  {habitDisplay.whoGuidance}
+                </p>
+              ) : (
+                <>
+                  <p className="text-[14px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
+                    {t('habitMathLine2', { limit: habitDisplay.limit, unit: habitDisplay.unit })}
+                  </p>
+                  <p className="text-[14px] font-semibold leading-relaxed pt-1" style={{ color: 'var(--v-poor)' }}>
+                    → {t('habitMathLine3', { percent: habitDisplay.percent })}
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="space-y-3">

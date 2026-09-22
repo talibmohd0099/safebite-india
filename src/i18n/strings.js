@@ -178,6 +178,15 @@ export const STRINGS = {
 
     quickHealthCheck: 'Quick health check',
     habitBarCaption: '{percent}% of your daily {nutrient} limit, in {servingText}.',
+    // Sodium's limit is a flat WHO figure, so a %-of-limit claim is fair
+    // (habitBarCaption above). Added sugar/saturated fat/trans fat are NOT
+    // flat numbers -- WHO states them as a % of energy intake, so these
+    // show the real amount plus WHO's actual guidance instead of a
+    // personalised percentage. See ENERGY_RELATIVE_LIMIT_KEYS.
+    habitAmountCaption: '{amount}{unit} of {nutrient}, in {servingText}.',
+    whoGuidanceAddedSugarG: 'WHO recommends limiting free sugars to less than 10% of total energy intake.',
+    whoGuidanceSaturatedFatG: 'WHO recommends limiting saturated fat to less than 10% of total energy intake.',
+    whoGuidanceTransFatG: 'WHO recommends limiting trans fat to less than 1% of total energy intake.',
     habitSeeMore: 'See what daily eating adds up to',
 
     noIngredientsAnalyzed: 'No ingredients analyzed',
@@ -437,6 +446,10 @@ export const STRINGS = {
 
     quickHealthCheck: 'जल्दी हेल्थ चेक',
     habitBarCaption: '{servingText} में आपकी दिन की {nutrient} लिमिट का {percent}%।',
+    habitAmountCaption: '{servingText} में {amount}{unit} {nutrient}।',
+    whoGuidanceAddedSugarG: 'WHO के अनुसार, फ्री शुगर को अपनी कुल दिन की एनर्जी के 10% से कम रखना चाहिए।',
+    whoGuidanceSaturatedFatG: 'WHO के अनुसार, सैचुरेटेड फैट को अपनी कुल दिन की एनर्जी के 10% से कम रखना चाहिए।',
+    whoGuidanceTransFatG: 'WHO के अनुसार, ट्रांस फैट को अपनी कुल दिन की एनर्जी के 1% से कम रखना चाहिए।',
     habitSeeMore: 'रोज़ खाने पर क्या होता है, यह देखें',
 
     noIngredientsAnalyzed: 'कोई सामग्री जांची नहीं गई',

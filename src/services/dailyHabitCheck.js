@@ -24,6 +24,18 @@ export const NUTRIENT_LIMITS = [
   { key: 'transFatG', unit: 'g', limit: 2, label: 'trans fat' },
 ];
 
+// Sodium's 2,000mg is a flat WHO figure for any adult, independent of how
+// much they eat that day -- a straightforward "X% of the limit" claim.
+// The other three are NOT flat numbers: WHO states them as a PERCENTAGE OF
+// ENERGY INTAKE (free sugars <10% of energy, saturated fat <10%, trans fat
+// <1%) -- the grams above are just the worked example for a 2,000 kcal
+// reference diet. Since nothing in this app ever collects a real personal
+// calorie target, presenting a "% of YOUR daily limit" for these three
+// would quietly assume that 2,000 kcal figure applies to the person
+// reading it. UI code should show WHO's actual %-of-energy guidance for
+// these instead of a personalised percentage -- see Result.jsx/MyIntake.jsx.
+export const ENERGY_RELATIVE_LIMIT_KEYS = new Set(['addedSugarG', 'saturatedFatG', 'transFatG']);
+
 // Below this, the "every day" framing isn't dramatic (or honest) enough
 // to be worth showing -- using 10-20% of a daily limit from one product
 // isn't a meaningful daily-habit risk on its own.
