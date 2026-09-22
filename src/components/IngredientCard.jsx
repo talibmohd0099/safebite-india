@@ -36,17 +36,20 @@ function Badge({ label, value }) {
   );
 }
 
-// One "icon + label" row with its detail text alongside -- What is it /
-// Health effects both use this exact shape, so they read as a matched
-// pair rather than two differently-built paragraphs.
+// The icon + label sit on their own compact caption line, with the
+// detail directly below at the card's full width -- a side-by-side
+// column (label left, text right) was the old shape, but it made every
+// row as tall as its LONGEST wrapped line while wasting the label
+// column's own width, which is exactly what made the panel feel so
+// long. Stacked, the same text wraps across more of the card and less
+// of it, so the whole panel reads noticeably shorter.
 function DetailRow({ icon, label, children }) {
   return (
-    <div className="flex gap-3">
-      <span className="flex-shrink-0 w-[92px] flex items-start gap-1.5 pt-0.5">
-        <span className="text-[13px]" aria-hidden="true">{icon}</span>
-        <span className="text-[12.5px] font-semibold leading-snug" style={{ color: 'var(--label-3)' }}>{label}</span>
+    <div>
+      <span className="flex items-center gap-1 text-[11.5px] font-semibold uppercase tracking-wide" style={{ color: 'var(--label-3)' }}>
+        <span aria-hidden="true">{icon}</span> {label}
       </span>
-      <div className="flex-1 min-w-0 text-[14.5px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
+      <div className="mt-0.5 text-[14px] leading-snug" style={{ color: 'var(--label-1)' }}>
         {children}
       </div>
     </div>
@@ -65,12 +68,15 @@ export default function IngredientCard({ ingredient, severityLabel, style }) {
       className="item-in rounded-2xl overflow-hidden"
       style={{
         ...style,
-        // A concerning ingredient's whole card carries the severity
-        // colour, not just its pill -- the same visual weight Result.jsx
-        // already gives a flagged concern elsewhere, so this row doesn't
-        // read as calmer than it actually is once expanded.
-        border: expanded && isConcerning ? `1px solid ${severity.color}55` : '1px solid transparent',
-        background: expanded && isConcerning ? severity.bg : 'transparent',
+        // Every severity gets its own light background when expanded --
+        // red for Harmful, orange for Concerning, yellow for Highly
+        // processed, green for Fine -- the same tier colours used
+        // everywhere else in the app (getIngredientSeverity), not a
+        // one-off palette just for this card. Fine used to stay
+        // transparent, which read as "less finished" than the flagged
+        // rows right next to it.
+        border: expanded ? `1px solid ${severity.color}40` : '1px solid transparent',
+        background: expanded ? severity.bg : 'transparent',
       }}
     >
       <button
@@ -115,9 +121,9 @@ export default function IngredientCard({ ingredient, severityLabel, style }) {
       </button>
 
       {expanded && (
-        <div className="item-in px-4 pb-4 pl-[64px] space-y-3">
+        <div className="item-in px-4 pb-3 space-y-2">
           {ingredient.commonName && (
-            <p className="text-[13px]" style={{ color: 'var(--label-2)' }}>
+            <p className="text-[12.5px]" style={{ color: 'var(--label-2)' }}>
               <span style={{ color: 'var(--label-3)' }}>Common name: </span>
               {ingredient.commonName}
               {ingredient.scientificName && ` (${ingredient.scientificName})`}
@@ -126,11 +132,11 @@ export default function IngredientCard({ ingredient, severityLabel, style }) {
 
           {ingredient.reason && (
             <div
-              className="flex items-start gap-2.5 rounded-xl px-3 py-2.5"
-              style={{ background: isConcerning ? `${severity.color}1A` : 'var(--fill)' }}
+              className="flex items-start gap-2 rounded-xl px-2.5 py-2"
+              style={{ background: `${severity.color}1A` }}
             >
-              <span className="text-[15px] flex-shrink-0" aria-hidden="true">{isConcerning ? '⚠️' : '💚'}</span>
-              <p className="text-[14.5px] font-semibold leading-relaxed" style={{ color: 'var(--label-1)' }}>
+              <span className="text-[13px] flex-shrink-0 leading-snug" aria-hidden="true">{isConcerning ? '⚠️' : '💚'}</span>
+              <p className="text-[14px] font-semibold leading-snug" style={{ color: 'var(--label-1)' }}>
                 {ingredient.reason}
               </p>
             </div>
@@ -181,11 +187,11 @@ export default function IngredientCard({ ingredient, severityLabel, style }) {
             href={researchUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="tap-scale flex items-center gap-2 rounded-xl px-3 py-2.5"
+            className="tap-scale flex items-center gap-2 rounded-xl px-2.5 py-2"
             style={{ background: 'var(--tint-bg)' }}
           >
-            <span aria-hidden="true">🔗</span>
-            <span className="flex-1 text-[14.5px] font-semibold" style={{ color: 'var(--tint)' }}>
+            <span className="text-[13px]" aria-hidden="true">🔗</span>
+            <span className="flex-1 text-[13.5px] font-semibold" style={{ color: 'var(--tint)' }}>
               Research this ingredient
             </span>
             <svg viewBox="0 0 8 13" fill="none" className="w-2 h-3 flex-shrink-0" style={{ color: 'var(--tint)' }}>
