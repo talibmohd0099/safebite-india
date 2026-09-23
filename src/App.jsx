@@ -42,6 +42,7 @@ import AdminProductList from './pages/admin/AdminProductList';
 import AdminProductForm from './pages/admin/AdminProductForm';
 import AdminFlagsList from './pages/admin/AdminFlagsList';
 import AdminDataIssuesList from './pages/admin/AdminDataIssuesList';
+import AdminScrapeProgress from './pages/admin/AdminScrapeProgress';
 import AdminDuplicates from './pages/admin/AdminDuplicates';
 import AdminImport from './pages/admin/AdminImport';
 import AdminActivityLog from './pages/admin/AdminActivityLog';
@@ -233,6 +234,7 @@ function AppShell() {
           <Route path="/admin/products/:id/history" element={<AdminGuard><AdminProductHistory /></AdminGuard>} />
           <Route path="/admin/flags" element={<AdminGuard><AdminFlagsList /></AdminGuard>} />
           <Route path="/admin/data-issues" element={<AdminGuard><AdminDataIssuesList /></AdminGuard>} />
+          <Route path="/admin/scrape-progress" element={<AdminGuard><AdminScrapeProgress /></AdminGuard>} />
           <Route path="/admin/submissions" element={<AdminGuard><AdminSubmissionsList /></AdminGuard>} />
           <Route path="/admin/duplicates" element={<AdminGuard><AdminDuplicates /></AdminGuard>} />
           <Route path="/admin/barcode-check" element={<AdminGuard><AdminBarcodeCheck /></AdminGuard>} />

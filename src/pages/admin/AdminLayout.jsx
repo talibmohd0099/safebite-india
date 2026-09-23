@@ -9,6 +9,7 @@ import { supabase } from '../../services/supabaseClient';
 
 const NAV = [
   { to: '/admin/products', label: 'Products' },
+  { to: '/admin/scrape-progress', label: 'Scrape progress' },
   { to: '/admin/flags', label: 'Flags' },
   { to: '/admin/data-issues', label: 'Manual review' },
   { to: '/admin/submissions', label: 'Submissions' },
