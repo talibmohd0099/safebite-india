@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AdminLayout from './AdminLayout';
-import { adminListProducts, adminDeleteProduct } from '../../services/adminProductsRepo';
+import PhotoCropModal from './PhotoCropModal';
+import { adminListProducts, adminDeleteProduct, adminUpdateProduct } from '../../services/adminProductsRepo';
 import { adminOpenFlaggedLookupKeys } from '../../services/adminFlagsRepo';
 import { getScoreColor } from '../../utils/storage';
 import { CATEGORY_KEYWORDS } from '../../data/categoryKeywords';
@@ -63,6 +64,11 @@ export default function AdminProductList() {
   const [page, setPage] = useState(() => loadStoredFilterState()?.page || 0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // The row currently open in the crop modal -- built for exactly the
+  // "same product shown twice in one photo" case, without needing a
+  // trip into the full Edit page just to fix a photo.
+  const [croppingRow, setCroppingRow] = useState(null);
+  const [savingCrop, setSavingCrop] = useState(false);
 
   useEffect(() => {
     try {
@@ -139,6 +145,29 @@ export default function AdminProductList() {
       load(filters, page);
     } catch (err) {
       window.alert(err.message);
+    }
+  };
+
+  // The row's own already-loaded report/lookup_key/etc. (adminListProducts
+  // selects the full row, not a thin one) is everything adminUpdateProduct
+  // needs -- no re-fetch, just the image field replaced.
+  const handleCropped = async (dataUrl) => {
+    const row = croppingRow;
+    setSavingCrop(true);
+    try {
+      await adminUpdateProduct(row.id, {
+        lookupKey: row.lookup_key,
+        source: row.source,
+        productName: row.product_name,
+        ingredientsText: row.ingredients_text,
+        report: { ...row.report, imageUrl: dataUrl },
+      });
+      setCroppingRow(null);
+      load(filters, page);
+    } catch (err) {
+      window.alert(err.message);
+    } finally {
+      setSavingCrop(false);
     }
   };
 
@@ -241,7 +270,7 @@ export default function AdminProductList() {
         <div className="rounded-[14px] overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--separator)' }}>
           <div
             className="grid gap-3 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide"
-            style={{ gridTemplateColumns: '48px 2.2fr 1fr 1fr 1fr 100px 175px', color: 'var(--label-3)', borderBottom: '1px solid var(--separator)' }}
+            style={{ gridTemplateColumns: '88px 2.2fr 1fr 1fr 1fr 100px 220px', color: 'var(--label-3)', borderBottom: '1px solid var(--separator)' }}
           >
             <span></span>
             <span>Product</span>
@@ -257,11 +286,16 @@ export default function AdminProductList() {
               <div
                 key={row.id}
                 className="grid gap-3 px-4 py-2.5 items-center text-[13.5px]"
-                style={{ gridTemplateColumns: '48px 2.2fr 1fr 1fr 1fr 100px 175px', borderBottom: '1px solid var(--separator)' }}
+                style={{ gridTemplateColumns: '88px 2.2fr 1fr 1fr 1fr 100px 220px', borderBottom: '1px solid var(--separator)' }}
               >
-                <div className="w-9 h-9 rounded-[8px] overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: 'var(--fill)' }}>
-                  {r.imageUrl ? <img src={r.imageUrl} alt="" className="w-full h-full object-cover" /> : <span style={{ fontSize: 16 }}>🍽️</span>}
-                </div>
+                <button
+                  onClick={() => r.imageUrl && setCroppingRow(row)}
+                  title={r.imageUrl ? 'Click to view larger / crop' : 'No photo'}
+                  className="tap-scale w-16 h-16 rounded-[8px] overflow-hidden flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'var(--fill)', cursor: r.imageUrl ? 'pointer' : 'default' }}
+                >
+                  {r.imageUrl ? <img src={r.imageUrl} alt="" className="w-full h-full object-cover" /> : <span style={{ fontSize: 22 }}>🍽️</span>}
+                </button>
                 <div className="min-w-0">
                   <p className="font-semibold truncate" style={{ color: 'var(--label-1)' }}>{row.product_name || 'Unnamed product'}</p>
                   <p className="text-[11px] truncate" style={{ color: 'var(--label-3)' }}>{row.lookup_key}</p>
@@ -275,6 +309,9 @@ export default function AdminProductList() {
                 <div className="flex items-center gap-2.5 justify-end">
                   <a href={`#/p/${row.id}`} target="_blank" rel="noreferrer" title="View in the app" className="tap-scale text-[13px] font-semibold" style={{ color: 'var(--label-2)' }}>View</a>
                   <Link to={`/admin/products/${row.id}/history`} title="History" className="tap-scale text-[15px]" style={{ color: 'var(--label-3)' }}>🕐</Link>
+                  {r.imageUrl && (
+                    <button onClick={() => setCroppingRow(row)} title="Crop photo" className="tap-scale text-[13px] font-semibold" style={{ color: 'var(--label-2)' }}>Crop</button>
+                  )}
                   <Link to={`/admin/products/${row.id}/edit`} className="tap-scale text-[13px] font-semibold" style={{ color: 'var(--tint)' }}>Edit</Link>
                   <button onClick={() => handleDelete(row.id, row.product_name)} className="tap-scale text-[13px] font-semibold" style={{ color: 'var(--v-poor)' }}>Delete</button>
                 </div>
@@ -303,6 +340,19 @@ export default function AdminProductList() {
           >
             Next →
           </button>
+        </div>
+      )}
+
+      {croppingRow && (
+        <PhotoCropModal
+          imageUrl={croppingRow.report?.imageUrl}
+          onCropped={handleCropped}
+          onClose={() => !savingCrop && setCroppingRow(null)}
+        />
+      )}
+      {savingCrop && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40">
+          <p className="px-4 py-2.5 rounded-full text-[13px] font-semibold text-white" style={{ background: 'rgba(0,0,0,0.7)' }}>Saving…</p>
         </div>
       )}
     </AdminLayout>
