@@ -7,6 +7,24 @@ import { supabase, isSupabaseConfigured } from './supabaseClient.js';
 // (generate-reports.js, discover-off-products.js) can't load outside Vite.
 import { CATEGORY_KEYWORDS } from '../data/categoryKeywords.js';
 
+// "Alternative"/"similar" only means something if the two products are
+// actually substitutable -- the browse page's own 'essentials' bucket
+// (oil, atta, flour, rice, sauce, ketchup, all in one) is fine for
+// browsing, but real report: a bottle of oil was surfacing a chilli
+// garlic SAUCE as its "safer alternative", which nobody would ever
+// treat as a substitute for the other. Split into groups that are each
+// genuinely one kind of pantry staple, used only for this matching --
+// categories.js/the browse page keeps the single broader bucket, since
+// splitting it there would need real illustrated art for each new
+// piece that doesn't exist yet.
+const ALTERNATIVES_CATEGORY_KEYWORDS = [
+  ...CATEGORY_KEYWORDS.filter((c) => c.id !== 'essentials'),
+  { id: 'oil', keywords: ['oil'] },
+  { id: 'atta-flour', keywords: ['atta', 'flour', 'maida', 'besan', 'sooji', 'rava'] },
+  { id: 'rice-grains', keywords: ['rice', 'poha', 'daliya'] },
+  { id: 'sauces-condiments', keywords: ['sauce', 'ketchup', 'chutney', 'pickle', 'achar'] },
+];
+
 function normalizeText(text) {
   return text.trim().toLowerCase().replace(/\s+/g, ' ');
 }
@@ -244,9 +262,12 @@ export async function getDailySpotlight() {
  * single product name -- lets us place a product into one of the fixed
  * categories without asking the user or calling the AI again.
  */
-function findCategoryForProduct(productName) {
+// Exported for testing -- the real bug this exists to catch (an oil
+// showing a sauce as its "safer alternative") only shows up by checking
+// real product-name pairs against this function's actual output.
+export function findCategoryForProduct(productName) {
   const name = (productName || '').toLowerCase();
-  return CATEGORY_KEYWORDS.find((c) => c.keywords.some((k) => name.includes(k))) || null;
+  return ALTERNATIVES_CATEGORY_KEYWORDS.find((c) => c.keywords.some((k) => name.includes(k))) || null;
 }
 
 // "Safe" here means the same bar the Result page already displays as
