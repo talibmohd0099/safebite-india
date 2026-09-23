@@ -5,9 +5,9 @@
 // and in Node -- the Netlify scheduled function reuses this same service,
 // where env vars come from process.env instead.
 //
-// Five keys (five separate free-tier quotas, 500 requests/day each) so
+// Six keys (six separate free-tier quotas, 500 requests/day each) so
 // this pipeline work and real user scans don't all compete for one shared
-// pool. _2 through _5 are optional -- everything still works with just the
+// pool. _2 through _6 are optional -- everything still works with just the
 // first key configured.
 export const GEMINI_API_KEYS = [
   import.meta.env?.VITE_GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY,
@@ -15,6 +15,7 @@ export const GEMINI_API_KEYS = [
   import.meta.env?.VITE_GEMINI_API_KEY_3 || process.env.VITE_GEMINI_API_KEY_3,
   import.meta.env?.VITE_GEMINI_API_KEY_4 || process.env.VITE_GEMINI_API_KEY_4,
   import.meta.env?.VITE_GEMINI_API_KEY_5 || process.env.VITE_GEMINI_API_KEY_5,
+  import.meta.env?.VITE_GEMINI_API_KEY_6 || process.env.VITE_GEMINI_API_KEY_6,
 ].filter(Boolean);
 
 function apiUrl(key) {
