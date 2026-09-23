@@ -165,7 +165,7 @@ export async function getPendingBlinkitProducts(limit) {
 
   const { data, error } = await supabase
     .from('blinkit_products')
-    .select('id, source, product_name, brand, ingredients_text, image_url, nutrition, pack_size, serving_size')
+    .select('id, source, product_name, brand, ingredients_text, image_url, optimized_image_url, nutrition, pack_size, serving_size')
     .is('report_generated_at', null)
     .order('scraped_at', { ascending: true })
     .limit(limit);

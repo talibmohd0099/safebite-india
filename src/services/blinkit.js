@@ -15,6 +15,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { GEMINI_API_KEYS, callGemini } from './geminiService.js';
 import { isBundleListing } from './bundleListing.js';
+import { optimizeAndUploadBlinkitImage } from './blinkitImageOptimizer.js';
 
 const SITEMAP_INDEX = 'https://blinkit.com/sitemap.xml';
 // A real browser UA, not a self-identifying bot string. Manual testing
@@ -382,14 +383,26 @@ export async function scrapeProduct(url, category, { useAI = false, useImageFall
   const servingSize = attributes['Standard Serve Size'] || null;
   const brand = jsonField(html, 'brand') || '';
 
-  // Deliberately NOT downloading/optimizing/uploading Blinkit's own
-  // product photo any more -- the standing decision is to stop using
-  // Blinkit images in the app at all (a copyright/reuse-rights concern,
-  // not a technical one), so creating more optimized copies in our own
-  // Storage bucket going forward would just work against that. image_url
-  // is still recorded here as plain metadata (a link, not a copy) --
-  // generate-reports.js is what actually enforces this never reaching a
-  // saved report's own imageUrl.
+  // The standing rule (clarified after an earlier over-correction this
+  // session): downloading and keeping our OWN copy of the product photo
+  // is wanted -- useful for identifying the product and as a reference
+  // for sourcing a real/raw photo of it later -- what's NOT wanted is
+  // the app ever pointing a user's browser AT Blinkit's own server for
+  // it. So image_url stays the raw Blinkit link purely as that
+  // reference (never shown to an end user -- see generate-reports.js,
+  // which only ever uses optimized_image_url for what a report
+  // actually displays), and optimized_image_url is our own Storage
+  // copy, cropped+compressed here at scrape time so it's ready
+  // immediately rather than waiting on report-generation to catch up.
+  // objectId has to be stable WITHOUT a database id (this product
+  // hasn't been saved yet) -- a slug of its own brand+name (the same
+  // value blinkitLookupKey() is built from elsewhere) serves that role
+  // just as well as a real id would. Failure-safe: a download/upload
+  // problem just leaves optimized_image_url empty for now (picked up
+  // later by a backfill pass), never blocks the scrape.
+  const rawImageUrl = jsonField(html, 'image_url');
+  const objectId = `${brand} ${productName}`.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 120) || null;
+  const optimized = rawImageUrl && objectId ? await optimizeAndUploadBlinkitImage(rawImageUrl, objectId) : null;
 
   return {
     viaAI,
@@ -399,7 +412,9 @@ export async function scrapeProduct(url, category, { useAI = false, useImageFall
       brand,
       ingredients_text: ingredients,
       category,
-      image_url: jsonField(html, 'image_url'),
+      image_url: rawImageUrl,
+      optimized_image_url: optimized?.url || null,
+      optimized_image_bytes: optimized?.bytes || null,
       nutrition,
       pack_size: packSize,
       serving_size: servingSize,

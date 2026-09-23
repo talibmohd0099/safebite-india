@@ -119,12 +119,13 @@ function normalizeBlinkitProduct(row) {
     brand: row.brand,
     ingredients_text: row.ingredients_text,
     off_ingredients: null,
-    // Deliberately null, not row.image_url -- the standing decision is
-    // to never use Blinkit's own product photos in the app (a
-    // copyright/reuse-rights concern, not a technical one), so no
-    // report built from here should ever end up with one as its
-    // imageUrl, no matter what blinkit_products itself has stored.
-    image_url: null,
+    // optimized_image_url (our own Storage copy), never row.image_url
+    // (Blinkit's own server) -- a report's imageUrl is what a user's
+    // browser actually loads, and that must never point at Blinkit
+    // directly. null (no image shown -- ProductImage.jsx already
+    // falls back gracefully) until the scrape-time optimizer or the
+    // backfill script has produced our own copy to use instead.
+    image_url: row.optimized_image_url || null,
     // The REAL per-serving amount (e.g. "200 ml"), not pack_size (the
     // whole pack/bottle, e.g. "2.25 ltr") -- see extractNutrientsForHabitCheck's
     // own doc comment for the real bug this fixes.
