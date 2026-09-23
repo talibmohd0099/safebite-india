@@ -15,6 +15,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { GEMINI_API_KEYS, callGemini } from './geminiService.js';
 import { isBundleListing } from './bundleListing.js';
+import { optimizeAndUploadBlinkitImage } from './blinkitImageOptimizer.js';
 
 const SITEMAP_INDEX = 'https://blinkit.com/sitemap.xml';
 // A real browser UA, not a self-identifying bot string. Manual testing
@@ -380,16 +381,35 @@ export async function scrapeProduct(url, category, { useAI = false, useImageFall
   // whole bottle in one sitting, while packSize is exactly correct for
   // its own actual purpose (barcode lookups, telling pack sizes apart).
   const servingSize = attributes['Standard Serve Size'] || null;
+  const brand = jsonField(html, 'brand') || '';
+
+  // Optimized at scrape time, not left for report-generation to catch up
+  // on later -- a real gap this closes: report-gen only optimizes a
+  // product's image once IT gets processed, so anything still sitting in
+  // the pending-report backlog (or an admin looking at the raw scrape
+  // before a report even exists) was stuck with Blinkit's own un-cropped,
+  // no-CORS original the whole time. objectId has to be stable WITHOUT a
+  // database id (this product hasn't been saved yet) -- a slug of its
+  // own brand+name, the same value blinkitLookupKey() is built from
+  // elsewhere, serves that role just as well as a real id would.
+  // Failure-safe: optimizeAndUploadBlinkitImage returns null on any
+  // download/upload problem, and the raw Blinkit URL is kept as-is
+  // rather than blocking the scrape over an image.
+  const rawImageUrl = jsonField(html, 'image_url');
+  const objectId = `${brand} ${productName}`.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 120) || null;
+  const optimized = rawImageUrl && objectId ? await optimizeAndUploadBlinkitImage(rawImageUrl, objectId) : null;
 
   return {
     viaAI,
     viaImage,
     product: {
       product_name: productName,
-      brand: jsonField(html, 'brand') || '',
+      brand,
       ingredients_text: ingredients,
       category,
-      image_url: jsonField(html, 'image_url'),
+      image_url: optimized?.url || rawImageUrl,
+      optimized_image_url: optimized?.url || null,
+      optimized_image_bytes: optimized?.bytes || null,
       nutrition,
       pack_size: packSize,
       serving_size: servingSize,

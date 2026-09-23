@@ -140,6 +140,13 @@ function normalizeBlinkitProduct(row) {
 // URL, never blocks report generation.
 async function optimizeBlinkitImageInPlace(product) {
   if (product.source !== 'blinkit' || !product.image_url || !product.id) return;
+  // Scraping itself now optimizes the image up front (see blinkit.js's
+  // scrapeProduct) -- image_url already pointing at our own Storage
+  // bucket means there's nothing left to do here. Re-running this on an
+  // already-cropped-and-compressed image would just re-process it for
+  // no gain (a cheap check, but the download+sharp+upload it skips
+  // isn't).
+  if (product.image_url.includes('/blinkit-images/')) return;
   const result = await optimizeAndUploadBlinkitImage(product.image_url, product.id);
   if (!result) return;
   product.image_url = result.url;
