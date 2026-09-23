@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLayout from './AdminLayout';
-import { adminListFlags, adminResolveFlag, adminReopenFlag, adminFindProductByLookupKey } from '../../services/adminFlagsRepo';
+import { adminListFlags, adminResolveFlag, adminReopenFlag, adminFindProductByLookupKey, adminOrphanedFlags } from '../../services/adminFlagsRepo';
 import { FLAG_REASONS } from '../../services/productFlags';
 
 const REASON_LABEL = Object.fromEntries(FLAG_REASONS.map((r) => [r.key, r.label]));
@@ -18,6 +18,12 @@ export default function AdminFlagsList() {
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Flag ids whose product genuinely has no matching row left, by
+  // EITHER lookup_key or product_name -- see adminOrphanedFlags for why
+  // a key-only check isn't enough (a re-keyed-but-still-present product,
+  // e.g. after its barcode was corrected, isn't "removed"). Checked
+  // once per list load, not per click.
+  const [orphanedIds, setOrphanedIds] = useState(() => new Set());
 
   const load = async (statusValue) => {
     setLoading(true);
@@ -26,6 +32,7 @@ export default function AdminFlagsList() {
       const { rows: r, count: c } = await adminListFlags({ status: statusValue, limit: 100 });
       setRows(r);
       setCount(c);
+      setOrphanedIds(await adminOrphanedFlags(r));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -53,10 +60,13 @@ export default function AdminFlagsList() {
     }
   };
 
-  const handleGoToProduct = async (lookupKey) => {
-    const product = await adminFindProductByLookupKey(lookupKey);
+  const handleGoToProduct = async (lookupKey, productName) => {
+    const product = await adminFindProductByLookupKey(lookupKey, productName);
+    // The batched orphanedIds check already hides "Edit product" for a
+    // confirmed-gone row (see below) -- this only fires if the product
+    // was removed in the moment between that check and this click.
     if (product) navigate(`/admin/products/${product.id}/edit`);
-    else window.alert('This scan was never saved to the shared cache, so there’s nothing to edit.');
+    else window.alert('This product is no longer in the catalog (removed since this was flagged) -- there’s nothing left to edit. Mark it resolved instead.');
   };
 
   return (
@@ -99,10 +109,15 @@ export default function AdminFlagsList() {
               </p>
             </div>
             <div className="flex flex-col items-end gap-2 flex-shrink-0">
-              {flag.lookup_key && (
-                <button onClick={() => handleGoToProduct(flag.lookup_key)} className="tap-scale text-[13px] font-semibold" style={{ color: 'var(--tint)' }}>
+              {flag.lookup_key && !orphanedIds.has(flag.id) && (
+                <button onClick={() => handleGoToProduct(flag.lookup_key, flag.product_name)} className="tap-scale text-[13px] font-semibold" style={{ color: 'var(--tint)' }}>
                   Edit product
                 </button>
+              )}
+              {flag.lookup_key && orphanedIds.has(flag.id) && (
+                <p className="text-[11.5px] text-right max-w-[140px]" style={{ color: 'var(--label-3)' }}>
+                  Product removed from catalog
+                </p>
               )}
               {flag.status === 'open' ? (
                 <button onClick={() => handleResolve(flag.id, flag.product_name)} className="tap-scale text-[13px] font-semibold" style={{ color: 'var(--v-good)' }}>

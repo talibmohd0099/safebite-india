@@ -33,13 +33,60 @@ export async function adminOpenFlaggedLookupKeys() {
   return [...new Set((data || []).map((r) => r.lookup_key))];
 }
 
-/** The product_reports row a flag points at, if it was ever cached (a flag on an un-cached scan has no target). */
-export async function adminFindProductByLookupKey(lookupKey) {
+/**
+ * The product_reports row a flag points at. Tries the lookup_key first,
+ * then falls back to an exact product_name match -- a real case this
+ * caught: a flag's key stopped matching not because the product was
+ * deleted, but because its barcode had been corrected via a normal
+ * admin edit afterward (blinkit:... -> barcode:...), which changes
+ * lookup_key without touching the row itself or its name. Only a
+ * product genuinely missing by BOTH has nothing left to edit.
+ */
+export async function adminFindProductByLookupKey(lookupKey, productName = null) {
   requireSupabase();
-  if (!lookupKey) return null;
-  const { data, error } = await supabase.from('product_reports').select('id').eq('lookup_key', lookupKey).maybeSingle();
-  if (error) return null;
-  return data;
+  if (lookupKey) {
+    const { data, error } = await supabase.from('product_reports').select('id').eq('lookup_key', lookupKey).maybeSingle();
+    if (!error && data) return data;
+  }
+  if (productName) {
+    const { data, error } = await supabase.from('product_reports').select('id').eq('product_name', productName).maybeSingle();
+    if (!error && data) return data;
+  }
+  return null;
+}
+
+/**
+ * Which of the given flags are truly orphaned -- no product_reports row
+ * matches EITHER their lookup_key or their product_name any more. Real
+ * case that made this necessary: a flag on "Nandini Sampoorna Toned
+ * Milk" read as gone because its OWN barcode had been corrected that
+ * same day (a completely normal admin edit, not a deletion) -- a
+ * key-only check would have kept mislabelling it "removed from
+ * catalog", which it never was. Two batched queries for the whole
+ * list (key pass, then a name pass only for what's still unresolved),
+ * not one per row. Returns a Set of flag ids.
+ */
+export async function adminOrphanedFlags(flags) {
+  requireSupabase();
+  const withKeys = flags.filter((f) => f.lookup_key);
+  if (withKeys.length === 0) return new Set();
+
+  const keys = [...new Set(withKeys.map((f) => f.lookup_key))];
+  const { data: byKey, error: keyErr } = await supabase.from('product_reports').select('lookup_key').in('lookup_key', keys);
+  if (keyErr) return new Set(); // uncertain -- don't claim orphaned, "Edit product" still gives the accurate answer on click
+
+  const keyFound = new Set((byKey || []).map((r) => r.lookup_key));
+  const stillMissing = withKeys.filter((f) => !keyFound.has(f.lookup_key));
+  if (stillMissing.length === 0) return new Set();
+
+  const names = [...new Set(stillMissing.map((f) => f.product_name).filter(Boolean))];
+  if (names.length === 0) return new Set(stillMissing.map((f) => f.id));
+
+  const { data: byName, error: nameErr } = await supabase.from('product_reports').select('product_name').in('product_name', names);
+  if (nameErr) return new Set(); // same -- fail open toward NOT claiming orphaned when unsure
+
+  const nameFound = new Set((byName || []).map((r) => r.product_name));
+  return new Set(stillMissing.filter((f) => !nameFound.has(f.product_name)).map((f) => f.id));
 }
 
 export async function adminResolveFlag(id, productName = null) {
