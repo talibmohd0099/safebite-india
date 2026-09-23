@@ -32,8 +32,7 @@ import { GEMINI_API_KEYS } from '../src/services/geminiService.js';
 import { saveReport } from '../src/services/productCache.js';
 import { getPendingProducts, markReportGenerated } from '../src/services/productsRepo.js';
 import { getPendingBlinkitProducts, markBlinkitReportGenerated, blinkitLookupKey, extractNutrientsForHabitCheck } from '../src/services/blinkitProductsRepo.js';
-import { optimizeAndUploadBlinkitImage } from '../src/services/blinkitImageOptimizer.js';
-import { supabase, isSupabaseConfigured } from '../src/services/supabaseClient.js';
+import { isSupabaseConfigured } from '../src/services/supabaseClient.js';
 
 // Proactive spacing, not just reacting to 429s. Calls now rotate across every
 // configured key (see callGemini), so each key sees only 1/N of them -- the
@@ -120,7 +119,12 @@ function normalizeBlinkitProduct(row) {
     brand: row.brand,
     ingredients_text: row.ingredients_text,
     off_ingredients: null,
-    image_url: row.image_url,
+    // Deliberately null, not row.image_url -- the standing decision is
+    // to never use Blinkit's own product photos in the app (a
+    // copyright/reuse-rights concern, not a technical one), so no
+    // report built from here should ever end up with one as its
+    // imageUrl, no matter what blinkit_products itself has stored.
+    image_url: null,
     // The REAL per-serving amount (e.g. "200 ml"), not pack_size (the
     // whole pack/bottle, e.g. "2.25 ltr") -- see extractNutrientsForHabitCheck's
     // own doc comment for the real bug this fixes.
@@ -128,32 +132,6 @@ function normalizeBlinkitProduct(row) {
     pack_size: row.pack_size || null,
     markGenerated: () => markBlinkitReportGenerated(row.id),
   };
-}
-
-// Blinkit's own photos are 1000x1000 with a lot of white padding -- crop
-// it away, compress, and upload to Storage BEFORE the report is built,
-// so report.imageUrl is the optimized one from the very first report
-// this product ever gets (see blinkitImageOptimizer.js; verified live
-// across a 50-product pilot, avg 78.9KB -> 18.4KB, 0 failures). Only
-// ever for Blinkit -- OFF/JioMart images are untouched. Best-effort: a
-// failure here just leaves the product with its original Blinkit image
-// URL, never blocks report generation.
-async function optimizeBlinkitImageInPlace(product) {
-  if (product.source !== 'blinkit' || !product.image_url || !product.id) return;
-  // Scraping itself now optimizes the image up front (see blinkit.js's
-  // scrapeProduct) -- image_url already pointing at our own Storage
-  // bucket means there's nothing left to do here. Re-running this on an
-  // already-cropped-and-compressed image would just re-process it for
-  // no gain (a cheap check, but the download+sharp+upload it skips
-  // isn't).
-  if (product.image_url.includes('/blinkit-images/')) return;
-  const result = await optimizeAndUploadBlinkitImage(product.image_url, product.id);
-  if (!result) return;
-  product.image_url = result.url;
-  await supabase
-    .from('blinkit_products')
-    .update({ optimized_image_url: result.url, optimized_image_bytes: result.bytes })
-    .eq('id', product.id);
 }
 
 async function main() {
@@ -192,7 +170,6 @@ async function main() {
       continue;
     }
 
-    await optimizeBlinkitImageInPlace(product);
     const { report, transient } = await generateWithRetry(product);
 
     if (report) {
