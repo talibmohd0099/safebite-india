@@ -18,6 +18,12 @@ const FREQUENCIES = [
   { perWeek: 1, key: 'sugarFreq1' },
 ];
 
+const SERVING_TEXT_KEY = {
+  label: 'sugarPerServing',
+  pack: 'sugarPerPack',
+  standard: 'sugarPerTypicalServing',
+};
+
 const MAX_SPOONS = 12;
 const MAX_PACKETS = 15;
 const PINK = '#ec4899';
@@ -92,8 +98,20 @@ export default function SugarAddsUp({ projection, t, onShowAlternatives }) {
       </div>
 
       {/* One serving, as spoons */}
-      <p className="text-[13px]" style={{ color: 'var(--label-2)' }}>
-        {t('sugarPerServing', { grams: projection.servingGrams, unit: projection.servingUnit })}
+      {/* Where the serving came from is always stated -- an estimate is
+          never presented as if the label said it (see servingResolver.js) */}
+      <p className="text-[13px] flex items-center flex-wrap gap-1.5" style={{ color: 'var(--label-2)' }}>
+        <span>
+          {t(SERVING_TEXT_KEY[projection.servingSource] || 'sugarPerServing', { grams: projection.servingGrams, unit: projection.servingUnit })}
+        </span>
+        {projection.servingSource === 'standard' && (
+          <span
+            className="text-[10.5px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
+            style={{ background: 'var(--v-moderate-bg)', color: 'var(--v-moderate)' }}
+          >
+            {t('sugarEstimateTag')}
+          </span>
+        )}
       </p>
       <div className="flex flex-wrap items-center gap-0.5 mt-1 mb-1" aria-hidden="true">
         {Array.from({ length: spoonsShown }).map((_, i) => (
@@ -159,6 +177,7 @@ export default function SugarAddsUp({ projection, t, onShowAlternatives }) {
       )}
 
       <p className="text-[11.5px] leading-relaxed mt-3" style={{ color: 'var(--label-3)' }}>
+        {projection.servingSource === 'standard' && `${t('sugarEstimateNote', { grams: projection.servingGrams, unit: projection.servingUnit })} `}
         {t('sugarWhoNote')} {t('sugarDisclaimer')}
       </p>
     </div>
