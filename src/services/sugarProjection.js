@@ -17,7 +17,7 @@
 // serving for the category (an estimate the UI labels as such).
 // No AI call, no network -- null whenever there's no honest story.
 import { getNutrientsPer100 } from './nutrientBasis.js';
-import { resolveServing } from './servingResolver.js';
+import { resolveServing, isNotEatenAsPackedName } from './servingResolver.js';
 
 // The standard conversion WHO/public-health sugar messaging uses.
 export const GRAMS_PER_TEASPOON = 4;
@@ -39,13 +39,6 @@ const MIN_GRAMS_PER_SERVING_NO_SPLIT = GRAMS_PER_TEASPOON * 2;
 // 100g unit, not anyone's real habit.
 const EXCLUDED_FOOD_TYPES = new Set(['condiment', 'supplement', 'infant', 'oil-fat']);
 
-// Made up into several servings, or used by the spoonful, not eaten as
-// packed (live: a 163g Knorr soup powder packet, which makes ~4 bowls,
-// read as 11.4 tsp "per serving"). "mix" is whole-word only, so "mixed
-// fruit juice"/"bhujia mixture" are unaffected. "condensed" -- condensed
-// milk is ~55% sugar and spooned, never drunk by the glass.
-const MADE_UP_PRODUCT_RE = /\b(soups?|premix|mix|mixers?|powder|concentrate|sharbat|squash|cordial|syrups?|condensed)\b/i;
-
 // Sugar/sweeteners sold AS a product -- an ingredient spooned into
 // something else, not a food eaten by the serving (live: "Mawana Brown
 // Sugar", "Puramate Icing Sugar", "I'm Lite Sugar with Stevia" all read
@@ -54,14 +47,6 @@ const MADE_UP_PRODUCT_RE = /\b(soups?|premix|mix|mixers?|powder|concentrate|shar
 const SWEETENER_PRODUCT_RE = /\b(jaggery|gur|mishri|khand|shakkar|stevia|sweeteners?|honey|icing sugar|brown sugar|cane sugar|caster sugar|castor sugar|coconut sugar|palm sugar|demerara|sugar cubes?|sugar sachets?)\b/i;
 const PLAIN_SUGAR_RE = /\bsugar\b/i;
 const SUGAR_CLAIM_RE = /\b(sugar[\s-]*free|no added sugar|less sugar|low sugar|zero sugar|without (?:added )?sugar|reduced sugar|sugarless)\b/i;
-// Tea/coffee sold as leaves, bags or granules, not a ready drink --
-// brewed with water, and the pack weight is dry product (live: "Lipton
-// Green Tea 250 g" read as a 180ml drink at 8.3 tsp). A ready-to-drink
-// iced tea / cold coffee still counts.
-const DRY_TEA_COFFEE_RE = /\b(tea|coffee|chai)\b/i;
-const READY_TO_DRINK_RE = /\b(iced|ice tea|cold coffee|cold brew|ready to drink|frappe|latte|can|bottle)\b/i;
-const isDryTeaOrCoffee = (name) => DRY_TEA_COFFEE_RE.test(name) && !READY_TO_DRINK_RE.test(name);
-
 const isSweetenerProduct = (name, foodType) =>
   SWEETENER_PRODUCT_RE.test(name)
   || (PLAIN_SUGAR_RE.test(name) && !SUGAR_CLAIM_RE.test(name) && (!foodType || foodType === 'staple' || foodType === 'other'));
@@ -80,6 +65,18 @@ const MAX_PLAUSIBLE_BEVERAGE_SUGAR_PER_100 = 20;
 const round1 = (n) => Math.round(n * 10) / 10;
 
 /**
+ * Shared by every 'what this adds up to' projection (sugar here; salt and
+ * fat in nutrientProjection.js): true for anything not eaten the way it's
+ * packed -- spooned in, dosed, made up with water, or not ordinary food --
+ * where multiplying a serving out would describe the unit, not a habit.
+ */
+export function isNotEatenAsPacked(report) {
+  if (report.isCondimentOrSeasoning || report.isInfantFormula) return true;
+  if (EXCLUDED_FOOD_TYPES.has(report.foodType)) return true;
+  return isNotEatenAsPackedName(report.productName);
+}
+
+/**
  * @param {object} report - a saved product report.
  * @returns {null | {
  *   gramsPerServing: number, teaspoonsPerServing: number,
@@ -88,12 +85,8 @@ const round1 = (n) => Math.round(n * 10) / 10;
  * }}
  */
 export function buildSugarProjection(report) {
-  if (!report) return null;
-  if (report.isCondimentOrSeasoning || report.isInfantFormula) return null;
-  if (EXCLUDED_FOOD_TYPES.has(report.foodType)) return null;
-  if (MADE_UP_PRODUCT_RE.test(report.productName || '')) return null;
+  if (!report || isNotEatenAsPacked(report)) return null;
   if (isSweetenerProduct(report.productName || '', report.foodType)) return null;
-  if (isDryTeaOrCoffee(report.productName || '')) return null;
 
   const per100 = getNutrientsPer100(report);
   if (!per100) return null;

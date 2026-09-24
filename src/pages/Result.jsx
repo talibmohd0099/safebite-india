@@ -30,8 +30,8 @@ import { peekHandoff } from '../utils/reportHandoff';
 import LogPortionModal from '../components/LogPortionModal';
 import { canLogIntake } from '../services/intakeLog';
 import { ENERGY_RELATIVE_LIMIT_KEYS } from '../services/dailyHabitCheck';
-import { buildSugarProjection } from '../services/sugarProjection';
-import SugarAddsUp from '../components/SugarAddsUp';
+import { buildNutrientProjections } from '../services/nutrientProjection';
+import NutrientAddsUp from '../components/NutrientAddsUp';
 
 // Maps a dailyHabitCheck.js nutrientKey to the matching i18n string keys
 // (see src/i18n/strings.js) for its display name and its three
@@ -614,10 +614,10 @@ export default function Result() {
     };
   })();
 
-  // Rule-based arithmetic on the label's own sugar figure -- null (and
-  // nothing shown) unless there's a real serving size and a genuine
-  // sugar story to tell. See sugarProjection.js for every guardrail.
-  const sugarProjection = result.isInfantFormula ? null : buildSugarProjection(result);
+  // Rule-based arithmetic on the label's own sugar/salt/fat figures --
+  // null (and nothing shown) unless there's a serving and a genuine story
+  // to tell. See nutrientProjection.js / sugarProjection.js for every guardrail.
+  const nutrientProjection = result.isInfantFormula ? null : buildNutrientProjections(result);
   const scrollToAlternatives = () => document.getElementById('alternatives-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   // For the "Why did this score X?" modal -- every ingredient that
@@ -1269,14 +1269,14 @@ export default function Result() {
           winner/loser comparison between regulated infant-nutrition
           products, exactly the kind of general-food judgment this
           category is deliberately kept out of. */}
-      {/* "How much sugar this adds up to" -- pure quantity from the
-          label, never a claim about what happens to anyone's body. */}
-      {view === 'overview' && sugarProjection && (
+      {/* "What this adds up to" (sugar / salt / fat) -- pure quantity from
+          the label, never a claim about what happens to anyone's body. */}
+      {view === 'overview' && nutrientProjection && (
         <>
-          <SectionHeader>🥄 {t('sugarAddsUpTitle')}</SectionHeader>
+          <SectionHeader>🥄 {t('addsUpTitle')}</SectionHeader>
           <Group>
-            <SugarAddsUp
-              projection={sugarProjection}
+            <NutrientAddsUp
+              projection={nutrientProjection}
               t={t}
               onShowAlternatives={!result.isInfantFormula && rankedAlternatives.length > 0 ? scrollToAlternatives : null}
             />

@@ -54,3 +54,21 @@ test('parsePackSize reads the per-unit size and converts kg/L', () => {
   assert.deepEqual(parsePackSize('200 ml'), { value: 200, unit: 'ml' });
   assert.equal(parsePackSize('Pack'), null);
 });
+
+test('a pack that is made up, brewed or cooked with is never one serving (live cases)', () => {
+  const cases = [
+    { productName: 'Cothas Premium Special Filter Coffee (80% coffee, 20% chicory)', foodType: 'beverage', packSize: '200 g' },
+    { productName: 'Organic Mandya Millet Badam Milk Drink Mix', foodType: 'beverage', packSize: '200 g' },
+    { productName: "Jimmy's Bloody Mary Cocktail Mix", foodType: 'beverage', packSize: '250 ml' },
+    { productName: 'Carpe Victus Crushed Chilli Flakes', foodType: 'other', packSize: '50 g' },
+  ];
+  for (const r of cases) assert.equal(resolveServing(r, { allowStandard: false }), null, r.productName);
+  // ...but the label's own stated serving still counts (30g = one cup)
+  assert.equal(resolveServing({ productName: 'Darkins Dark Hot Chocolate Mix', foodType: 'beverage', realNutrientsServingGrams: 30 }).source, 'label');
+  // and a ready-to-drink iced tea can is still one serving
+  assert.equal(resolveServing({ productName: 'Himalayan Brew Kangra Iced Tea', foodType: 'beverage', packSize: '330 ml' }).grams, 330);
+  // a seasoning's own tiny serving is real, not junk
+  assert.equal(resolveServing({ productName: 'Carpe Victus Crushed Chilli Flakes', realNutrientsServingGrams: 2 }).grams, 2);
+  // corn flakes are still cereal
+  assert.equal(resolveServing({ productName: "Kellogg's Corn Flakes", foodType: 'staple' }).grams, 40);
+});

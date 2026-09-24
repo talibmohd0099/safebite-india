@@ -5,7 +5,8 @@
 // score it with plain rules. No whole-product AI call needed once
 // ingredients are known.
 
-import { toPer100 } from './nutrientBasis.js';
+import { toPer100, toServing } from './nutrientBasis.js';
+import { resolveServing } from './servingResolver.js';
 import { classifyFoodType, normalizeFoodType } from './foodType.js';
 import { applyNutritionDensityCeiling } from './nutritionDensity.js';
 import { parseLabel, isBracketBalanced, looksLikeNutritionPanel } from './ingredientParser.js';
@@ -210,9 +211,34 @@ export async function analyzeText(rawText, productName, brand, offIngredients, i
     // was simply never set. The keyword classifier (classifyFoodType,
     // which DOES recognise "electrolyte"/"supplement") gives a second,
     // deterministic chance to catch exactly this case.
+    // Re-decide the serving now that foodType is known -- the producer's
+    // servingGrams can be the per-100g basis mislabelled as a serving
+    // (exactly 100), junk ("1 g"), or the whole PACK weight
+    // (openFoodFacts.js's product_quantity fallback: a 400g family pack
+    // read as one serving, inflating the habit check -- and, through
+    // applyRealNutrientCap, wrongly capping the score). REAL servings
+    // only (label or single-serve pack), never the category estimate --
+    // see servingResolver.js. No real serving = per 100g, as before.
+    let servingGrams = null;
+    let servingUnit = 'g';
+    if (nutrientsInfo?.nutrients && report.nutrientsPer100) {
+      const real = resolveServing({
+        productName: report.productName,
+        foodType: report.foodType,
+        packSize,
+        realNutrientsServingGrams: nutrientsInfo.servingGrams,
+        realNutrientsServingUnit: nutrientsInfo.servingUnit,
+      }, { allowStandard: false });
+      servingGrams = real?.grams ?? null;
+      servingUnit = real?.unit || 'g';
+      report.realNutrientsServingGrams = servingGrams;
+      report.realNutrientsServingUnit = servingUnit;
+      report.realNutrients = toServing(report.nutrientsPer100, servingGrams);
+    }
+
     const isSmallDoseType = report.foodType === 'condiment' || report.foodType === 'supplement';
-    if (nutrientsInfo && !report.isCondimentOrSeasoning && !report.isInfantFormula && !isSmallDoseType && !isSmallPortionFood(report.productName, nutrientsInfo.servingGrams)) {
-      const habitCheck = buildDailyHabitCheck(nutrientsInfo.nutrients, nutrientsInfo.servingGrams, nutrientsInfo.servingUnit || 'g');
+    if (nutrientsInfo && !report.isCondimentOrSeasoning && !report.isInfantFormula && !isSmallDoseType && !isSmallPortionFood(report.productName, servingGrams)) {
+      const habitCheck = buildDailyHabitCheck(report.realNutrients, servingGrams, servingUnit);
       if (habitCheck) {
         report.dailyHabitCheck = habitCheck;
         // A real nutrient number worth showing in the Quick Health
