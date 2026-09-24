@@ -30,6 +30,8 @@ import { peekHandoff } from '../utils/reportHandoff';
 import LogPortionModal from '../components/LogPortionModal';
 import { canLogIntake } from '../services/intakeLog';
 import { ENERGY_RELATIVE_LIMIT_KEYS } from '../services/dailyHabitCheck';
+import { buildSugarProjection } from '../services/sugarProjection';
+import SugarAddsUp from '../components/SugarAddsUp';
 
 // Maps a dailyHabitCheck.js nutrientKey to the matching i18n string keys
 // (see src/i18n/strings.js) for its display name and its three
@@ -611,6 +613,12 @@ export default function Result() {
       whoGuidance: isEnergyRelative ? t(HABIT_WHO_GUIDANCE_KEY[habit.nutrientKey]) : null,
     };
   })();
+
+  // Rule-based arithmetic on the label's own sugar figure -- null (and
+  // nothing shown) unless there's a real serving size and a genuine
+  // sugar story to tell. See sugarProjection.js for every guardrail.
+  const sugarProjection = result.isInfantFormula ? null : buildSugarProjection(result);
+  const scrollToAlternatives = () => document.getElementById('alternatives-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   // For the "Why did this score X?" modal -- every ingredient that
   // actually pulled the score down (Harmful/Concerning/Highly processed;
@@ -1261,8 +1269,24 @@ export default function Result() {
           winner/loser comparison between regulated infant-nutrition
           products, exactly the kind of general-food judgment this
           category is deliberately kept out of. */}
+      {/* "How much sugar this adds up to" -- pure quantity from the
+          label, never a claim about what happens to anyone's body. */}
+      {view === 'overview' && sugarProjection && (
+        <>
+          <SectionHeader>🥄 {t('sugarAddsUpTitle')}</SectionHeader>
+          <Group>
+            <SugarAddsUp
+              projection={sugarProjection}
+              t={t}
+              onShowAlternatives={!result.isInfantFormula && rankedAlternatives.length > 0 ? scrollToAlternatives : null}
+            />
+          </Group>
+        </>
+      )}
+
       {view === 'overview' && !result.isInfantFormula && rankedAlternatives.length > 0 && (
         <>
+          <div id="alternatives-section" style={{ scrollMarginTop: 72 }} />
           <SectionHeader>
             {activeProfile
               ? t('betterOptionsFor', { name: activeProfile.nickname })
