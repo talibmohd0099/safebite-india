@@ -18,8 +18,10 @@ export const GEMINI_API_KEYS = [
   import.meta.env?.VITE_GEMINI_API_KEY_6 || process.env.VITE_GEMINI_API_KEY_6,
 ].filter(Boolean);
 
-function apiUrl(key) {
-  return `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${key}`;
+const DEFAULT_MODEL = 'gemini-3.1-flash-lite';
+
+function apiUrl(key, model = DEFAULT_MODEL) {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
 }
 
 function isQuotaError(message) {
@@ -58,16 +60,17 @@ export function cooldownFor(message) {
 
 /**
  * POST one request to Gemini, round-robin across the configured keys and
- * falling through to the next key when one is out of quota. Returns
- * { text, finishReason } on success; throws (with the real API error
- * message) once every key has failed, so existing callers' try/catch and
- * error handling still work unchanged.
+ * falling through to the next key when one is out of quota. Returns the
+ * raw parsed response JSON; throws (with the real API error message) once
+ * every key has failed. `model` defaults to the text model -- the photo
+ * clean-up (geminiImageService.js) passes an image model instead.
  */
-export async function callGemini(requestBody) {
+export async function callGeminiRaw(requestBody, model = DEFAULT_MODEL) {
+  if (GEMINI_API_KEYS.length === 0) throw new Error('No Gemini API key configured');
   let lastMessage = 'API request failed';
   const order = orderKeys(GEMINI_API_KEYS.length, nextKey, cooldownUntil, Date.now());
   for (const [position, i] of order.entries()) {
-    const response = await fetch(apiUrl(GEMINI_API_KEYS[i]), {
+    const response = await fetch(apiUrl(GEMINI_API_KEYS[i], model), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody),
@@ -76,11 +79,7 @@ export async function callGemini(requestBody) {
     if (response.ok) {
       nextKey = (i + 1) % GEMINI_API_KEYS.length;
       cooldownUntil.delete(i);
-      const data = await response.json();
-      return {
-        text: data.candidates?.[0]?.content?.parts?.[0]?.text,
-        finishReason: data.candidates?.[0]?.finishReason,
-      };
+      return response.json();
     }
 
     const error = await response.json().catch(() => null);
@@ -96,6 +95,18 @@ export async function callGemini(requestBody) {
     throw new Error(lastMessage);
   }
   throw new Error(lastMessage);
+}
+
+/**
+ * Text-model call: same as callGeminiRaw, reduced to
+ * { text, finishReason } for the existing analysis callers.
+ */
+export async function callGemini(requestBody) {
+  const data = await callGeminiRaw(requestBody);
+  return {
+    text: data.candidates?.[0]?.content?.parts?.[0]?.text,
+    finishReason: data.candidates?.[0]?.finishReason,
+  };
 }
 
 const ANALYSIS_PROMPT = `You are a food safety expert specializing in Indian food regulations (FSSAI) and EU/EFSA standards. Your job is to help Indian consumers understand what's in their packaged food.
