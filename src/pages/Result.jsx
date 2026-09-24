@@ -33,6 +33,8 @@ import { ENERGY_RELATIVE_LIMIT_KEYS } from '../services/dailyHabitCheck';
 import { buildNutrientProjections } from '../services/nutrientProjection';
 import NutrientAddsUp from '../components/NutrientAddsUp';
 import LabelXray from '../components/LabelXray';
+import NutritionTrafficLight from '../components/NutritionTrafficLight';
+import { buildTrafficLight } from '../services/trafficLight';
 
 // Maps a dailyHabitCheck.js nutrientKey to the matching i18n string keys
 // (see src/i18n/strings.js) for its display name and its three
@@ -633,6 +635,8 @@ export default function Result() {
   // null (and nothing shown) unless there's a serving and a genuine story
   // to tell. See nutrientProjection.js / sugarProjection.js for every guardrail.
   const nutrientProjection = result.isInfantFormula ? null : buildNutrientProjections(result);
+  // Low/Medium/High tiles for the Nutrition section -- always per 100g/ml.
+  const trafficLight = buildTrafficLight(result);
   const scrollToAlternatives = () => document.getElementById('alternatives-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   // For the "Why did this score X?" modal -- every ingredient that
@@ -1188,6 +1192,7 @@ export default function Result() {
                   </button>
                 )}
               </div>
+              {trafficLight && <NutritionTrafficLight light={trafficLight} t={t} />}
               <div className="grid grid-cols-3 gap-3">
                 {NUTRITION_TABLE_ROWS.filter((row) => typeof displayNutrients[row.key] === 'number').map((row) => (
                   <div key={row.key}>
