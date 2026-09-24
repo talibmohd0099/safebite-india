@@ -76,6 +76,38 @@ test('a "serving" of exactly 100 is treated as the per-100 basis, not a real ser
   assert.equal(p.gramsPerServing, 12.8);
 });
 
+test('a whole-pack weight recorded as the "serving" is rejected, per food type', () => {
+  // Real live cases: family packs whose pack weight became the serving.
+  const cases = [
+    { productName: 'HIDE & SEEK Choco Chip Creme Sandwiches', foodType: 'other', realNutrientsServingGrams: 400 },
+    { productName: 'Marie biscuits', foodType: 'sweet-snack', realNutrientsServingGrams: 300 },
+    { productName: 'Southern Classic Bread', foodType: 'staple', realNutrientsServingGrams: 400 },
+  ];
+  for (const c of cases) {
+    assert.equal(buildSugarProjection({ ...c, nutrientsPer100: { addedSugarG: 30, totalSugarG: 32 } }), null, c.productName);
+  }
+});
+
+test('a genuinely single-serve large pack is kept (ready meal, juice bottle)', () => {
+  const pasta = { productName: 'Tata Q Saucy Tomato Pasta', foodType: 'ready-meal', realNutrientsServingGrams: 305 };
+  assert.ok(buildSugarProjection({ ...pasta, nutrientsPer100: { addedSugarG: 3.8, totalSugarG: 5 } }));
+  const juice = { productName: 'Pokka Carrot Fruit Juice', foodType: 'beverage', realNutrientsServingGrams: 300, realNutrientsServingUnit: 'ml' };
+  assert.ok(buildSugarProjection({ ...juice, nutrientsPer100: { addedSugarG: 9.9, totalSugarG: 11 } }));
+});
+
+test('powders/mixes/soups are skipped -- the pack is several servings once made up', () => {
+  const knorr = { productName: 'Knorr International Mexican Tomato Corn Soup', foodType: 'ready-meal', realNutrientsServingGrams: 163 };
+  assert.equal(buildSugarProjection({ ...knorr, nutrientsPer100: { addedSugarG: 28, totalSugarG: 30 } }), null);
+  // "mixed"/"mixture" are not "mix"
+  const juice = { productName: 'Real Mixed Fruit Juice', foodType: 'beverage', realNutrientsServingGrams: 200, realNutrientsServingUnit: 'ml' };
+  assert.ok(buildSugarProjection({ ...juice, nutrientsPer100: { addedSugarG: 12, totalSugarG: 13 } }));
+});
+
+test('a drink with an impossible sugar density is skipped (per-bottle figure saved as per-100)', () => {
+  const mogu = { productName: 'Mogu Mogu Pineapple Fruit Drink', foodType: 'beverage', realNutrientsServingGrams: 320, realNutrientsServingUnit: 'ml' };
+  assert.equal(buildSugarProjection({ ...mogu, nutrientsPer100: { addedSugarG: 32, totalSugarG: 33 } }), null);
+});
+
 test('an added-sugar figure of 0 (with a split) shows nothing', () => {
   assert.equal(buildSugarProjection({ ...base, nutrientsPer100: { addedSugarG: 0, totalSugarG: 9 } }), null);
 });

@@ -41,6 +41,39 @@ const EXCLUDED_FOOD_TYPES = new Set(['condiment', 'supplement', 'infant', 'oil-f
 // added-sugar figure to tell the two apart (see below).
 const NATURAL_SUGAR_NAME_RE = /(\b100\s*%|\bno added sugar|\bwithout added sugar|\bzero added sugar|\bunsweetened\b)/i;
 
+// The largest amount that's still believably ONE serving of each food
+// type. Needed because openFoodFacts.js falls back to the whole PACK
+// weight when a product has no serving size of its own -- found live
+// with this card showing a 400g Hide & Seek family pack as "one
+// serving = 39.8 teaspoons", a 300g Marie pack at 14 tsp and a 400g
+// loaf of bread at 13 tsp. A single 305g ready-meal pack or a 300ml
+// juice bottle genuinely IS one serving, so the bar is per type, not
+// one flat number. Anything past it is treated as "no real serving".
+const MAX_PLAUSIBLE_SERVING = {
+  'fried-snack': 100,
+  'sweet-snack': 100,
+  'baked-snack': 100,
+  'nuts-seeds': 100,
+  staple: 100,
+  dairy: 300,
+  beverage: 600,
+  'ready-meal': 450,
+};
+const MAX_PLAUSIBLE_SERVING_DEFAULT = 150;
+
+// Made up into several servings, not eaten as packed -- the pack
+// weight of a powder isn't one serving (live: a 163g Knorr soup powder
+// packet, which makes ~4 bowls, read as 11.4 tsp "per serving").
+// "mix" is whole-word only, so "mixed fruit juice"/"bhujia mixture"
+// are unaffected.
+const MADE_UP_PRODUCT_RE = /\b(soups?|premix|mix|powder|concentrate|sharbat|squash|cordial|syrups?)\b/i;
+
+// A ready-to-drink with more sugar than this per 100ml isn't real --
+// Coke is ~10.6g, sweetened juices ~12-14g. Live: a Mogu Mogu at 32g/100ml
+// (25.6 tsp a bottle), almost certainly its per-bottle figure saved as
+// per-100. Syrups/concentrates are already excluded by name above.
+const MAX_PLAUSIBLE_BEVERAGE_SUGAR_PER_100 = 20;
+
 const round1 = (n) => Math.round(n * 10) / 10;
 
 /**
@@ -54,6 +87,7 @@ export function buildSugarProjection(report) {
   if (!report) return null;
   if (report.isCondimentOrSeasoning || report.isInfantFormula) return null;
   if (EXCLUDED_FOOD_TYPES.has(report.foodType)) return null;
+  if (MADE_UP_PRODUCT_RE.test(report.productName || '')) return null;
 
   // A REAL serving size is required, not a fallback to per-100g --
   // nobody eats 100g of chips as "one", they eat a packet, and a daily
@@ -70,6 +104,7 @@ export function buildSugarProjection(report) {
   // 100g cups (a yogurt, a mishti doi) lose the card too -- better to
   // quietly lose a signal than to show a wrong one.
   if (servingGrams === 100) return null;
+  if (servingGrams > (MAX_PLAUSIBLE_SERVING[report.foodType] ?? MAX_PLAUSIBLE_SERVING_DEFAULT)) return null;
 
   const per100 = getNutrientsPer100(report);
   if (!per100) return null;
@@ -82,6 +117,7 @@ export function buildSugarProjection(report) {
   const hasSplit = typeof per100.totalSugarG === 'number';
   const sugarPer100 = per100.addedSugarG;
   if (typeof sugarPer100 !== 'number' || !Number.isFinite(sugarPer100) || sugarPer100 <= 0) return null;
+  if (report.foodType === 'beverage' && sugarPer100 > MAX_PLAUSIBLE_BEVERAGE_SUGAR_PER_100) return null;
 
   // Without that split, the one figure could be entirely natural sugar
   // (a glass of plain milk's own lactose, a 100% juice's own fruit
