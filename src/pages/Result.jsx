@@ -32,6 +32,7 @@ import { canLogIntake } from '../services/intakeLog';
 import { ENERGY_RELATIVE_LIMIT_KEYS } from '../services/dailyHabitCheck';
 import { buildNutrientProjections } from '../services/nutrientProjection';
 import NutrientAddsUp from '../components/NutrientAddsUp';
+import LabelXray from '../components/LabelXray';
 
 // Maps a dailyHabitCheck.js nutrientKey to the matching i18n string keys
 // (see src/i18n/strings.js) for its display name and its three
@@ -530,6 +531,20 @@ export default function Result() {
   // sorted list reads just as clearly as the old grouped sections did,
   // without repeating a header per tier.
   const sortedIngredients = tiers.flatMap((tier) => ingredients.filter((i) => severityOf(i) === tier.key));
+
+  // Label X-Ray tap: show the full list (a filter could be hiding it),
+  // then scroll to that ingredient's card and flash it once.
+  const jumpToIngredient = (index) => {
+    setFilter('all');
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const el = document.getElementById(`ingredient-card-${index}`);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.remove('xray-flash');
+      void el.offsetWidth; // restart the animation on a repeat tap
+      el.classList.add('xray-flash');
+    }));
+  };
 
   const savedDate = new Date(result.savedAt).toLocaleDateString('en-IN', {
     day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -1320,6 +1335,27 @@ export default function Result() {
       {/* Ingredients */}
       {view === 'ingredients' && (
         <>
+          {/* Label X-Ray -- the raw label as printed, each analysed
+              ingredient lit up in its severity colour; tap to jump to
+              its card. Replaces the old plain "As read from label" text. */}
+          {result.ingredientsText && ingredients.length > 0 && (
+            <>
+              <SectionHeader>🔬 {t('xrayTitle')}</SectionHeader>
+              <Group>
+                <LabelXray
+                  text={result.ingredientsText}
+                  ingredients={ingredients}
+                  tierOf={(ing) => tiers.find((tier) => tier.key === severityOf(ing))}
+                  t={t}
+                  onPick={jumpToIngredient}
+                />
+              </Group>
+              <p className="px-5 pt-2 text-[12px] leading-relaxed" style={{ color: 'var(--label-3)' }}>
+                {t('compareLabelNote')}
+              </p>
+            </>
+          )}
+
           {/* Filter chips -- "All" plus every severity tier that actually
               has members, each carrying its own count. Replaces the old
               per-tier header sections: severity is now shown on every
@@ -1381,6 +1417,7 @@ export default function Result() {
               {(filter === 'all' ? sortedIngredients : filteredIngredients).map((ingredient, i) => (
                 <IngredientCard
                   key={i}
+                  id={`ingredient-card-${ingredients.indexOf(ingredient)}`}
                   ingredient={ingredient}
                   severityLabel={tiers.find((tier) => tier.key === severityOf(ingredient))?.label}
                   style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }}
@@ -1389,20 +1426,6 @@ export default function Result() {
             </Group>
           )}
 
-          {/* Raw label */}
-          {result.ingredientsText && (
-            <>
-              <SectionHeader>{t('asReadFromLabel')}</SectionHeader>
-              <Group>
-                <p className="px-4 py-3.5 text-[13px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: 'var(--label-2)' }}>
-                  {result.ingredientsText}
-                </p>
-              </Group>
-              <p className="px-5 pt-2 text-[13px] leading-relaxed" style={{ color: 'var(--label-3)' }}>
-                {t('compareLabelNote')}
-              </p>
-            </>
-          )}
         </>
       )}
 

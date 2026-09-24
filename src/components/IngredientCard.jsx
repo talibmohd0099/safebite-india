@@ -56,7 +56,7 @@ function DetailRow({ icon, label, children }) {
   );
 }
 
-export default function IngredientCard({ ingredient, severityLabel, style }) {
+export default function IngredientCard({ ingredient, severityLabel, style, id }) {
   const [expanded, setExpanded] = useState(false);
   const severity = getIngredientSeverity(ingredient);
   const isConcerning = severity.label !== 'Fine';
@@ -65,6 +65,7 @@ export default function IngredientCard({ ingredient, severityLabel, style }) {
 
   return (
     <div
+      id={id}
       className="item-in rounded-2xl overflow-hidden"
       style={{
         ...style,

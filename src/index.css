@@ -426,3 +426,27 @@ body {
   .loader-glow, .loader-orbit, .loader-tick, .loader-complete, .verdict-reveal { animation: none; }
   .result-burst { display: none; }
 }
+
+/* Label X-Ray (LabelXray.jsx): one scan pass down the label, the
+   ingredients light up in order behind it, and a tapped ingredient's
+   card flashes once when scrolled to. */
+@keyframes xray-scan {
+  0% { top: -40px; opacity: 0; }
+  15% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+.xray-scan { top: -40px; opacity: 0; animation: xray-scan 1.4s ease-in-out 0.15s 1 both; }
+@keyframes xray-mark {
+  from { opacity: 0.35; filter: saturate(0); }
+  to { opacity: 1; filter: none; }
+}
+.xray-mark { animation: xray-mark 0.5s ease-out both; }
+@keyframes xray-flash {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  30% { box-shadow: 0 0 0 3px var(--tint); }
+}
+.xray-flash { animation: xray-flash 1.2s ease-out 1; }
+@media (prefers-reduced-motion: reduce) {
+  .xray-scan { display: none; }
+  .xray-mark, .xray-flash { animation: none; }
+}

@@ -252,7 +252,7 @@ export const STRINGS = {
     showLess: 'Show less',
 
     asReadFromLabel: 'As read from the label',
-    compareLabelNote: "Compare this against the list above — if something on your pack isn't here, it was missed while reading the label.",
+    compareLabelNote: "Check this against your pack — if something printed there is missing here, it was missed while reading the label.",
 
     storyHistory: 'History & legacy',
     storyWhyUsed: "Why it's used",
@@ -291,6 +291,8 @@ export const STRINGS = {
     sugarCompareOptions: 'Compare other options in this category',
     sugarWhoNote: 'WHO advises keeping free sugars under 10% of daily energy, ideally under 5%.',
     sugarDisclaimer: 'This is just this one product, worked out from its own label — not a prediction about your health.',
+    xrayTitle: 'Label X-Ray',
+    xrayFound: 'Found {found} of {total} ingredients on the label. Tap any one to see why.',
     addsUpTitle: 'What this adds up to',
     addsTabSugar: 'Sugar',
     addsTabSalt: 'Salt',
@@ -542,7 +544,7 @@ export const STRINGS = {
     showLess: 'कम दिखाएं',
 
     asReadFromLabel: 'लेबल पर जैसा लिखा है',
-    compareLabelNote: 'इसे ऊपर की लिस्ट से मिलाकर देखें — अगर आपके पैक पर कुछ ऐसा है जो यहां नहीं है, तो वह लेबल पढ़ते समय छूट गया होगा।',
+    compareLabelNote: 'इसे अपने पैक से मिलाकर देखें — अगर पैक पर छपी कोई चीज़ यहां नहीं है, तो वह लेबल पढ़ते समय छूट गई होगी।',
 
     storyHistory: 'इतिहास और पहचान',
     storyWhyUsed: 'इसका इस्तेमाल क्यों होता है',
@@ -579,6 +581,8 @@ export const STRINGS = {
     sugarCompareOptions: 'इस कैटेगरी के दूसरे विकल्प देखें',
     sugarWhoNote: 'WHO के मुताबिक़ फ्री शुगर रोज़ की ऊर्जा का 10% से कम, बेहतर हो तो 5% से कम होनी चाहिए।',
     sugarDisclaimer: 'यह सिर्फ़ इस एक प्रोडक्ट का हिसाब है, इसके अपने लेबल से — आपकी सेहत के बारे में कोई भविष्यवाणी नहीं।',
+    xrayTitle: 'लेबल का X-Ray',
+    xrayFound: 'लेबल पर {total} में से {found} इंग्रीडिएंट मिले। किसी पर भी टैप करके वजह देखें।',
     addsUpTitle: 'इससे कितना जुड़ता है',
     addsTabSugar: 'चीनी',
     addsTabSalt: 'नमक',
