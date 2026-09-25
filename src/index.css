@@ -450,3 +450,8 @@ body {
   .xray-scan { display: none; }
   .xray-mark, .xray-flash { animation: none; }
 }
+
+/* Score waterfall (ScoreWaterfall.jsx): each bite grows in turn. */
+@keyframes wf-bar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.wf-bar { transform-origin: right center; animation: wf-bar 0.5s ease-out backwards; }
+@media (prefers-reduced-motion: reduce) { .wf-bar { animation: none; } }

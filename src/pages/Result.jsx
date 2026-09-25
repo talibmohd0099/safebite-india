@@ -36,6 +36,8 @@ import LabelXray from '../components/LabelXray';
 import NutritionTrafficLight from '../components/NutritionTrafficLight';
 import { buildTrafficLight } from '../services/trafficLight';
 import { swapSavings } from '../services/swapSavings';
+import { buildScoreWaterfall } from '../services/scoreWaterfall';
+import ScoreWaterfall from '../components/ScoreWaterfall';
 
 // Maps a dailyHabitCheck.js nutrientKey to the matching i18n string keys
 // (see src/i18n/strings.js) for its display name and its three
@@ -658,6 +660,9 @@ export default function Result() {
   const nutrientProjection = result.isInfantFormula ? null : buildNutrientProjections(result);
   // Low/Medium/High tiles for the Nutrition section -- always per 100g/ml.
   const trafficLight = buildTrafficLight(result);
+  // null for infant formula (no score shown) and whenever the steps
+  // can't reproduce the stored score exactly.
+  const scoreWaterfall = result.isInfantFormula ? null : buildScoreWaterfall(result);
   const scrollToAlternatives = () => document.getElementById('alternatives-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   // For the "Why did this score X?" modal -- every ingredient that
@@ -1694,6 +1699,20 @@ export default function Result() {
                   </div>
                 )}
               </div>
+
+              {/* The score as a waterfall -- only when its steps reproduce
+                  the stored score exactly (see scoreWaterfall.js). */}
+              {scoreWaterfall && (
+                <div className="mb-5">
+                  <p className="text-[15px] font-bold" style={{ color: 'var(--label-1)' }}>{t('wfTitle')}</p>
+                  <p className="text-[12px] mb-3" style={{ color: 'var(--label-3)' }}>{t('wfSubtitle')}</p>
+                  <ScoreWaterfall
+                    waterfall={scoreWaterfall}
+                    t={t}
+                    nutrientLabel={result.dailyHabitCheck ? t(HABIT_NUTRIENT_LABEL_KEY[result.dailyHabitCheck.nutrientKey] || 'nutrientTotalFatG') : ''}
+                  />
+                </div>
+              )}
 
               <p className="text-[15px] font-bold" style={{ color: 'var(--label-1)' }}>
                 {t('scoreModalWhatInfluenced')}
