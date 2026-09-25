@@ -455,3 +455,11 @@ body {
 @keyframes wf-bar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .wf-bar { transform-origin: right center; animation: wf-bar 0.5s ease-out backwards; }
 @media (prefers-reduced-motion: reduce) { .wf-bar { animation: none; } }
+
+/* Drink glass (DrinkGlass.jsx): liquid pours in, then the sugar settles. */
+@keyframes glass-pour { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes glass-settle { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.glass-pour, .glass-settle { transform-box: fill-box; }
+.glass-pour { animation: glass-pour 0.9s ease-out backwards; }
+.glass-settle { animation: glass-settle 0.7s ease-out 0.9s backwards; }
+@media (prefers-reduced-motion: reduce) { .glass-pour, .glass-settle { animation: none; } }

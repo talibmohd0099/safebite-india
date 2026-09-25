@@ -13,6 +13,7 @@
 // a warning with no clear action tends to be tuned out, not acted on.
 import { useEffect, useState } from 'react';
 import { accumulate } from '../services/nutrientProjection';
+import DrinkGlass from './DrinkGlass';
 
 const FREQUENCIES = [
   { perWeek: 7, key: 'sugarFreqDaily' },
@@ -75,7 +76,7 @@ function PeriodTile({ label, unitLabel, spoons, grams, color }) {
 const yearAmount = (key, year) => (key === 'fat' ? year.packs : round1(year.grams / 1000));
 
 // "One serving has ≈ N teaspoons of ..." -- the per-serving line, per nutrient.
-function ServingDetail({ item, t, color }) {
+function ServingDetail({ item, t, color, serving }) {
   if (item.key === 'salt') {
     // Salt's WHO limit is a flat 5g, so "% of the day's limit" is fair to
     // say here (and only here -- sugar/fat limits are a share of energy).
@@ -90,6 +91,23 @@ function ServingDetail({ item, t, color }) {
         </p>
         <p className="text-[13px] mt-0.5" style={{ color: 'var(--label-2)' }}>{t('addsSaltPercent', { percent: pct })}</p>
       </>
+    );
+  }
+  // A drink's sugar as the layer it would make in the glass -- more
+  // telling for a drink than a row of spoons (see DrinkGlass.jsx).
+  if (item.key === 'sugar' && serving.unit === 'ml') {
+    return (
+      <div className="flex items-center gap-3.5 mt-2 mb-1">
+        <DrinkGlass servingMl={serving.grams} teaspoons={item.teaspoonsPerServing} color={color} />
+        <div className="min-w-0">
+          <p className="text-[15px] font-bold" style={{ color: 'var(--label-1)' }}>
+            {t('sugarTeaspoons', { tsp: item.teaspoonsPerServing, kind: t(item.isAddedSugar ? 'sugarKindAdded' : 'sugarKindPlain'), grams: item.gramsPerServing })}
+          </p>
+          <p className="text-[12.5px] leading-snug mt-1" style={{ color: 'var(--label-2)' }}>
+            {t('glassSugarShare', { ml: Math.round(item.teaspoonsPerServing * 5), total: serving.grams })}
+          </p>
+        </div>
+      </div>
     );
   }
   const spoonCount = Math.max(1, Math.round(item.teaspoonsPerServing));
@@ -211,7 +229,7 @@ export default function NutrientAddsUp({ projection, t, onShowAlternatives }) {
         )}
       </p>
       <div key={item.key}>
-        <ServingDetail item={item} t={t} color={look.color} />
+        <ServingDetail item={item} t={t} color={look.color} serving={serving} />
       </div>
 
       {/* What it adds up to */}
