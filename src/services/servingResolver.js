@@ -36,7 +36,7 @@ const CATEGORIES = [
   { id: 'candy', re: /\b(candy|candies|toffees?|lollipops?|lollies|gumm(?:y|ies)|jelly beans?|eclairs?|chewing gum|bubble gum|pastilles?)\b/i, standard: 10, unit: 'g', singleServeMax: 15 },
   // "diary milk": a real catalog typo ("Diary Milk Silk") that otherwise
   // read as a 180ml milk drink.
-  { id: 'chocolate', re: /\b(chocolates?|choco|kitkat|dairy milk|diary milk|munch|5 star|perk|truffles?)\b/i, standard: 30, unit: 'g', singleServeMax: 60 },
+  { id: 'chocolate', re: /\b(chocolates?|choco|kitkat|(?<!mother )dairy milk|diary milk|munch|5 star|perk|truffles?)\b/i, standard: 30, unit: 'g', singleServeMax: 60 },
   // "bikis": Britannia Milk Bikis has no "biscuit" in its name, and its
   // "Milk" otherwise matched the milk-drink rule (live: 180ml, 10 tsp).
   { id: 'biscuit', re: /\b(biscuits?|bikis|cookies?|crackers?|rusks?|wafers?|bourbon)\b/i, standard: 20, unit: 'g', singleServeMax: 60 },
@@ -48,7 +48,9 @@ const CATEGORIES = [
   // block is several servings, not one (live: read as one serving = 15
   // tsp of oil's fat). Median real label serving: 28g; only a single
   // cube/slice pack counts as one serving by itself.
-  { id: 'cheese', re: /\b(cheese|paneer)\b/i, standard: 25, unit: 'g', singleServeMax: 30 },
+  { id: 'cheese', re: /\bcheese\b/i, standard: 25, unit: 'g', singleServeMax: 30 },
+  // Its own kind so a cheese snack is never "swapped" for paneer.
+  { id: 'paneer', re: /\bpaneer\b/i, standard: 25, unit: 'g', singleServeMax: 30 },
   // Frozen snack packs (360g nuggets, 400g seekh kebab) are several
   // servings. Median real label serving: 84g. Not bare "frozen" -- frozen
   // peas or grated coconut are cooking ingredients, not snacks.
@@ -134,7 +136,12 @@ const READY_TO_DRINK_RE = /\b(iced|ice tea|cold coffee|cold brew|ready to drink|
 // (live: a 200g frozen grated coconut read as one serving = 17 tsp of
 // oil's fat; a 200ml fresh cream as 11 tsp; a 50g chilli-flakes jar as
 // one serving).
-const COOKING_INGREDIENT_RE = /\b(grated coconut|desiccated coconut|coconut milk|coconut cream|fresh cream|cooking cream|whipping cream|dairy cream|chil+i flakes|oregano|seasoning|spices?)\b/i;
+const COOKING_INGREDIENT_RE = /\b(grated coconut|desiccated coconut|coconut milk|coconut cream|fresh cream|cooking cream|whipping cream|dairy cream|chil+i flakes|oregano|seasoning|spices?|spreads?)\b/i;
+
+// Ayurvedic/herbal juices are taken as a small dose (typically 30ml,
+// often diluted), not drunk by the glass -- live: a seabuckthorn "herbal
+// juice" offered as a swap for a 250ml mango drink.
+const DOSED_JUICE_RE = /\b(herbal|aloe vera|amla|karela|giloy|wheatgrass|noni|sea ?buckthorn|jamun|tulsi|neem)\b[\w\s]*\bjuice\b/i;
 
 /**
  * True for a name that says the product isn't eaten the way it's packed
@@ -146,7 +153,8 @@ export function isNotEatenAsPackedName(name) {
   const n = name || '';
   return MADE_UP_PRODUCT_RE.test(n)
     || (DRY_TEA_COFFEE_RE.test(n) && !READY_TO_DRINK_RE.test(n))
-    || COOKING_INGREDIENT_RE.test(n);
+    || COOKING_INGREDIENT_RE.test(n)
+    || DOSED_JUICE_RE.test(n);
 }
 
 function categoryFor(report) {
@@ -154,6 +162,16 @@ function categoryFor(report) {
   const byName = CATEGORIES.find((c) => c.re.test(name) && (!c.drinkOnly || !report.foodType || DRINK_FOOD_TYPES.has(report.foodType)));
   if (byName) return byName;
   return BY_FOOD_TYPE[report.foodType] || BY_FOOD_TYPE.other;
+}
+
+/**
+ * The specific kind of product by name ('biscuit', 'chocolate',
+ * 'noodles', 'ice-cream'...), or null when the name matches none --
+ * narrower than foodType, which lumps ice cream with curd as 'dairy'.
+ */
+export function productKind(report) {
+  const c = CATEGORIES.find((cat) => cat.re.test(report?.productName || '') && (!cat.drinkOnly || !report.foodType || DRINK_FOOD_TYPES.has(report.foodType)));
+  return c ? c.id : null;
 }
 
 /** A stated serving we can trust: not the per-100 basis, not junk, not a pack weight. */

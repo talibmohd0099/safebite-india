@@ -35,6 +35,7 @@ import NutrientAddsUp from '../components/NutrientAddsUp';
 import LabelXray from '../components/LabelXray';
 import NutritionTrafficLight from '../components/NutritionTrafficLight';
 import { buildTrafficLight } from '../services/trafficLight';
+import { swapSavings } from '../services/swapSavings';
 
 // Maps a dailyHabitCheck.js nutrientKey to the matching i18n string keys
 // (see src/i18n/strings.js) for its display name and its three
@@ -130,7 +131,11 @@ const MAIN_FACTORS_LIMIT = 4;
 // personal ranking could only reshuffle the same three products the
 // general score already picked.
 const ALTERNATIVES_SHOWN = 3;
-const ALTERNATIVES_POOL_SIZE = 12;
+// 60 = everything the category query fetches anyway (productCache.js's
+// getCategoryProducts always reads 60 rows), so a bigger pool costs no
+// extra query -- and the "swap and save" pick (swapSavings.js) needs it:
+// like-for-like swaps are rare among just the top few by score.
+const ALTERNATIVES_POOL_SIZE = 60;
 
 // Short, direct answer to "should I eat this?" shown next to the fork
 // icon in the score hero -- deliberately a different word than the big
@@ -507,6 +512,22 @@ export default function Result() {
         .slice(0, ALTERNATIVES_SHOWN)
         .map(({ item, personalScore }) => ({ ...item, personalScore }))
     : alternatives.slice(0, ALTERNATIVES_SHOWN);
+
+  // "Swap and save": per 100g, what each alternative has less of than
+  // this product (swapSavings.js). The spelled-out best swap is the
+  // first-ranked alternative that also scores higher -- a lower-scoring
+  // "similar product" is never suggested as a swap.
+  const savingsByKey = Object.fromEntries(alternatives.map((item) => [item.lookupKey, swapSavings(result, item)]));
+  // From the WHOLE pool (already sorted best-first), not just the three
+  // cards shown -- the best like-for-like swap is often further down.
+  const bestSwapItem = (result.overallScore || 0) < 65
+    ? alternatives.find((item) => item.score > (result.overallScore || 0) && savingsByKey[item.lookupKey].length > 0)
+    : null;
+  const bestSwap = bestSwapItem && (() => {
+    const parts = savingsByKey[bestSwapItem.lookupKey].map((sv) => t(`swapLess_${sv.key}`, { tsp: sv.teaspoons, grams: sv.grams }));
+    const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} ${t('addsAnd')} ${parts[parts.length - 1]}` : parts[0];
+    return { item: bestSwapItem, list, unit: result.foodType === 'beverage' || result.realNutrientsServingUnit === 'ml' ? 'ml' : 'g' };
+  })();
 
   // Stats, dots and the filter all read from one severity scale, so the
   // counts can never disagree with the colours shown next to each row.
@@ -1316,9 +1337,36 @@ export default function Result() {
           </SectionHeader>
           <div className="flex gap-3 overflow-x-auto px-4 pb-1" style={{ scrollbarWidth: 'none' }}>
             {rankedAlternatives.map((item) => (
-              <ProductStripCard key={item.lookupKey} item={item} onClick={() => openAlternative(item)} />
+              <ProductStripCard
+                key={item.lookupKey}
+                item={item}
+                onClick={() => openAlternative(item)}
+                savingsText={(savingsByKey[item.lookupKey] || []).slice(0, 2).map((s) => t(`swapChip_${s.key}`, { grams: s.grams })).join(' · ') || null}
+              />
             ))}
           </div>
+          {/* The one best swap, spelled out -- the first (best-ranked)
+              alternative that scores higher AND is meaningfully lower in
+              something, per 100g. A concrete "do this instead", not just
+              a row of thumbnails. */}
+          {bestSwap && (
+            <button
+              onClick={() => openAlternative(bestSwap.item)}
+              className="tap-scale mx-4 mt-3 w-[calc(100%-2rem)] rounded-2xl px-3.5 py-3 flex items-start gap-2.5 text-left"
+              style={{ background: 'var(--v-good-bg)' }}
+            >
+              <span className="text-[16px] flex-shrink-0" aria-hidden="true">🔁</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[14px] font-bold leading-snug" style={{ color: 'var(--label-1)' }}>
+                  {t('swapTo', { name: bestSwap.item.productName })} ›
+                </span>
+                <span className="block text-[12.5px] leading-snug mt-0.5" style={{ color: 'var(--label-2)' }}>
+                  {t('swapScores', { alt: bestSwap.item.score, current: result.overallScore })}{' '}
+                  {t('swapPer100', { unit: bestSwap.unit, list: bestSwap.list })}
+                </span>
+              </span>
+            </button>
+          )}
         </>
       )}
 

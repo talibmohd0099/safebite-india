@@ -4,7 +4,7 @@
 import ProductImage from './ProductImage';
 import { getScoreColor } from '../utils/storage';
 
-export default function ProductStripCard({ item, onClick, style }) {
+export default function ProductStripCard({ item, onClick, style, savingsText }) {
   // When a family profile is active, the card carries both scores --
   // general first, personal second ("71 / 68") -- instead of only ever
   // showing the personal one, so it's visible how much (if at all) this
@@ -44,6 +44,11 @@ export default function ProductStripCard({ item, onClick, style }) {
             {hasPersonal ? `${item.score} / ${item.personalScore}` : `${item.score}/100`}
           </span>
         )
+      )}
+      {/* "Swap and save" -- what this alternative has less of, per 100g
+          (see swapSavings.js). Only ever passed on the Result page. */}
+      {savingsText && (
+        <p className="text-[10.5px] font-semibold leading-tight mt-1" style={{ color: 'var(--v-good)' }}>{savingsText}</p>
       )}
     </button>
   );

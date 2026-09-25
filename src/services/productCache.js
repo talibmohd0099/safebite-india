@@ -324,6 +324,13 @@ async function getCategoryProducts({ productName, lookupKey, limit, minScore }) 
       // carrying two more of its fields costs nothing extra.
       ingredients: row.report?.ingredients || [],
       realNutrients: row.report?.realNutrients || null,
+      // For the "swap and save" comparison (swapSavings.js) -- same
+      // already-fetched JSON, no extra query.
+      nutrientsPer100: row.report?.nutrientsPer100 || null,
+      realNutrientsServingGrams: row.report?.realNutrientsServingGrams ?? null,
+      nutritionPanel: row.report?.nutritionPanel || null,
+      foodType: row.report?.foodType || null,
+      isCondimentOrSeasoning: row.report?.isCondimentOrSeasoning || false,
     }))
     .filter((p) => typeof p.score === 'number' && (minScore == null || p.score >= minScore))
     .sort((a, b) => b.score - a.score)
