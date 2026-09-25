@@ -13,6 +13,7 @@
 // disallows /s/* (search); nothing here touches it.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { chromium } from 'playwright';
 import { GEMINI_API_KEYS, callGemini } from './geminiService.js';
 import { isBundleListing } from './bundleListing.js';
 import { optimizeAndUploadBlinkitImage } from './blinkitImageOptimizer.js';
@@ -85,25 +86,73 @@ export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Node's own fetch() gets an immediate 403 from Blinkit -- confirmed on a
 // single isolated request, same IP, same User-Agent, no other requests
 // around it at all, so this was never actually about request volume the
-// way it first looked. curl succeeds on that exact same request every
-// time. That points to their anti-bot check fingerprinting the HTTP
-// client itself (most likely at the TLS/connection level, e.g. JA3/JA4 --
-// curl and Node's fetch have different TLS stacks even with an identical
-// User-Agent header) rather than tracking who's asking or how often.
-// Shelling out to curl changes nothing about what's requested, how often,
-// or from where -- same single IP, same honest User-Agent, same pacing
-// the caller already applies between requests.
+// way it first looked. curl succeeded on that exact same request for a
+// long time. That pointed to their anti-bot check fingerprinting the
+// HTTP client itself (most likely at the TLS/connection level, e.g.
+// JA3/JA4 -- curl and Node's fetch have different TLS stacks even with
+// an identical User-Agent header) rather than tracking who's asking or
+// how often. Shelling out to curl changed nothing about what's
+// requested, how often, or from where -- same single IP, same honest
+// User-Agent, same pacing the caller already applies between requests.
+//
+// 2026-09-25: curl itself started getting 403 too, now with a
+// `Cf-Mitigated: challenge` response header -- Cloudflare escalated from
+// fingerprinting the TLS client to actually serving a JS challenge, which
+// no plain HTTP client (curl or Node's fetch) can execute. A real browser
+// engine (Playwright's headless Chromium) runs that JS and passes it
+// immediately -- confirmed: a single page load gets 200 with no visible
+// CAPTCHA or manual step. Running a full browser for every one of a
+// scrape's thousands of requests would be slow, so instead one browser
+// page load extracts the two cookies the challenge sets (`__cf_bm`,
+// `_cfuvid`) and every curl call after that carries them -- confirmed
+// this alone is enough (curl with no other change than the Cookie header
+// gets 200). `__cf_bm` lasts ~30 minutes, so it's refreshed on a timer
+// and again on the spot if a request still comes back 403 despite having
+// a "fresh" cookie.
+const CF_COOKIE_DOMAIN = 'blinkit.com';
+const CF_COOKIE_MAX_AGE_MS = 20 * 60 * 1000; // refresh before the ~30 min __cf_bm actually expires
+let cfCookies = null; // { header: string, obtainedAt: number }
+let cfCookiesPromise = null; // in-flight refresh, so concurrent callers share one browser launch
+
+async function refreshCloudflareCookies() {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext({ userAgent: USER_AGENT });
+    const page = await context.newPage();
+    await page.goto(SITEMAP_INDEX, { waitUntil: 'domcontentloaded', timeout: 25000 });
+    const cookies = await context.cookies();
+    const header = cookies
+      .filter((c) => c.domain.includes(CF_COOKIE_DOMAIN))
+      .map((c) => `${c.name}=${c.value}`)
+      .join('; ');
+    if (!header) throw new Error('no cookies came back from the challenge page');
+    cfCookies = { header, obtainedAt: Date.now() };
+  } finally {
+    await browser.close();
+  }
+}
+
+/** @param {boolean} [force] - bypass the age check, e.g. after a 403 despite a "fresh" cookie. */
+async function ensureCloudflareCookies(force = false) {
+  if (!force && cfCookies && Date.now() - cfCookies.obtainedAt < CF_COOKIE_MAX_AGE_MS) return;
+  // A concurrent caller reuses the SAME refresh rather than each
+  // launching its own browser -- fetchText calls can overlap (Promise.all
+  // callers elsewhere in the scraper).
+  if (!cfCookiesPromise) {
+    cfCookiesPromise = refreshCloudflareCookies().finally(() => { cfCookiesPromise = null; });
+  }
+  await cfCookiesPromise;
+}
+
 const execFileAsync = promisify(execFile);
 const STATUS_MARKER = '\n__HTTP_STATUS__';
 
 async function curlGet(url) {
-  const { stdout } = await execFileAsync('curl', [
-    '-sS',
-    '--max-time', '20',
-    '-A', USER_AGENT,
-    '-w', `${STATUS_MARKER}%{http_code}`,
-    url,
-  ], { maxBuffer: 25 * 1024 * 1024 });
+  const args = ['-sS', '--max-time', '20', '-A', USER_AGENT];
+  if (cfCookies) args.push('-H', `Cookie: ${cfCookies.header}`);
+  args.push('-w', `${STATUS_MARKER}%{http_code}`, url);
+
+  const { stdout } = await execFileAsync('curl', args, { maxBuffer: 25 * 1024 * 1024 });
 
   const idx = stdout.lastIndexOf(STATUS_MARKER);
   if (idx === -1) throw new Error('curl output missing status marker');
@@ -114,13 +163,17 @@ async function curlGet(url) {
  * Same as fetchText, but returns raw bytes -- for downloading a gallery
  * photo rather than parsing HTML. No retry/status-marker plumbing here:
  * a missing photo just means this one candidate is skipped, not a page
- * worth re-fetching.
+ * worth re-fetching. The Cloudflare cookie is domain-scoped to
+ * blinkit.com and gallery photos are usually served from a separate CDN
+ * host, so it's attached defensively (harmless where it isn't needed)
+ * rather than assumed to be the whole fix for this path.
  */
 async function fetchImageBuffer(url) {
   try {
-    const { stdout } = await execFileAsync('curl', [
-      '-sS', '--max-time', '20', '-A', USER_AGENT, url,
-    ], { maxBuffer: 25 * 1024 * 1024, encoding: 'buffer' });
+    const args = ['-sS', '--max-time', '20', '-A', USER_AGENT];
+    if (cfCookies) args.push('-H', `Cookie: ${cfCookies.header}`);
+    args.push(url);
+    const { stdout } = await execFileAsync('curl', args, { maxBuffer: 25 * 1024 * 1024, encoding: 'buffer' });
     return stdout.length > 0 ? stdout : null;
   } catch {
     return null;
@@ -132,9 +185,15 @@ export async function fetchText(url, retries = 3) {
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
+      await ensureCloudflareCookies();
       const { status, body } = await curlGet(url);
       if (status >= 200 && status < 300) return body;
       lastFailure = `HTTP ${status}`;
+      // A 403 despite a cookie we believe is still fresh means Cloudflare
+      // invalidated it early (or this is the very first call and the
+      // cookie was never actually fetched yet) -- force a real refresh
+      // rather than retrying with the same cookie and failing the same way.
+      if (status === 403) await ensureCloudflareCookies(true);
     } catch (err) {
       lastFailure = `${err.name}: ${err.message}`;
     }

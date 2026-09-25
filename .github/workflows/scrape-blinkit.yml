@@ -13,13 +13,22 @@ name: Scrape Blinkit
 # rather than re-scraping their opening products every time.
 
 on:
-  # Schedule is OFF (2026-09-10): Blinkit is now returning 403 Forbidden
-  # on every request, including from the machine that scraped it
-  # successfully all session — that's an active block, most likely from
-  # request volume during development, not a code problem. Firing every
-  # 2 hours against a site that's already blocking us risks extending
-  # or worsening it. Uncomment once there's reason to believe the block
-  # has lifted (try a manual "Run workflow" first to check).
+  # Schedule is OFF (2026-09-10, still off 2026-09-25): Blinkit was
+  # returning plain 403 Forbidden on every request from 2026-09-10, which
+  # blinkit.js worked around (2026-09-25) by solving Cloudflare's JS
+  # challenge with a real headless browser once per run and reusing the
+  # two cookies it sets for the rest of that run's plain curl requests --
+  # see the comment above refreshCloudflareCookies() there for the full
+  # story. That fix is confirmed working from a residential IP (a real
+  # scrape saved real products). It is NOT yet confirmed from GitHub
+  # Actions' own datacenter IP range, which anti-bot systems generally
+  # score far more suspiciously than a residential one regardless of
+  # whether the JS challenge is solved -- the escalation to a JS
+  # challenge in the first place was most likely a reaction to sustained
+  # automated traffic during development, and a shared CI IP re-running
+  # every 2 hours is exactly the pattern that invites another escalation.
+  # Try a manual "Run workflow" first and confirm it actually saves
+  # products before uncommenting the schedule below.
   #
   # schedule:
   #   - cron: '0 */2 * * *'
@@ -47,6 +56,13 @@ jobs:
           cache: 'npm'
 
       - run: npm ci
+
+      # blinkit.js now needs a real browser to solve Blinkit's Cloudflare
+      # challenge once per run (see this file's schedule comment above and
+      # the comment above refreshCloudflareCookies() in blinkit.js) --
+      # `npm ci` installs the playwright package but not its browser
+      # binary, which is a separate download.
+      - run: npx playwright install --with-deps chromium
 
       - name: Scrape
         env:
