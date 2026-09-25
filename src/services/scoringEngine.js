@@ -81,22 +81,6 @@ function quantityWeight(ingredient) {
   return TRACE_CATEGORIES.has((ingredient.category || '').toLowerCase()) ? 0.5 : 1;
 }
 
-/**
- * Each ingredient's real, quantity-weighted penalty -- exactly what
- * computeScore subtracts from 100. For the score waterfall
- * (scoreWaterfall.js), so it can never describe a different sum.
- */
-export function penaltyContributions(ingredients) {
-  return ingredients.map((ing) => (ing.penalty || 0) * quantityWeight(ing));
-}
-
-/** The caps computeScore / applyRealNutrientCap use, for the waterfall. */
-export const SCORE_CAPS = {
-  harmful: [HARMFUL_SCORE_CAP, HARMFUL_SCORE_FLOOR],
-  concerning: [CONCERNING_SCORE_CAP, CONCERNING_SCORE_FLOOR],
-};
-export { squeezeToCap };
-
 function totalPenaltyOf(ingredients) {
   return ingredients.reduce((sum, ing) => sum + (ing.penalty || 0) * quantityWeight(ing), 0);
 }

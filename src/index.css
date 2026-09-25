@@ -451,7 +451,8 @@ body {
   .xray-mark, .xray-flash { animation: none; }
 }
 
-/* Score waterfall (ScoreWaterfall.jsx): each bite grows in turn. */
+/* Shared "grow in" bar animation -- ScoreWaterfall.jsx originally, now
+   also reused by WeeklyReportCard.jsx's verdict-mix stacked bar. */
 @keyframes wf-bar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .wf-bar { transform-origin: right center; animation: wf-bar 0.5s ease-out backwards; }
 @media (prefers-reduced-motion: reduce) { .wf-bar { animation: none; } }
