@@ -4,6 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { getHistory, clearHistory, getScoreColor } from '../utils/storage';
 import ScoreCircle from '../components/ScoreCircle';
 import ProductImage from '../components/ProductImage';
+import WeeklyReportCard from '../components/WeeklyReportCard';
+import { buildWeeklyReport } from '../services/weeklyReport';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const FILTERS = ['All', 'Good', 'Moderate', 'Caution'];
 
@@ -36,6 +39,7 @@ export default function History() {
   const navigate = useNavigate();
   const [history, setHistory] = useState(getHistory());
   const [filter, setFilter] = useState('All');
+  const { t } = useLanguage();
 
   const handleClearAll = () => {
     if (window.confirm('Clear all scan history? This cannot be undone.')) {
@@ -63,6 +67,8 @@ export default function History() {
   }
 
   const filtered = filter === 'All' ? history : history.filter((e) => bucketFor(e.overallScore || 0) === filter);
+  // "Your week" report card -- null (not shown) with no checks in 7 days.
+  const weekly = buildWeeklyReport(history);
 
   return (
     <div className="page-in max-w-2xl mx-auto px-4 py-6 pb-24">
@@ -78,6 +84,14 @@ export default function History() {
           Clear all
         </button>
       </div>
+
+      {weekly && (
+        <WeeklyReportCard
+          report={weekly}
+          t={t}
+          onOpen={(entry) => navigate(`/result/${entry.id}`, { state: { quiet: true } })}
+        />
+      )}
 
       <button
         onClick={() => navigate('/compare')}
