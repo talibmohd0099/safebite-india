@@ -3,8 +3,10 @@
 // added, Continue where you left off) -- image, name, score badge.
 import ProductImage from './ProductImage';
 import { getScoreColor } from '../utils/storage';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function ProductStripCard({ item, onClick, style, savingsText }) {
+  const { t } = useLanguage();
   // When a family profile is active, the card carries both scores --
   // general first, personal second ("71 / 68") -- instead of only ever
   // showing the personal one, so it's visible how much (if at all) this
@@ -33,7 +35,7 @@ export default function ProductStripCard({ item, onClick, style, savingsText }) 
           className="inline-block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
           style={{ background: 'var(--v-moderate-bg)', color: 'var(--v-moderate)' }}
         >
-          Specialized
+          {t('infantFormulaBadge')}
         </span>
       ) : (
         colors && (

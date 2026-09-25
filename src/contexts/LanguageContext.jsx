@@ -10,14 +10,12 @@ import { STRINGS, interpolate } from '../i18n/strings';
 const STORAGE_KEY = 'safebite-language';
 const LanguageContext = createContext(null);
 
-// Hindi is switched off app-wide for now: the app is still growing new
-// screens every week, and translating each one as it lands means every
-// new feature carries a second, half-checked language with it. One full
-// Hindi pass happens once the feature set settles. Flip this to true to
-// bring the language toggle back -- nothing else needs changing, and
-// everyone's stored language preference is left untouched below, so it
-// comes back exactly as they left it.
-export const HINDI_ENABLED = false;
+// Hindi switched back on (2026-09-25): the full translation pass across
+// every page is happening in stages (see the per-page audit in this
+// commit's message) rather than all at once, but the toggle itself goes
+// live now so finished pages are usable immediately instead of sitting
+// behind a flag until the very last page is done.
+export const HINDI_ENABLED = true;
 
 export function LanguageProvider({ children }) {
   const [language, setLanguageState] = useState(() => {

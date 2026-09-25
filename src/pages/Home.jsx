@@ -18,6 +18,7 @@ import { getTodaysTip } from '../data/didYouKnowTips';
 import { getTodaysFact } from '../services/dailyFactRepo';
 import BarcodeScanner, { isBarcodeScanSupported } from '../components/BarcodeScanner';
 import { useFamily } from '../contexts/FamilyContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // A plain pulsing placeholder block -- shared shape for every home
 // screen section's skeleton, so a section always reserves the same
@@ -49,6 +50,7 @@ function BarcodeIcon() {
 }
 
 export default function Home() {
+  const { t, language } = useLanguage();
   const [searchParams] = useSearchParams();
   const [mode, setMode] = useState('search'); // 'search' | 'text' | 'image' | 'barcode'
   const [text, setText] = useState('');
@@ -246,7 +248,7 @@ export default function Home() {
     try {
       const cached = await getCachedReport(item.lookupKey);
       if (!cached) {
-        setError("Couldn't load that saved report. Try another result, or paste the ingredients instead.");
+        setError(t('homeErrLoadFailed'));
         setLoading(false);
         return;
       }
@@ -254,7 +256,7 @@ export default function Home() {
       const id = saveToHistory(cached, 'search');
       await goToResult(id);
     } catch (err) {
-      setError(err.message || 'Something went wrong. Please try again.');
+      setError(err.message || t('genericErrorRetry'));
       setLoading(false);
     }
   };
@@ -286,18 +288,18 @@ export default function Home() {
       });
       setLoading(false);
     } catch (err) {
-      setError(err.message || 'Something went wrong. Please try again.');
+      setError(err.message || t('genericErrorRetry'));
       setLoading(false);
     }
   };
 
   const handleImageSelect = (file) => {
     if (!file?.type.startsWith('image/')) {
-      setError('Please select a valid image file (JPG, PNG, etc.)');
+      setError(t('homeErrInvalidImage'));
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      setError('Image too large. Please use an image under 5MB.');
+      setError(t('homeErrImageTooLarge'));
       return;
     }
     setImageFile(file);
@@ -327,15 +329,15 @@ export default function Home() {
     const barcodeValue = (scannedCode ?? barcodeInput).trim();
 
     if (mode === 'text' && !text.trim()) {
-      setError('Please paste or type the ingredients list.');
+      setError(t('homeErrPasteText'));
       return;
     }
     if (mode === 'image' && !imageFile) {
-      setError('Please upload a photo of the food label.');
+      setError(t('homeErrUploadPhoto'));
       return;
     }
     if (mode === 'barcode' && !barcodeValue) {
-      setError('Please enter the barcode number (usually below the barcode lines).');
+      setError(t('homeErrEnterBarcode'));
       return;
     }
 
@@ -379,7 +381,7 @@ export default function Home() {
       if (mode === 'image') {
         const extracted = await extractIngredientsFromImage(imageFile);
         if (!extracted.readable && !extracted.ingredientsText) {
-          setError(extracted.notes || "Couldn't read this photo clearly. Try a clearer, closer photo, or paste the ingredients instead.");
+          setError(extracted.notes || t('homeErrUnreadablePhoto'));
           setLoading(false);
           return;
         }
@@ -406,7 +408,7 @@ export default function Home() {
 
         const found = await lookupBarcode(barcodeValue);
         if (!found.found) {
-          setError("This product isn't in the product database yet. Try pasting the ingredients or uploading a photo instead.");
+          setError(t('homeErrNotFound'));
           setNotFoundBarcode(barcodeValue);
           setLoading(false);
           return;
@@ -416,7 +418,7 @@ export default function Home() {
         return;
       }
     } catch (err) {
-      setError(err.message || 'Something went wrong. Please try again.');
+      setError(err.message || t('genericErrorRetry'));
       setLoading(false);
     }
   };
@@ -429,7 +431,7 @@ export default function Home() {
 
   const handleConfirmReview = async () => {
     if (!reviewText.trim()) {
-      setError('Ingredients list is empty. Please add at least one ingredient.');
+      setError(t('homeEmptyIngredientsError'));
       return;
     }
     setError('');
@@ -476,7 +478,7 @@ export default function Home() {
       }
       await goToResult(id);
     } catch (err) {
-      setError(err.message || 'Something went wrong. Please try again.');
+      setError(err.message || t('genericErrorRetry'));
       setLoading(false);
     }
   };
@@ -498,10 +500,10 @@ export default function Home() {
     <div className="mb-5">
       <div className="flex items-center justify-between mb-2 px-0.5">
         <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
-          Shopping Session ({shoppingSession.length})
+          {t('homeShoppingSession', { count: shoppingSession.length })}
         </p>
         <button onClick={clearShoppingSession} className="tap-scale text-xs font-semibold text-red-400 hover:text-red-600 transition-colors">
-          Clear
+          {t('homeClear')}
         </button>
       </div>
       <div className="space-y-2 mb-3">
@@ -518,14 +520,14 @@ export default function Home() {
                 onClick={() => navigate(`/result/${item.historyId}`, { state: { quiet: true } })}
                 className="tap-scale flex-1 min-w-0 text-left text-sm text-slate-700 dark:text-slate-200 truncate"
               >
-                {r.productName || 'Unknown Product'}
+                {r.productName || t('unknownProduct')}
               </button>
               {r.isInfantFormula ? (
                 <span
                   className="flex-shrink-0 text-[10px] font-bold rounded-full px-2 py-0.5"
                   style={{ background: 'var(--v-moderate-bg)', color: 'var(--v-moderate)' }}
                 >
-                  Specialized
+                  {t('infantFormulaBadge')}
                 </span>
               ) : (
                 colors && (
@@ -539,7 +541,7 @@ export default function Home() {
               )}
               <button
                 onClick={() => removeFromShoppingSession(item.historyId)}
-                aria-label="Remove"
+                aria-label={t('ariaRemove')}
                 className="tap-scale flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-slate-400 hover:text-red-500 bg-slate-100 dark:bg-slate-700 transition-colors"
               >
                 ×
@@ -553,7 +555,7 @@ export default function Home() {
           onClick={() => navigate('/compare/result', { state: { products: shoppingSession.map((s) => s.report) } })}
           className="tap-scale w-full py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white text-sm font-bold transition-colors"
         >
-          ⚖️ Compare selected ({shoppingSession.length})
+          ⚖️ {t('homeCompareSelected', { count: shoppingSession.length })}
         </button>
       )}
     </div>
@@ -576,38 +578,36 @@ export default function Home() {
           onClick={cancelReview}
           className="tap-scale inline-flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 mb-4 transition-colors"
         >
-          ← Start over
+          ← {t('homeStartOver')}
         </button>
 
         {shoppingSessionPanel}
 
-        <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-1">Check before we analyze</h1>
+        <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-1">{t('homeCheckBefore')}</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-          {mode === 'image'
-            ? "Small print is easy to misread — please check this matches the pack before we generate your report."
-            : 'This came from an open product database — please check it looks right.'}
+          {mode === 'image' ? t('homeCheckImageDesc') : t('homeCheckBarcodeDesc')}
         </p>
 
         {(!review.readable || review.notes) && (
           <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-xl text-sm text-amber-800 dark:text-amber-300 flex items-start gap-2">
             <span>⚠️</span>
-            <span>{review.notes || 'The photo may not have captured the full ingredients list clearly — please double-check and complete it below.'}</span>
+            <span>{review.notes || t('homeNotesFallback')}</span>
           </div>
         )}
 
         <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
-          Product name (optional)
+          {t('homeProductNameOptional')}
         </label>
         <input
           type="text"
           value={reviewProductName}
           onChange={(e) => setReviewProductName(e.target.value)}
-          placeholder="e.g. Maggi 2-Minute Noodles"
+          placeholder={t('homeProductNamePlaceholder')}
           className="w-full mb-4 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder:text-slate-400 dark:placeholder:text-slate-500"
         />
 
         <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
-          Ingredients list — edit or complete anything that's missing:
+          {t('homeIngredientsEditLabel')}
         </label>
         <textarea
           value={reviewText}
@@ -626,7 +626,7 @@ export default function Home() {
           onClick={handleConfirmReview}
           className="tap-scale w-full mt-4 py-4 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-base rounded-xl transition-colors shadow-md shadow-green-200"
         >
-          ✅ Looks good — Analyze
+          ✅ {t('homeLooksGoodAnalyze')}
         </button>
       </div>
     );
@@ -640,15 +640,15 @@ export default function Home() {
           {/* Hero band -- compact: one headline line and one quiet stats line. */}
           <div className="hero-animated relative -mx-4 px-5 pt-3 pb-8 rounded-b-[24px] overflow-hidden">
             <h1 className="relative text-white text-[21px] leading-tight font-extrabold tracking-tight">
-              Know what's <span className="text-lime-300">in</span> your food.
+              {t('homeHeroPre')}<span className="text-lime-300">{t('homeHeroHighlight')}</span>{t('homeHeroPost')}
             </h1>
             {sectionsLoading ? (
               <div className="relative shimmer-light h-3.5 w-44 rounded-full mt-2" />
             ) : stats && (
               <p className="relative mt-1 flex items-center gap-1.5 text-[12px] text-white/85">
-                <span><span className="font-bold text-white">{stats.total.toLocaleString()}</span> foods checked</span>
+                <span><span className="font-bold text-white">{stats.total.toLocaleString()}</span> {t('homeStatsCheckedSuffix')}</span>
                 <span className="text-white/40" aria-hidden="true">·</span>
-                <span><span className="font-bold text-white">+{stats.addedToday.toLocaleString()}</span> today</span>
+                <span><span className="font-bold text-white">+{stats.addedToday.toLocaleString()}</span> {t('homeStatsTodaySuffix')}</span>
               </p>
             )}
           </div>
@@ -663,8 +663,8 @@ export default function Home() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search food"
-                aria-label="Search food"
+                placeholder={t('homeSearchPlaceholder')}
+                aria-label={t('homeSearchPlaceholder')}
                 autoComplete="off"
                 className="flex-1 min-w-0 text-[15px] font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 bg-transparent focus:outline-none"
               />
@@ -680,21 +680,21 @@ export default function Home() {
                 className="tap-scale flex-1 flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 shadow-sm transition-colors"
               >
                 <BarcodeIcon />
-                <span className="text-sm font-bold">Scan Barcode</span>
+                <span className="text-sm font-bold">{t('homeScanBarcode')}</span>
               </button>
               <button
                 onClick={() => { setMode('image'); setError(''); }}
                 className="tap-scale flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
               >
                 <span className="text-sm">📷</span>
-                <span className="text-xs font-semibold">Photo</span>
+                <span className="text-xs font-semibold">{t('homePhoto')}</span>
               </button>
               <button
                 onClick={() => { setMode('text'); setError(''); }}
                 className="tap-scale flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
               >
                 <span className="text-sm">📄</span>
-                <span className="text-xs font-semibold">Paste</span>
+                <span className="text-xs font-semibold">{t('homePaste')}</span>
               </button>
             </div>
           )}
@@ -711,9 +711,11 @@ export default function Home() {
               <div className="flex items-center gap-2.5 min-w-0">
                 <span className="text-lg flex-shrink-0">🍽️</span>
                 <div className="text-left min-w-0">
-                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Today's intake</p>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{t('homeTodaysIntake')}</p>
                   <p className="text-xs text-slate-400 dark:text-slate-500">
-                    {typeof intakeToday.totals.caloriesKcal === 'number' ? `${Math.round(intakeToday.totals.caloriesKcal)} kcal logged` : `${intakeToday.entryCount} item${intakeToday.entryCount === 1 ? '' : 's'} logged`}
+                    {typeof intakeToday.totals.caloriesKcal === 'number'
+                      ? t('homeKcalLogged', { kcal: Math.round(intakeToday.totals.caloriesKcal) })
+                      : t(intakeToday.entryCount === 1 ? 'homeItemLogged' : 'homeItemsLogged', { count: intakeToday.entryCount })}
                   </p>
                 </div>
               </div>
@@ -737,12 +739,12 @@ export default function Home() {
                     : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
                 }`}
               >
-                <span className="text-sm font-bold">🛒 Shopping Mode</span>
-                <span className="text-xs font-semibold">{shoppingMode ? 'ON — tap to end' : 'OFF — tap to start'}</span>
+                <span className="text-sm font-bold">🛒 {t('homeShoppingMode')}</span>
+                <span className="text-xs font-semibold">{t(shoppingMode ? 'homeShoppingOn' : 'homeShoppingOff')}</span>
               </button>
               {shoppingMode && (
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5 px-1">
-                  Every scan adds to your list below and gets you ready for the next one straight away.
+                  {t('homeShoppingHint')}
                 </p>
               )}
             </div>
@@ -759,14 +761,14 @@ export default function Home() {
             <div className="mb-5">
               <div className="flex items-start justify-between gap-2 mb-2 px-0.5">
                 <div>
-                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Who are you checking food for?</p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">FoodGuard can personalize the result to each family member.</p>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{t('homeWhoFor')}</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{t('homeWhoForDesc')}</p>
                 </div>
                 <button
                   onClick={() => navigate('/family')}
                   className="tap-scale text-xs font-semibold text-green-600 dark:text-green-400 flex-shrink-0 pt-0.5"
                 >
-                  Manage family
+                  {t('homeManageFamily')}
                 </button>
               </div>
               <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
@@ -797,7 +799,7 @@ export default function Home() {
                   onClick={() => navigate('/family')}
                   className="tap-scale flex-shrink-0 flex items-center px-3 py-2 rounded-full text-sm font-semibold bg-slate-100 dark:bg-slate-800 text-green-600 dark:text-green-400"
                 >
-                  + Add person
+                  {t('homeAddPerson')}
                 </button>
               </div>
             </div>
@@ -825,14 +827,14 @@ export default function Home() {
 
           {searchQuery.trim().length === 0 && !sectionsLoading && (spotlight.best || spotlight.worst) && (
             <div className="mb-6">
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">Today's FoodGuard picks</p>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">{t('homeTodaysPicks')}</p>
               <div className="grid grid-cols-2 gap-2.5">
                 {spotlight.best && (
                   <button
                     onClick={() => openCachedSuggestion(spotlight.best)}
                     className="tap-scale flex flex-col gap-1.5 p-3 rounded-2xl bg-green-50 dark:bg-green-950 border border-green-100 dark:border-green-900 text-left"
                   >
-                    <span className="text-[10px] font-bold text-green-700 dark:text-green-400 uppercase tracking-wide">FoodGuard pick</span>
+                    <span className="text-[10px] font-bold text-green-700 dark:text-green-400 uppercase tracking-wide">{t('homeFoodguardPick')}</span>
                     <div className="flex items-center gap-2.5">
                       <ProductImage src={spotlight.best.imageUrl} size={44} expandable={false} />
                       <span className="block min-w-0 flex-1 text-xs font-semibold text-slate-700 dark:text-slate-200 leading-tight line-clamp-2">{spotlight.best.productName}</span>
@@ -855,7 +857,7 @@ export default function Home() {
                     onClick={() => openCachedSuggestion(spotlight.worst)}
                     className="tap-scale flex flex-col gap-1.5 p-3 rounded-2xl bg-red-50 dark:bg-red-950 border border-red-100 dark:border-red-900 text-left"
                   >
-                    <span className="text-[10px] font-bold text-red-700 dark:text-red-400 uppercase tracking-wide">Worth a closer look</span>
+                    <span className="text-[10px] font-bold text-red-700 dark:text-red-400 uppercase tracking-wide">{t('homeWorthCloserLook')}</span>
                     <div className="flex items-center gap-2.5">
                       <ProductImage src={spotlight.worst.imageUrl} size={44} expandable={false} />
                       <span className="block min-w-0 flex-1 text-xs font-semibold text-slate-700 dark:text-slate-200 leading-tight line-clamp-2">{spotlight.worst.productName}</span>
@@ -890,7 +892,7 @@ export default function Home() {
           )}
           {searchQuery.trim().length === 0 && !sectionsLoading && popularTerms.length > 0 && (
             <div className="mb-6">
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">Popular searches</p>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">{t('homePopularSearches')}</p>
               <div className="relative">
                 <div className="flex gap-2 overflow-x-auto pb-1 pr-8" style={{ scrollbarWidth: 'none' }}>
                   {popularTerms.map((term, i) => (
@@ -931,7 +933,7 @@ export default function Home() {
           )}
           {searchQuery.trim().length === 0 && !sectionsLoading && recentlyAdded.length > 0 && (
             <div className="mb-6">
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">Recently analyzed</p>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">{t('homeRecentlyAnalyzed')}</p>
               <div className="relative">
                 <div className="flex gap-3 overflow-x-auto pb-1 pr-8" style={{ scrollbarWidth: 'none' }}>
                   {recentlyAdded.map((item, i) => (
@@ -965,7 +967,7 @@ export default function Home() {
           )}
           {searchQuery.trim().length === 0 && !sectionsLoading && (
             <div className="mb-6">
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">Explore food</p>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2 px-0.5">{t('homeExploreFood')}</p>
               <div className="relative">
                 <div className="flex gap-3 overflow-x-auto pb-1 pr-8" style={{ scrollbarWidth: 'none' }}>
                   {CATEGORIES.map((cat, i) => (
@@ -982,7 +984,7 @@ export default function Home() {
                         className="w-[72px] h-[72px] object-cover rounded-2xl shadow-sm"
                       />
                       <span className="text-[10.5px] font-semibold text-slate-600 dark:text-slate-300 text-center leading-tight line-clamp-2 w-full">
-                        {cat.label}
+                        {language === 'hi' && cat.labelHi ? cat.labelHi : cat.label}
                       </span>
                     </button>
                   ))}
@@ -1008,7 +1010,7 @@ export default function Home() {
               <span className="text-lg flex-shrink-0">💡</span>
               <div className="min-w-0">
                 <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                  <span className="font-bold text-slate-800 dark:text-slate-100">Did you know? </span>
+                  <span className="font-bold text-slate-800 dark:text-slate-100">{t('homeDidYouKnow')} </span>
                   {dailyFact ? dailyFact.shortFact : todaysTip}
                 </p>
                 {dailyFact && (
@@ -1016,7 +1018,7 @@ export default function Home() {
                     onClick={() => setShowFactDetail(true)}
                     className="tap-scale text-xs font-semibold text-green-600 dark:text-green-400 mt-1"
                   >
-                    Learn more
+                    {t('learnMore')}
                   </button>
                 )}
               </div>
@@ -1034,12 +1036,12 @@ export default function Home() {
               >
                 <button
                   onClick={() => setShowFactDetail(false)}
-                  aria-label="Close"
+                  aria-label={t('ariaClose')}
                   className="tap-scale absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-lg bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300"
                 >
                   ×
                 </button>
-                <p className="text-[13px] font-bold text-green-600 dark:text-green-400 pr-8 mb-2">💡 Did you know?</p>
+                <p className="text-[13px] font-bold text-green-600 dark:text-green-400 pr-8 mb-2">💡 {t('homeDidYouKnow')}</p>
                 <p className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 leading-relaxed mb-3">
                   {dailyFact.shortFact}
                 </p>
@@ -1052,7 +1054,7 @@ export default function Home() {
           )}
 
           {searching && (
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 px-1">Searching…</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 px-1">{t('homeSearching')}</p>
           )}
 
           {!searching && searchError && suggestions.cached.length === 0 && suggestions.off.length === 0 && (
@@ -1063,13 +1065,13 @@ export default function Home() {
             suggestions.cached.length === 0 && suggestions.off.length === 0 && (
             <div className="mt-2 mx-1 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-                Can't find "{searchQuery.trim()}"? Scan the label and FoodGuard will analyze and add it.
+                {t('homeCantFind', { query: searchQuery.trim() })}
               </p>
               <button
                 onClick={() => { setMode('image'); setError(''); setSearchQuery(''); }}
                 className="tap-scale w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition-colors"
               >
-                📷 Scan label
+                📷 {t('homeScanLabelBtn')}
               </button>
             </div>
           )}
@@ -1121,7 +1123,7 @@ export default function Home() {
           )}
 
           <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-3 text-center">
-            Powered by a free open product database · already-scored items load instantly
+            {t('homePoweredBy')}
           </p>
         </>
       )}
@@ -1133,7 +1135,7 @@ export default function Home() {
           onClick={() => { setMode('search'); setError(''); }}
           className="tap-scale inline-flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 pt-5 pb-2 transition-colors"
         >
-          ← Back to search
+          ← {t('homeBackToSearch')}
         </button>
       )}
 
@@ -1143,18 +1145,18 @@ export default function Home() {
       {mode === 'text' && (
         <div className="mb-4">
           <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
-            Product name (optional, but helps identify it correctly)
+            {t('homeTextProductNameLabel')}
           </label>
           <input
             type="text"
             value={textProductName}
             onChange={(e) => setTextProductName(e.target.value)}
-            placeholder="e.g. Parle-G Biscuits"
+            placeholder={t('homeTextProductNamePlaceholder')}
             className="w-full mb-4 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder:text-slate-400 dark:placeholder:text-slate-500"
           />
 
           <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
-            Paste the ingredients list from the back of the pack:
+            {t('homeTextPasteLabel')}
           </label>
           <textarea
             value={text}
@@ -1163,7 +1165,7 @@ export default function Home() {
             className="w-full h-44 p-4 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder:text-slate-400 dark:placeholder:text-slate-500"
           />
           <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-            Tip: The ingredient list is usually on the back of the packet in small text.
+            {t('homeTextTip')}
           </p>
         </div>
       )}
@@ -1185,15 +1187,15 @@ export default function Home() {
                   alt="Selected label"
                   className="max-h-48 mx-auto rounded-lg object-contain mb-3"
                 />
-                <p className="text-sm text-green-600 dark:text-green-400 font-medium">✅ Photo selected — tap Analyze to continue</p>
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Click to change photo</p>
+                <p className="text-sm text-green-600 dark:text-green-400 font-medium">✅ {t('homeImageSelected')}</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{t('homeImageChangePhoto')}</p>
               </div>
             ) : (
               <div>
                 <div className="text-5xl mb-3">📸</div>
-                <p className="font-semibold text-slate-700 dark:text-slate-200 mb-1">Drop your food label photo here</p>
-                <p className="text-sm text-slate-400 dark:text-slate-500">or click to choose from your device</p>
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">JPG, PNG, WEBP · Max 5MB</p>
+                <p className="font-semibold text-slate-700 dark:text-slate-200 mb-1">{t('homeImageDropHere')}</p>
+                <p className="text-sm text-slate-400 dark:text-slate-500">{t('homeImageOrClick')}</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">{t('homeImageFormats')}</p>
               </div>
             )}
           </div>
@@ -1205,7 +1207,7 @@ export default function Home() {
             onChange={(e) => handleImageSelect(e.target.files[0])}
           />
           <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
-            💡 Tip: get close, use good light, and if the list wraps around the pack, fit as much as you can in one shot — you'll get to check and complete it before we analyze.
+            💡 {t('homeImageTip')}
           </p>
         </div>
       )}
@@ -1218,11 +1220,11 @@ export default function Home() {
               onClick={() => setShowScanner(true)}
               className="tap-scale w-full mb-3 py-3.5 rounded-xl border-2 border-dashed border-green-300 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-400 font-semibold text-sm flex items-center justify-center gap-2"
             >
-              📷 Scan with camera
+              📷 {t('homeBarcodeScanCamera')}
             </button>
           )}
           <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
-            Or enter the barcode number:
+            {t('homeBarcodeEnterLabel')}
           </label>
           <input
             type="text"
@@ -1233,7 +1235,7 @@ export default function Home() {
             className="w-full p-4 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder:text-slate-400 dark:placeholder:text-slate-500 tracking-widest"
           />
           <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-            The number printed below the barcode lines on the pack. We check it against a free open product database — if it's not listed, you can still paste ingredients or take a photo.
+            {t('homeBarcodeTip')}
           </p>
         </div>
       )}
@@ -1253,7 +1255,7 @@ export default function Home() {
           onClick={() => navigate(`/submit-product?barcode=${notFoundBarcode}`)}
           className="tap-scale w-full mb-4 py-3 rounded-xl border-2 border-dashed border-green-300 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-400 font-semibold text-sm flex items-center justify-center gap-2"
         >
-          📷 Submit this product to FoodGuard
+          📷 {t('homeSubmitProduct')}
         </button>
       )}
 
@@ -1264,7 +1266,7 @@ export default function Home() {
           disabled={loading}
           className="tap-scale w-full py-4 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-base rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-green-200"
         >
-          {mode === 'barcode' ? '🔍 Look Up Product' : '🔍 Analyze Ingredients'}
+          {mode === 'barcode' ? `🔍 ${t('homeLookUpProduct')}` : `🔍 ${t('homeAnalyzeIngredients')}`}
         </button>
       )}
 
