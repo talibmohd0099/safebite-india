@@ -38,6 +38,7 @@ import { buildTrafficLight } from '../services/trafficLight';
 import { swapSavings } from '../services/swapSavings';
 import { buildScoreWaterfall } from '../services/scoreWaterfall';
 import ScoreWaterfall from '../components/ScoreWaterfall';
+import StoryCards from '../components/StoryCards';
 
 // Maps a dailyHabitCheck.js nutrientKey to the matching i18n string keys
 // (see src/i18n/strings.js) for its display name and its three
@@ -1492,110 +1493,8 @@ export default function Result() {
           things to say (see geminiService.js's "story" rules) -- never
           fabricated filler for an unfamiliar generic product, which is
           also why the tab itself only appears when this exists. */}
-      {view === 'story' && displayStory && (
-        <>
-          {displayStory.headline && (
-            <div className="mx-4 mt-4 rounded-[16px] px-5 py-4" style={{ background: 'var(--tint-bg)' }}>
-              <p className="text-[17px] font-bold leading-snug" style={{ color: 'var(--label-1)' }}>
-                {displayStory.headline}
-              </p>
-            </div>
-          )}
-
-          {displayStory.history && (
-            <>
-              <SectionHeader>{t('storyHistory')}</SectionHeader>
-              <Group>
-                <div className="flex gap-3 items-start px-4 py-3.5">
-                  <span
-                    className="w-9 h-9 rounded-[10px] flex-shrink-0 flex items-center justify-center text-[16px]"
-                    style={{ background: 'var(--tint-bg)' }}
-                  >
-                    📜
-                  </span>
-                  <p className="text-[15px] leading-relaxed pt-1" style={{ color: 'var(--label-1)' }}>
-                    {displayStory.history}
-                  </p>
-                </div>
-              </Group>
-            </>
-          )}
-
-          {displayStory.whyItsUsed && (
-            <>
-              <SectionHeader>{t('storyWhyUsed')}</SectionHeader>
-              <Group>
-                <div className="flex gap-3 items-start px-4 py-3.5">
-                  <span
-                    className="w-9 h-9 rounded-[10px] flex-shrink-0 flex items-center justify-center text-[16px]"
-                    style={{ background: 'var(--v-good-bg)' }}
-                  >
-                    ⚙️
-                  </span>
-                  <p className="text-[15px] leading-relaxed pt-1" style={{ color: 'var(--label-1)' }}>
-                    {displayStory.whyItsUsed}
-                  </p>
-                </div>
-              </Group>
-            </>
-          )}
-
-          {displayStory.controversy && (
-            <>
-              <SectionHeader>{t('storyControversy')}</SectionHeader>
-              <Group>
-                <div className="flex gap-3 items-start px-4 py-3.5">
-                  <span
-                    className="w-9 h-9 rounded-[10px] flex-shrink-0 flex items-center justify-center text-[16px]"
-                    style={{ background: 'var(--v-poor-bg)' }}
-                  >
-                    ⚠️
-                  </span>
-                  <p className="text-[15px] leading-relaxed pt-1" style={{ color: 'var(--label-1)' }}>
-                    {displayStory.controversy}
-                  </p>
-                </div>
-              </Group>
-            </>
-          )}
-
-          {displayStory.mythVsFact?.length > 0 && (
-            <>
-              <SectionHeader>{t('storyMythVsFact')}</SectionHeader>
-              <div className="mx-4 space-y-2.5">
-                {displayStory.mythVsFact.map((pair, i) => (
-                  <div key={i} className="rounded-[14px] p-3.5" style={{ background: 'var(--bg-card)' }}>
-                    <div className="flex gap-2.5 items-start mb-2.5">
-                      <span
-                        className="w-5 h-5 mt-0.5 rounded-full flex-shrink-0 flex items-center justify-center text-[11px] font-bold"
-                        style={{ background: 'var(--v-poor-bg)', color: 'var(--v-poor)' }}
-                      >
-                        ✗
-                      </span>
-                      <p className="text-[14px] leading-relaxed" style={{ color: 'var(--label-2)' }}>
-                        <span className="font-semibold" style={{ color: 'var(--label-1)' }}>{t('mythLabel')}</span>
-                        {pair.myth}
-                      </p>
-                    </div>
-                    <div className="flex gap-2.5 items-start">
-                      <span
-                        className="w-5 h-5 mt-0.5 rounded-full flex-shrink-0 flex items-center justify-center text-[11px] font-bold"
-                        style={{ background: 'var(--v-good-bg)', color: 'var(--v-good)' }}
-                      >
-                        ✓
-                      </span>
-                      <p className="text-[14px] leading-relaxed" style={{ color: 'var(--label-1)' }}>
-                        <span className="font-semibold">{t('factLabel')}</span>
-                        {pair.fact}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </>
-      )}
+      {/* Swipeable cards (StoryCards.jsx) -- same story text, one idea per card. */}
+      {view === 'story' && displayStory && <StoryCards story={displayStory} t={t} />}
 
       {/* Verification + disclaimer */}
       <div className="px-5 pt-8 text-center">
