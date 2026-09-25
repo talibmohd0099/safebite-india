@@ -5,7 +5,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCleanupRequest, extractImage, cleanProductPhoto, CLEANUP_PROMPT } from './geminiImageService.js';
+import { buildCleanupRequest, extractImage, cleanProductPhoto, friendlyCleanupError, CLEANUP_PROMPT } from './geminiImageService.js';
 import { GEMINI_API_KEYS } from './geminiService.js';
 
 test('request sends the photo first, then the clean-up instructions, and asks for an image back', () => {
@@ -44,4 +44,17 @@ test('rejects a photo that is not a base64 data URL, before any API call', async
 
 test('fails with a readable message when no API key is configured', { skip: GEMINI_API_KEYS.length > 0 }, async () => {
   await assert.rejects(cleanProductPhoto('data:image/jpeg;base64,AAAA'), /No Gemini API key configured/);
+});
+
+// Confirmed live (2026-09-25): Gemini's free tier has NO allocation at
+// all for image-generation models (every configured key, both models,
+// immediate 429 with this exact wording) -- a billing-plan fact, not a
+// transient quota that retrying would fix, so it gets its own message
+// instead of surfacing the raw "please retry in 3s" API text.
+test('tells the free-tier-has-no-image-quota case apart from a real failure', () => {
+  const real429 = "Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-3.1-flash-image";
+  assert.match(friendlyCleanupError(real429), /paid Gemini plan/);
+  assert.doesNotMatch(friendlyCleanupError(real429), /Please retry/);
+
+  assert.equal(friendlyCleanupError('The model declined to edit this photo.'), 'AI clean-up failed: The model declined to edit this photo.');
 });

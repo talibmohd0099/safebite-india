@@ -158,7 +158,10 @@ export default function PhotoCropModal({ imageUrl, onCropped, onClose }) {
       setSrc(result);
       setCleaned(true);
     } catch (err) {
-      setError(`AI clean-up failed: ${err.message}`);
+      // geminiImageService.js's cleanProductPhoto() already returns a
+      // complete, ready-to-show message (it tells the free-tier-quota
+      // case apart from a genuine failure) -- shown as-is, not re-wrapped.
+      setError(err.message);
     } finally {
       setCleaning(false);
     }

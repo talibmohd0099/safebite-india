@@ -85,5 +85,22 @@ export async function cleanProductPhoto(dataUrl) {
       lastError = err.message || lastError;
     }
   }
-  throw new Error(lastError);
+  throw new Error(friendlyCleanupError(lastError));
+}
+
+// Confirmed live (2026-09-25): every configured key, on both image
+// models, gets this immediately -- Gemini's free tier has NO allocation
+// at all for image-generation models (Google's own pricing page lists
+// both as "Not available" on the free tier), unlike the text model this
+// app otherwise runs on. That's a billing-plan fact, not a quota that
+// retrying, waiting, or rotating keys can work around, so it deserves
+// its own message instead of surfacing the raw "retry in 3s" API text,
+// which reads like a transient problem it isn't.
+const FREE_TIER_IMAGE_UNAVAILABLE_RE = /free_tier|free tier/i;
+
+export function friendlyCleanupError(message) {
+  if (FREE_TIER_IMAGE_UNAVAILABLE_RE.test(message || '')) {
+    return 'AI clean-up needs a paid Gemini plan -- image generation isn’t included in the free tier at all (confirmed on every configured key). Enable billing on the Google Cloud project for a Gemini key, then try again.';
+  }
+  return `AI clean-up failed: ${message}`;
 }
